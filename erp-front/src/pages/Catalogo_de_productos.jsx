@@ -3,11 +3,15 @@ import { useState } from 'react';
 
 function Catalogo_de_productos() {
 
-    <div>
-        <h1>
+    return(
+
+        <div>
+            <h1>
             Hola aca soy el catalogo de productos
-        </h1>
-    </div>
+            </h1>
+        </div>
+
+    );
 
 }
 

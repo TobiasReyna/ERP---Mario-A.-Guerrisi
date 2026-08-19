@@ -3,11 +3,15 @@ import { useState } from 'react';
 
 function Dashboard() {
 
-    <div>
-        <h1>
-            Hola aca soy la parte del dashboard
-        </h1>
-    </div>
+    return(
+
+        <div>
+            <h1>
+                Hola aca soy la parte del dashboard
+            </h1>
+        </div>
+
+    );
 
 }
 
