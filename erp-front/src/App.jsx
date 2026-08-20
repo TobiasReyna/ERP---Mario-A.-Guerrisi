@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 
+//import './App.css';
+
 import Dashboard from './pages/Dashboard';
 import Catalogo_de_productos from './pages/Catalogo_de_productos';
 import Inventario from './pages/Inventario';
@@ -13,10 +15,12 @@ function App() {
 
   return (
     <>
+      
+
       <BrowserRouter>
 
         {/* Acá irá el menú lateral de navegación */}
-
+    
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/Catalogo_De_Productos" element={<Catalogo_de_productos />} />
