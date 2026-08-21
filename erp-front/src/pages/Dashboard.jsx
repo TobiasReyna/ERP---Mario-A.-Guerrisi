@@ -55,7 +55,58 @@ function Dashboard() {
             <div class="stat-label">Movimientos del día</div>
           </div>
         </div>
-        
+        <div className="dashboard-row">
+          <div class="panel">
+            <div class="panel-header">
+              <h3>Stock por categoría</h3>
+              <span class="link">Ver inventario</span>
+            </div>
+            <div class="panel-body">
+              <div class="bar-chart">
+                <div class="bar-row">
+                  <span class="bar-row-label">Guitarras eléctricas</span>
+                  <div class="bar-track"><div class="bar-fill" ></div></div>
+                  <span class="bar-row-value">612</span>
+                </div>
+                <div class="bar-row">
+                  <span class="bar-row-label">Guitarras acústicas</span>
+                  <div class="bar-track"><div class="bar-fill alt" ></div></div>
+                  <span class="bar-row-value">398</span>
+                </div>
+                <div class="bar-row">
+                  <span class="bar-row-label">Bajos</span>
+                  <div class="bar-track"><div class="bar-fill" ></div></div>
+                  <span class="bar-row-value">211</span>
+                </div>
+                <div class="bar-row">
+                  <span class="bar-row-label">Teclados y pianos</span>
+                  <div class="bar-track"><div class="bar-fill alt" ></div></div>
+                  <span class="bar-row-value">487</span>
+                </div>
+                <div class="bar-row">
+                  <span class="bar-row-label">Baterías y percusión</span>
+                  <div class="bar-track"><div class="bar-fill" ></div></div>
+                  <span class="bar-row-value">318</span>
+                </div>
+                <div class="bar-row">
+                  <span class="bar-row-label">Amplificadores</span>
+                  <div class="bar-track"><div class="bar-fill alt" ></div></div>
+                  <span class="bar-row-value">267</span>
+                </div>
+                <div class="bar-row">
+                  <span class="bar-row-label">Micrófonos y audio</span>
+                  <div class="bar-track"><div class="bar-fill"></div></div>
+                  <span class="bar-row-value">743</span>
+                </div>
+                <div class="bar-row">
+                  <span class="bar-row-label">Accesorios</span>
+                  <div class="bar-track"><div class="bar-fill alt"></div></div>
+                  <span class="bar-row-value">806</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
         <div class="panel">
           <div class="panel-header">
             <h3>Últimos movimientos</h3>
