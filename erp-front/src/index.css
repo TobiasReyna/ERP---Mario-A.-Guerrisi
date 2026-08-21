@@ -126,9 +126,15 @@
   /* ===================== MAIN ===================== */
   .main{
     flex:1;
+    flex-grow: 1;
+    justify-content:center;
+    align-items:center;
     display:flex;
     flex-direction:column;
     min-width:0;
+    border-left: 262px solid transparent;
+    display:flex;
+    align-items: flex-start;
   }
 
   /* ===================== TOPBAR ===================== */
@@ -200,9 +206,14 @@
   .user-menu svg{width:14px;height:14px;stroke:var(--gray-500);margin-left:2px;}
 
   /* ===================== CONTENT ===================== */
-  .content{padding:26px 28px 60px 28px;}
+  .content{
+    padding:26px 28px 60px 28px;
+    display:flex;
+    flex-direction:column;
+    gap:26px;
+  }
   .view{display:none;}
-  .view.active{display:block;}
+  .view.active{display:flex;}
 
   .section-heading{
     display:flex;align-items:center;justify-content:space-between;
