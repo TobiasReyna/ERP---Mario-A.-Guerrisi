@@ -1,0 +1,48 @@
+de index.html 
+<style> ya esta pasado (lineas 7-690)
+<body>:
+sidebar: []
+main: 
+	1. topbar []
+	2. content
+		a. Dashboard
+			i. stats-grid[v]
+			ii. dashboard row [x]
+			90% pasado FALTA: style="width:78%" y variaciones que cambian el largo de la barra
+			iii. panel[v]
+		b. catalog
+			i. toolbar []
+			ii. categ rail[]
+			iii. sect heading[]
+			iv. product grid[]
+		c. prod detail
+			i. detail grid[]
+			ii. warehouse stock grid[]
+			iii. dashboard row[]
+		d. inventory
+			i. sect heading[]
+			ii. warehouse tabs[]
+			iii. filter bar[]
+			iv. table panel[]
+		e. movements
+			i. sect heading[]
+			ii. filter bar[]
+			iii. table panel[]
+		f. alerts
+			i. alert sumary card[]
+			ii. sect heading[]
+			iii. alert cards[]
+		g. warehouses
+			i. sect heading[]
+			ii. warehouse grid[]
+			iii. panel[]
+		h. settings
+			i. heading[]
+			ii. placeholder[]
+		i. users
+			i. heading[]
+			ii. table panel[]
+modal:
+	1. heading[]
+	2. body[]
+	3. footer[]
