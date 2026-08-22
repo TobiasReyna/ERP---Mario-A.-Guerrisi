@@ -22,7 +22,7 @@ function Dashboard() {
               <span class="stat-trend up">+4.2%</span>
             </div>
             <div class="stat-value">186</div>
-            <div class="stat-label">Productos registrados</div>
+            <div class="stat-label">Productos en catalogo</div>
           </div>
 
           <div class="stat-card">
@@ -33,7 +33,7 @@ function Dashboard() {
               <span class="stat-trend flat">estable</span>
             </div>
             <div class="stat-value">3.842</div>
-            <div class="stat-label">Unidades en stock total</div>
+            <div class="stat-label">Unidades - stock consolidado</div>
           </div>
 
           <div class="stat-card">
@@ -44,7 +44,7 @@ function Dashboard() {
               <span class="stat-trend down">+2 hoy</span>
             </div>
             <div class="stat-value">12</div>
-            <div class="stat-label">Productos con stock bajo</div>
+            <div class="stat-label">Productos que requieren atención</div>
           </div>
 
           <div class="stat-card">
@@ -61,8 +61,10 @@ function Dashboard() {
         <div className="dashboard-row">
           <div class="panel">
             <div class="panel-header">
-              <h3>Stock por categoría</h3>
+              <h3>Stock consolidado por categoría</h3>
+              <Link to="/Inventario">
               <span class="link">Ver inventario</span>
+              </Link>
             </div>
             <div class="panel-body">
               <div class="bar-chart">
@@ -113,7 +115,11 @@ function Dashboard() {
           <div class="panel">
             <div class="panel-header">
               <h3>Alertas recientes</h3>
+
+              {/*Agregar a futuro el link que conduzca a la nueva página "Alertas y notificaciones"*/}
               <span class="link">Ver todas</span>
+
+
             </div>
             <div class="panel-body">
               <div class="alert-mini">
@@ -163,7 +169,11 @@ function Dashboard() {
         <div class="panel">
           <div class="panel-header">
             <h3>Últimos movimientos</h3>
+            
+            <Link to="/Movimientos">
             <span class="link">Ver historial completo</span>
+            </Link>
+            
           </div>
           <div class="table-scroll">
             <table>

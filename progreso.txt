@@ -3,12 +3,21 @@ de index.html
 <body>:
 sidebar: []
 main:
+-Debido al modelo actualizado, iré agregando los posibles cambios introducidos con ~~
+-[v] completado, [] sin avance registrado, [x] con problemas
 	0. App
 		i. Falta la funcionalidad que permite que los botones cambien a rojo.
 	1. topbar []
+		a. <div class="topbar-left"> []
+			i. Funcionalidad que cambia el titulo []
+		b. <div class="topbar-right">
+			i. <div class="global-search"> [v]
+			ii. <div class="topbar-item"> (~~Notificaciones) []
+			iii. <div class="topbar-item"> (~~Menú de usuario) []
 	2. content
 		a. Dashboard
 			i. stats-grid[v]
+				~~ Ligeros cambios textuales
 			ii. dashboard row [x]
 			90% pasado FALTA: style="width:78%" y variaciones que cambian el largo de la barra
 			iii. panel[v]
