@@ -10,7 +10,8 @@ import Alertas_de_stock from './pages/Alertas_de_stock';
 import Depositos from './pages/Depositos';
 import Configuracion from './pages/Configuracion';
 import Usuarios from './pages/Usuarios';
-import Movimientos from './pages/Movimientos'
+import Movimientos from './pages/Movimientos';
+import Detalle_producto from './pages/Detalle_producto'
 
 function App() {
   
@@ -137,6 +138,7 @@ function App() {
           <Route path="/Configuracion" element={<Configuracion />} />
           <Route path="/Usuarios" element={<Usuarios />} />
           <Route path="/Movimientos" element={<Movimientos />} />
+          <Route path="/Detalle_producto" element={<Detalle_producto />} />
         </Routes>
       </main>
 
