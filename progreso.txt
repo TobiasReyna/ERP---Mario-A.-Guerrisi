@@ -41,7 +41,7 @@ main:
 		g. warehouses
 			i. sect heading[]
 			ii. warehouse grid[]
-			iii. panel[]
+			iii. panel[x] Otro mas que lo mata
 		h. settings
 			i. heading[]
 			ii. placeholder[]
