@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Link } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Link, useNavigate, useLocation} from 'react-router-dom'
 
 //import './App.css';
 
@@ -14,8 +14,14 @@ import Movimientos from './pages/Movimientos'
 
 function App() {
 
+  const navigate = useNavigate();
+  const location = useLocation(); //pie a la funcionalidad de que un boton se vuelva rojo. Es la base para que cambie de color. Pero no funciona esto.
+
   return (
     <>
+
+    {/* Aca estaba antiguamente el top bar */}
+
     <aside class="sidebar">
     <div class="sidebar-brand">
       <div class="brand-mark">
@@ -82,7 +88,8 @@ function App() {
       <div class="sidebar-footer-text">Mario A. Guerrisi<br></br>Instrumentos Musicales &copy; 2026</div>
     </div>
   </aside>
-      
+      <main>
+
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/Catalogo_de_productos" element={<Catalogo_de_productos />} />
@@ -94,6 +101,7 @@ function App() {
           <Route path="/Movimientos" element={<Movimientos />} />
         </Routes>
 
+      </main>
     </>
   );
 }
