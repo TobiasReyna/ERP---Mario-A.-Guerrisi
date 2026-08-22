@@ -25,10 +25,7 @@ function Movimientos() {
           <div class="select-field">Usuario:
             <select><option>Todos</option><option>Juan Pérez</option><option>María Gómez</option><option>Carlos Ruiz</option></select>
           </div>
-          <div class="search-input" style="max-width:240px;">
-            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-            <input type="text" placeholder="Buscar producto o SKU"/>
-          </div>
+          
         </div>
 
         <div class="table-panel">
