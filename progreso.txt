@@ -2,7 +2,9 @@ de index.html
 <style> ya esta pasado (lineas 7-690)
 <body>:
 sidebar: []
-main: 
+main:
+	0. App
+		i. Falta la funcionalidad que permite que los botones cambien a rojo.
 	1. topbar []
 	2. content
 		a. Dashboard

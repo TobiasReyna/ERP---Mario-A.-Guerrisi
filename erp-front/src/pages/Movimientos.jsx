@@ -1,4 +1,12 @@
+import { useState } from 'react';
+
 function Movimientos() {
+
+    const [isOpen, setIsOpen] = useState(false);
+
+  // 2. Funciones para manejar el estado
+  const openModal = () => setIsOpen(true);
+  const closeModal = () => setIsOpen(false);
 
     return (
 
