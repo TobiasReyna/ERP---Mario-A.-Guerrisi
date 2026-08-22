@@ -9,6 +9,35 @@ function Dashboard() {
 
         
         <div className="main">
+
+          <header class="topbar">
+      <div class="topbar-left">
+        <h1 class="topbar-title" id="topbar-title">Dashboard</h1>
+        <span class="topbar-subtitle" id="topbar-subtitle">Resumen general del inventario y el catálogo</span>
+      </div>
+      <div class="topbar-right">
+        <div class="global-search">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+          <input type="text" placeholder="Buscar productos, SKU, movimientos…"></input>
+        </div>
+        <button class="icon-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          <span class="dot"></span>
+        </button>
+        <button class="icon-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+        </button>
+        <div class="user-menu">
+          <div class="avatar">MG</div>
+          <div class="user-meta">
+            <span class="user-name">Administrador</span>
+            <span class="user-role">Depósito Central</span>
+          </div>
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        </div>
+      </div>
+          </header>
+
             <main className="content">
                 <div class="stats-grid">
           <div class="stat-card">
@@ -106,6 +135,56 @@ function Dashboard() {
               </div>
             </div>
           </div>
+
+          <div class="panel">
+            <div class="panel-header">
+              <h3>Alertas recientes</h3>
+              <span class="link">Ver todas</span>
+            </div>
+            <div class="panel-body">
+              <div class="alert-mini">
+                <span class="alert-mini-dot crit"></span>
+                <div class="alert-mini-info">
+                  <div class="alert-mini-name">Pearl Export Series</div>
+                  <div class="alert-mini-sub">Depósito Central · mínimo 4</div>
+                </div>
+                <span class="alert-mini-stock">2 uds.</span>
+              </div>
+              <div class="alert-mini">
+                <span class="alert-mini-dot crit"></span>
+                <div class="alert-mini-info">
+                  <div class="alert-mini-name">Ibanez GSR200</div>
+                  <div class="alert-mini-sub">Depósito Sur · mínimo 6</div>
+                </div>
+                <span class="alert-mini-stock">3 uds.</span>
+              </div>
+              <div class="alert-mini">
+                <span class="alert-mini-dot low"></span>
+                <div class="alert-mini-info">
+                  <div class="alert-mini-name">Fender Stratocaster Player</div>
+                  <div class="alert-mini-sub">Depósito Norte · mínimo 5</div>
+                </div>
+                <span class="alert-mini-stock low">3 uds.</span>
+              </div>
+              <div class="alert-mini">
+                <span class="alert-mini-dot low"></span>
+                <div class="alert-mini-info">
+                  <div class="alert-mini-name">Taylor 214ce</div>
+                  <div class="alert-mini-sub">Depósito Sur · mínimo 6</div>
+                </div>
+                <span class="alert-mini-stock low">4 uds.</span>
+              </div>
+              <div class="alert-mini">
+                <span class="alert-mini-dot low"></span>
+                <div class="alert-mini-info">
+                  <div class="alert-mini-name">Yamaha YTR-2330</div>
+                  <div class="alert-mini-sub">Depósito Norte · mínimo 5</div>
+                </div>
+                <span class="alert-mini-stock low">3 uds.</span>
+              </div>
+            </div>
+          </div>
+
         </div>
         <div class="panel">
           <div class="panel-header">
