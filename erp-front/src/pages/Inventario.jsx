@@ -4,7 +4,7 @@ import { useState } from 'react';
 function Inventario() {
 
     return(
-        <section class="view" id="view-inventory">
+        <div>
             <div class="section-heading">
           <div>
             <h2>Inventario multi-depósito</h2>
@@ -157,7 +157,7 @@ function Inventario() {
           </div>
         </div>
 
-        </section>
+        </div>
     );
 }
 

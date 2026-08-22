@@ -2,7 +2,7 @@ function Movimientos() {
 
     return (
 
-        <section class="view" id="view-movements">
+        <div>
 
         <div class="section-heading">
           <div>
@@ -15,7 +15,7 @@ function Movimientos() {
           </button>
         </div>
 
-        <div class="filter-bar">
+        {/*<div class="filter-bar">
           <div class="select-field">Tipo:
             <select><option>Todos</option><option>Entrada</option><option>Salida</option><option>Ajuste positivo</option><option>Ajuste negativo</option><option>Transferencia</option></select>
           </div>
@@ -25,8 +25,16 @@ function Movimientos() {
           <div class="select-field">Usuario:
             <select><option>Todos</option><option>Juan Pérez</option><option>María Gómez</option><option>Carlos Ruiz</option></select>
           </div>
+<<<<<<< HEAD
           
         </div>
+=======
+          <div class="search-input" style="max-width:240px;">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+            <input type="text" placeholder="Buscar producto o SKU"/>
+          </div>
+        </div>*/}
+>>>>>>> ebf39822b130501563d4a10b454ec3a704140f95
 
         <div class="table-panel">
           <div class="table-scroll">
@@ -111,7 +119,7 @@ function Movimientos() {
             </table>
           </div>
         </div>
-      </section>
+      </div>
 
     );
 }

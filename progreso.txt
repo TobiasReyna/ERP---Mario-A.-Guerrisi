@@ -11,22 +11,26 @@ main:
 			90% pasado FALTA: style="width:78%" y variaciones que cambian el largo de la barra
 			iii. panel[v]
 		b. catalog
-			i. toolbar []
-			ii. categ rail[]
-			iii. sect heading[]
-			iv. product grid[]
+			i. toolbar [v]
+			ii. categ rail[v]
+			iii. sect heading[v]
+			iv. product grid[v]
 		c. prod detail
-			i. detail grid[]
-			ii. warehouse stock grid[]
-			iii. dashboard row[]
+			i. detail grid[v]
+			ii. warehouse stock grid[X] 
+			Los 3 grids que muestran el stock de cada deposito (Central,Norte,Sur), explotan la pagina de detalle
+			iii. dashboard row[v]
+			iv. Boton abrir modal ()
 		d. inventory
-			i. sect heading[]
-			ii. warehouse tabs[]
-			iii. filter bar[]
-			iv. table panel[]
+			i. sect heading[v]
+			ii. warehouse tabs[v]
+			iii. filter bar[v]
+			iv. table panel[v]
+			v. detalle de los botones que cambian a rojo []
 		e. movements
 			i. sect heading[]
-			ii. filter bar[]
+			ii. filter bar[X]
+			Esta parte lo mata la pagina
 			iii. table panel[]
 		f. alerts
 			i. alert sumary card[]
