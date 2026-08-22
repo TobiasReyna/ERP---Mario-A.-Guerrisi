@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
+import { useState } from 'react';
 
-function Detalle_producto(){
+function Detalle_producto() {
 
 
     return(
@@ -63,7 +64,7 @@ function Detalle_producto(){
         </div>
 
         <div class="section-heading"><h2>Stock por depósito</h2></div>
-        <div class="warehouse-stock-grid">
+        {/*<div class="warehouse-stock-grid">
           <div class="wh-stock-card">
             <div class="wh-name">Depósito Central</div>
             <div class="wh-qty">10</div>
@@ -79,7 +80,7 @@ function Detalle_producto(){
             <div class="wh-qty">3</div>
             <div class="wh-bar"><div class="wh-bar-fill" style="width:30%"></div></div>
           </div>
-        </div>
+        </div>*/}
 
         <div class="dashboard-row">
           <div class="panel">
