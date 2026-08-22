@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Link, useNavigate, useLocation} from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom'
 
 //import './App.css';
 
@@ -13,16 +13,18 @@ import Usuarios from './pages/Usuarios';
 import Movimientos from './pages/Movimientos'
 
 function App() {
+  
 
   const navigate = useNavigate();
   const location = useLocation(); //pie a la funcionalidad de que un boton se vuelva rojo. Es la base para que cambie de color. Pero no funciona esto.
 
   return (
-    <>
+    <body>
 
-    {/* Aca estaba antiguamente el top bar */}
+    <div class="app">
 
-    <aside class="sidebar">
+
+      <aside class="sidebar">
     <div class="sidebar-brand">
       <div class="brand-mark">
         <svg viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
@@ -87,9 +89,45 @@ function App() {
     <div class="sidebar-footer">
       <div class="sidebar-footer-text">Mario A. Guerrisi<br></br>Instrumentos Musicales &copy; 2026</div>
     </div>
-  </aside>
-      <main>
+      </aside>
 
+
+
+  <div class="main">
+
+
+      <header class="topbar">
+      <div class="topbar-left">
+        <h1 class="topbar-title" id="topbar-title">Dashboard</h1>
+        <span class="topbar-subtitle" id="topbar-subtitle">Resumen general del inventario y el catálogo</span>
+      </div>
+      <div class="topbar-right">
+        <div class="global-search">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+          <input type="text" placeholder="Buscar productos, SKU, movimientos…"></input>
+        </div>
+        <button class="icon-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          <span class="dot"></span>
+        </button>
+        <button class="icon-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+        </button>
+        <div class="user-menu">
+          <div class="avatar">MG</div>
+          <div class="user-meta">
+            <span class="user-name">Administrador</span>
+            <span class="user-role">Depósito Central</span>
+          </div>
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        </div>
+      </div>
+          </header>
+
+          <main ClassName="content">
+        <div class="stats-grid">
+
+      </div>
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/Catalogo_de_productos" element={<Catalogo_de_productos />} />
@@ -100,9 +138,16 @@ function App() {
           <Route path="/Usuarios" element={<Usuarios />} />
           <Route path="/Movimientos" element={<Movimientos />} />
         </Routes>
-
       </main>
-    </>
+
+
+  </div>
+
+</div>
+
+
+
+      </body>
   );
 }
 

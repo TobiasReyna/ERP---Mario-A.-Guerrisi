@@ -35,6 +35,12 @@
     background:var(--gray-50);
     color:var(--ink);
     -webkit-font-smoothing:antialiased;
+    display:flex;
+    flex-direction:row;
+    min-height:100vh;
+    width:100%;
+    position:relative;
+    top:0;
   }
   h1,h2,h3,h4,p,ul,ol{margin:0;padding:0;}
   ul{list-style:none;}
@@ -45,23 +51,24 @@
   /* ===================== APP SHELL ===================== */
   .app{
     display:flex;
-    min-height:100vh;
-    min-width:1200px;
+    flex-direction:row;
+    width: 100vw;
+    align-items: flex-start;
   }
 
   /* ===================== SIDEBAR ===================== */
   .sidebar{
-    width:252px;
-    flex-shrink:0;
-    background:var(--black);
-    color:var(--white);
-    display:flex;
-    flex-direction:column;
-    padding:24px 0 20px 0;
-    position:sticky;
-    top:0;
-    height:100vh;
-  }
+  width: 252px;
+  flex-shrink: 0; /* Keeps sidebar exactly 252px wide */
+  background: var(--black);
+  color: var(--white);
+  display: flex;
+  flex-direction: column;
+  padding: 24px 0 20px 0;
+  position: sticky;
+  top: 0;
+  height: 100vh; /* Locks sidebar to full screen height */
+}
   .sidebar-brand{
     display:flex;
     align-items:center;
@@ -125,25 +132,21 @@
 
   /* ===================== MAIN ===================== */
   .main{
-    flex:1;
-    flex-grow: 1;
-    justify-content:center;
-    align-items:center;
-    display:flex;
-    flex-direction:column;
-    min-width:0;
-    border-left: 262px solid transparent;
-    display:flex;
-    align-items: flex-start;
-  }
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1; 
+  min-height: 100vh;
+  min-width: 0;
+}
 
   /* ===================== TOPBAR ===================== */
   .topbar{
     height:68px;
+    width:100%;
     background:var(--white);
     border-bottom:1px solid var(--gray-200);
     display:flex;
-    align-items:center;
+    align-items: center;
     justify-content:space-between;
     padding:0 28px;
     position:sticky;
