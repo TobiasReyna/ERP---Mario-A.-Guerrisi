@@ -1,45 +1,75 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { NavLink, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 
 import Dashboard from './pages/Dashboard';
 import Catalogo_de_productos from './pages/Catalogo_de_productos';
 import Inventario from './pages/Inventario';
 import Alertas_de_stock from './pages/Alertas_de_stock';
-import Depositos from './pages/Depositos';
-import Configuracion from './pages/Configuracion';
-import Usuarios from './pages/Usuarios';
 import Movimientos from './pages/Movimientos';
 import Detalle_producto from './pages/Detalle_producto';
-import Modal from './components/Modal';
+import Perfil from './pages/Perfil';
 
 const ROUTE_INFO = {
   '/': { title: 'Dashboard', subtitle: 'Resumen general del inventario y el catálogo' },
-  '/Catalogo_de_productos': { title: 'Catálogo de Productos', subtitle: 'Gestión y listado de instrumentos y accesorios' },
-  '/Inventario': { title: 'Inventario', subtitle: 'Control de existencias y niveles de stock' },
-  '/Movimientos': { title: 'Movimientos', subtitle: 'Registro de entradas, salidas y transferencias' },
-  '/Alertas_de_stock': { title: 'Alertas de Stock', subtitle: 'Productos por debajo del nivel mínimo operativo' },
-  '/Depositos': { title: 'Depósitos', subtitle: 'Ubicaciones físicas y asignación de stock' },
-  '/Configuracion': { title: 'Configuración', subtitle: 'Parámetros del sistema y preferencias' },
-  '/Usuarios': { title: 'Usuarios', subtitle: 'Gestión de accesos, roles y permisos' },
-  '/Detalle_producto': { title: 'Detalle de Producto', subtitle: 'Ficha técnica y desglose por depósito' },
+  '/Catalogo_de_productos': { title: 'Catálogo', subtitle: 'Base maestra de productos — código interno, EAN-13, marca y precio' },
+  '/Inventario': { title: 'Inventario', subtitle: 'Stock comparado entre Tienda Central y Galería Margalef' },
+  '/Movimientos': { title: 'Movimientos', subtitle: 'Entradas, salidas, ajustes y transferencias de stock' },
+  '/Alertas_de_stock': { title: 'Alertas y notificaciones', subtitle: 'Reposición de stock y actividad general del sistema' },
+  '/Detalle_producto': { title: 'Detalle de producto', subtitle: 'Stock por depósito, historial de precios y movimientos' },
+  '/Perfil': { title: 'Mi perfil', subtitle: 'Información de la cuenta y el depósito asignado' },
 };
+
+const INITIAL_NOTIFICATIONS = [
+  { id: 1, type: 'crit', title: 'Stock crítico:', text: 'Fender Stratocaster Player alcanzó el stock mínimo.', time: 'Hace 5 minutos', unread: true },
+  { id: 2, type: 'warn', title: 'Reposición sugerida:', text: 'Yamaha P-145 requiere una reposición de 6 unidades.', time: 'Hace 18 minutos', unread: true },
+  { id: 3, type: 'ok', title: 'Movimiento registrado:', text: 'Se registró un ajuste de stock correctamente.', time: 'Hace 32 minutos', unread: true },
+];
 
 function App() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Estados interactivos del Topbar
-  const [searchQuery, setSearchQuery] = useState('');
+  const [notifications, setNotifications] = useState(INITIAL_NOTIFICATIONS);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
-  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-  const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [isUserOpen, setIsUserOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const notifRef = useRef(null);
+  const userRef = useRef(null);
+
+  const unreadCount = notifications.filter(n => n.unread).length;
 
   const currentRouteInfo = ROUTE_INFO[location.pathname] || {
     title: 'Sistema ERP',
     subtitle: 'Mario A. Guerrisi Instrumentos Musicales',
   };
 
-  const handleSearchSubmit = (e) => {
+  // Cerrar dropdowns al hacer clic fuera
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (notifRef.current && !notifRef.current.contains(e.target)) {
+        setIsNotifOpen(false);
+      }
+      if (userRef.current && !userRef.current.contains(e.target)) {
+        setIsUserOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleMarkAllRead = (e) => {
+    e.stopPropagation();
+    setNotifications(notifications.map(n => ({ ...n, unread: false })));
+  };
+
+  const handleNotifClick = (id) => {
+    setNotifications(notifications.map(n => n.id === id ? { ...n, unread: false } : n));
+    setIsNotifOpen(false);
+    navigate('/Alertas_de_stock');
+  };
+
+  const handleSearchKeyDown = (e) => {
     if (e.key === 'Enter' && searchQuery.trim() !== '') {
       navigate('/Catalogo_de_productos');
     }
@@ -88,7 +118,7 @@ function App() {
               <path d="M20.59 13.41 11 3.83A2 2 0 0 0 9.59 3.24L4 3v5.59a2 2 0 0 0 .59 1.41l9.59 9.59a2 2 0 0 0 2.82 0l3.59-3.59a2 2 0 0 0 0-2.59Z" />
               <circle cx="8" cy="8" r="1.2" />
             </svg>
-            Catálogo de productos
+            Catálogo
           </NavLink>
 
           <NavLink
@@ -121,53 +151,16 @@ function App() {
               <path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
               <path d="M13.73 21a2 2 0 0 1-3.46 0" />
             </svg>
-            Alertas de stock
-          </NavLink>
-
-          <NavLink
-            to="/Depositos"
-            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-          >
-            <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 21V9l9-6 9 6v12" />
-              <path d="M9 21v-6h6v6" />
-            </svg>
-            Depósitos
-          </NavLink>
-        </nav>
-
-        <nav className="nav-group">
-          <div className="nav-group-label">Administración</div>
-
-          <NavLink
-            to="/Configuracion"
-            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-          >
-            <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="3" />
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
-            </svg>
-            Configuración
-          </NavLink>
-
-          <NavLink
-            to="/Usuarios"
-            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-          >
-            <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-              <circle cx="9" cy="7" r="4" />
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-            </svg>
-            Usuarios
+            Alertas y notificaciones
+            <span className="nav-item-badge">10</span>
           </NavLink>
         </nav>
 
         <div className="sidebar-footer">
           <div className="sidebar-footer-text">
             Mario A. Guerrisi<br />
-            Instrumentos Musicales &copy; 2026
+            Instrumentos Musicales &copy; 2026<br />
+            Sprint 1 · v1.1
           </div>
         </div>
       </aside>
@@ -182,7 +175,6 @@ function App() {
           </div>
 
           <div className="topbar-right">
-            {/* BUSCADOR GLOBAL */}
             <div className="global-search">
               <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="11" cy="11" r="7" />
@@ -190,194 +182,144 @@ function App() {
               </svg>
               <input
                 type="text"
-                placeholder="Buscar productos, SKU, movimientos…"
+                placeholder="Buscar por producto, código interno o EAN-13…"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={handleSearchSubmit}
+                onKeyDown={handleSearchKeyDown}
               />
             </div>
 
             {/* NOTIFICACIONES */}
-            <div className="topbar-right-item">
+            <div className="topbar-item" ref={notifRef}>
               <button
                 className="icon-btn"
                 aria-label="Notificaciones"
                 onClick={() => {
                   setIsNotifOpen(!isNotifOpen);
-                  setIsUserMenuOpen(false);
+                  setIsUserOpen(false);
                 }}
               >
                 <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
                   <path d="M13.73 21a2 2 0 0 1-3.46 0" />
                 </svg>
-                <span className="dot"></span>
+                {unreadCount > 0 && <span className="count-badge">{unreadCount}</span>}
               </button>
 
               {isNotifOpen && (
-                <div className="topbar-dropdown notif-dropdown">
-                  <div className="notif-header">
-                    <span>Notificaciones</span>
-                    <span className="badge badge-red"><span className="badge-dot"></span>3 Nuevas</span>
+                <div className="dropdown-panel notif-dropdown open">
+                  <div className="dropdown-head">
+                    <h4>Notificaciones</h4>
+                    {unreadCount > 0 && (
+                      <button className="mark-read" onClick={handleMarkAllRead}>
+                        Marcar todas como leídas
+                      </button>
+                    )}
                   </div>
-                  <div
-                    className="notif-item"
-                    onClick={() => {
-                      setIsNotifOpen(false);
-                      navigate('/Alertas_de_stock');
-                    }}
-                  >
-                    <div>
-                      <div className="notif-title">Stock crítico: Pearl Export Series</div>
-                      <div className="notif-time">Quedan 2 unidades en Depósito Central</div>
-                    </div>
+                  <div className="notif-list">
+                    {notifications.map((n) => (
+                      <div
+                        key={n.id}
+                        className={`notif-item ${n.unread ? 'unread' : ''}`}
+                        onClick={() => handleNotifClick(n.id)}
+                      >
+                        <span className={`notif-dot ${n.type}`}></span>
+                        <div className="notif-body">
+                          <div className="notif-text">
+                            <strong>{n.title}</strong> {n.text}
+                          </div>
+                          <div className="notif-time">{n.time}</div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  <div
-                    className="notif-item"
-                    onClick={() => {
-                      setIsNotifOpen(false);
-                      navigate('/Alertas_de_stock');
-                    }}
-                  >
-                    <div>
-                      <div className="notif-title">Stock crítico: Yamaha YTR-2330</div>
-                      <div className="notif-time">0 unidades en Depósito Sur</div>
-                    </div>
-                  </div>
-                  <div
-                    className="notif-item"
-                    onClick={() => {
-                      setIsNotifOpen(false);
-                      navigate('/Movimientos');
-                    }}
-                  >
-                    <div>
-                      <div className="notif-title">Transferencia pendiente</div>
-                      <div className="notif-time">Cort AD810: Norte → Sur</div>
-                    </div>
+                  <div className="dropdown-foot">
+                    <a
+                      onClick={() => {
+                        setIsNotifOpen(false);
+                        navigate('/Alertas_de_stock');
+                      }}
+                    >
+                      Ver todas las notificaciones
+                    </a>
                   </div>
                 </div>
               )}
             </div>
 
-            {/* AYUDA / INFORMACIÓN */}
-            <button
-              className="icon-btn"
-              aria-label="Ayuda"
-              onClick={() => setIsHelpOpen(true)}
-            >
-              <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10" />
-                <path d="M12 8v4M12 16h.01" />
-              </svg>
-            </button>
-
             {/* MENÚ DE USUARIO */}
-            <div className="topbar-right-item">
-              <div
-                className="user-menu"
-                style={{ cursor: 'pointer' }}
+            <div className="topbar-item" ref={userRef}>
+              <button
+                className="user-menu-trigger"
                 onClick={() => {
-                  setIsUserMenuOpen(!isUserMenuOpen);
+                  setIsUserOpen(!isUserOpen);
                   setIsNotifOpen(false);
                 }}
               >
-                <div className="avatar">MG</div>
+                <div className="avatar">JP</div>
                 <div className="user-meta">
-                  <span className="user-name">Administrador</span>
-                  <span className="user-role">Depósito Central</span>
+                  <span className="user-name">Juan Pérez</span>
+                  <span className="user-role">Encargado de Depósito</span>
                 </div>
-                <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg className="chev" viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="m6 9 6 6 6-6" />
                 </svg>
-              </div>
+              </button>
 
-              {isUserMenuOpen && (
-                <div className="topbar-dropdown user-dropdown">
-                  <div className="user-dropdown-header">
-                    <div style={{ fontWeight: 600, fontSize: '13px' }}>Mario A. Guerrisi</div>
-                    <div className="email">admin@guerrisi-erp.com</div>
+              {isUserOpen && (
+                <div className="dropdown-panel user-dropdown open">
+                  <div className="user-dropdown-head">
+                    <div className="name">Juan Pérez</div>
+                    <div className="role">Encargado de Depósito · Tienda Central</div>
                   </div>
-
-                  <button
-                    className="user-menu-item"
-                    onClick={() => {
-                      setIsUserMenuOpen(false);
-                      navigate('/Configuracion');
-                    }}
-                  >
-                    <svg viewBox="0 0 24 24" fill="none" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
-                    Configuración
-                  </button>
-
-                  <button
-                    className="user-menu-item"
-                    onClick={() => {
-                      setIsUserMenuOpen(false);
-                      navigate('/Usuarios');
-                    }}
-                  >
-                    <svg viewBox="0 0 24 24" fill="none" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
-                    Usuarios y Permisos
-                  </button>
-
-                  <button
-                    className="user-menu-item danger"
-                    onClick={() => {
-                      alert('Sesión cerrada.');
-                      setIsUserMenuOpen(false);
-                    }}
-                  >
-                    <svg viewBox="0 0 24 24" fill="none" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-                    Cerrar sesión
-                  </button>
+                  <div className="user-dropdown-list">
+                    <button
+                      className="user-dropdown-item"
+                      onClick={() => {
+                        setIsUserOpen(false);
+                        navigate('/Perfil');
+                      }}
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                        <circle cx="12" cy="7" r="4" />
+                      </svg>
+                      Mi perfil
+                    </button>
+                    <button
+                      className="user-dropdown-item danger"
+                      onClick={() => {
+                        setIsUserOpen(false);
+                        alert('Sesión cerrada.');
+                      }}
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                        <path d="M16 17l5-5-5-5" />
+                        <path d="M21 12H9" />
+                      </svg>
+                      Cerrar sesión
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
           </div>
         </header>
 
-        {/* CONTENIDO */}
+        {/* CONTENIDO PRINCIPAL */}
         <main className="content">
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/Catalogo_de_productos" element={<Catalogo_de_productos />} />
             <Route path="/Inventario" element={<Inventario />} />
-            <Route path="/Alertas_de_stock" element={<Alertas_de_stock />} />
-            <Route path="/Depositos" element={<Depositos />} />
-            <Route path="/Configuracion" element={<Configuracion />} />
-            <Route path="/Usuarios" element={<Usuarios />} />
             <Route path="/Movimientos" element={<Movimientos />} />
+            <Route path="/Alertas_de_stock" element={<Alertas_de_stock />} />
             <Route path="/Detalle_producto" element={<Detalle_producto />} />
+            <Route path="/Perfil" element={<Perfil />} />
           </Routes>
         </main>
       </div>
-
-      {/* MODAL DE AYUDA */}
-      <Modal
-        isOpen={isHelpOpen}
-        onClose={() => setIsHelpOpen(false)}
-        title="Centro de Ayuda y Atajos"
-        footer={
-          <button className="btn btn-primary" onClick={() => setIsHelpOpen(false)}>
-            Entendido
-          </button>
-        }
-      >
-        <div>
-          <h4 style={{ marginBottom: '8px' }}>Sistema ERP — Mario A. Guerrisi</h4>
-          <p style={{ fontSize: '13px', color: 'var(--gray-700)', lineHeight: '1.5', marginBottom: '16px' }}>
-            Plataforma integral para control de inventario multi-depósito, gestión de catálogo musical y trazabilidad de movimientos.
-          </p>
-
-          <h4 style={{ marginBottom: '8px' }}>Atajos de Navegación</h4>
-          <ul style={{ fontSize: '13px', color: 'var(--gray-700)', lineHeight: '1.8' }}>
-            <li><strong>Búsqueda global:</strong> Escribí en el buscador superior y presioná Enter para ir al catálogo[cite: 2, 6].</li>
-            <li><strong>Cerrar modales:</strong> Podés presionar la tecla <code>Escape</code> o hacer clic fuera de la ventana.</li>
-            <li><strong>Notificaciones:</strong> Hacé clic en la campana para ver alertas de quiebre de stock[cite: 2, 5].</li>
-          </ul>
-        </div>
-      </Modal>
     </div>
   );
 }
