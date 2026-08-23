@@ -1,157 +1,327 @@
-import { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom'
-
-
-//import './App.css';
+import { useState, useEffect, useRef } from 'react';
+import { NavLink, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 
 import Dashboard from './pages/Dashboard';
 import Catalogo_de_productos from './pages/Catalogo_de_productos';
 import Inventario from './pages/Inventario';
 import Alertas_de_stock from './pages/Alertas_de_stock';
-import Depositos from './pages/Depositos';
-import Configuracion from './pages/Configuracion';
-import Usuarios from './pages/Usuarios';
 import Movimientos from './pages/Movimientos';
-import Detalle_producto from './pages/Detalle_producto'
+import Detalle_producto from './pages/Detalle_producto';
+import Perfil from './pages/Perfil';
+
+const ROUTE_INFO = {
+  '/': { title: 'Dashboard', subtitle: 'Resumen general del inventario y el catálogo' },
+  '/Catalogo_de_productos': { title: 'Catálogo', subtitle: 'Base maestra de productos — código interno, EAN-13, marca y precio' },
+  '/Inventario': { title: 'Inventario', subtitle: 'Stock comparado entre Tienda Central y Galería Margalef' },
+  '/Movimientos': { title: 'Movimientos', subtitle: 'Entradas, salidas, ajustes y transferencias de stock' },
+  '/Alertas_de_stock': { title: 'Alertas y notificaciones', subtitle: 'Reposición de stock y actividad general del sistema' },
+  '/Detalle_producto': { title: 'Detalle de producto', subtitle: 'Stock por depósito, historial de precios y movimientos' },
+  '/Perfil': { title: 'Mi perfil', subtitle: 'Información de la cuenta y el depósito asignado' },
+};
+
+const INITIAL_NOTIFICATIONS = [
+  { id: 1, type: 'crit', title: 'Stock crítico:', text: 'Fender Stratocaster Player alcanzó el stock mínimo.', time: 'Hace 5 minutos', unread: true },
+  { id: 2, type: 'warn', title: 'Reposición sugerida:', text: 'Yamaha P-145 requiere una reposición de 6 unidades.', time: 'Hace 18 minutos', unread: true },
+  { id: 3, type: 'ok', title: 'Movimiento registrado:', text: 'Se registró un ajuste de stock correctamente.', time: 'Hace 32 minutos', unread: true },
+];
 
 function App() {
-  
- 
+  const location = useLocation(); 
   const navigate = useNavigate();
-  const location = useLocation(); //pie a la funcionalidad de que un boton se vuelva rojo. Es la base para que cambie de color. Pero no funciona esto.
+
+  const [notifications, setNotifications] = useState(INITIAL_NOTIFICATIONS);
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const [isUserOpen, setIsUserOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const notifRef = useRef(null);
+  const userRef = useRef(null);
+
+  const unreadCount = notifications.filter(n => n.unread).length;
+
+  const currentRouteInfo = ROUTE_INFO[location.pathname] || {
+    title: 'Sistema ERP',
+    subtitle: 'Mario A. Guerrisi Instrumentos Musicales',
+  };
+
+  // Cerrar dropdowns al hacer clic fuera
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (notifRef.current && !notifRef.current.contains(e.target)) {
+        setIsNotifOpen(false);
+      }
+      if (userRef.current && !userRef.current.contains(e.target)) {
+        setIsUserOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleMarkAllRead = (e) => {
+    e.stopPropagation();
+    setNotifications(notifications.map(n => ({ ...n, unread: false })));
+  };
+
+  const handleNotifClick = (id) => {
+    setNotifications(notifications.map(n => n.id === id ? { ...n, unread: false } : n));
+    setIsNotifOpen(false);
+    navigate('/Alertas_de_stock');
+  };
+
+  const handleSearchKeyDown = (e) => {
+    if (e.key === 'Enter' && searchQuery.trim() !== '') {
+      navigate('/Catalogo_de_productos');
+    }
+  };
   
 
   return (
-    <body>
+    <div className="app">
+      {/* SIDEBAR */}
+      <aside className="sidebar">
+        <div className="sidebar-brand">
+          <div className="brand-mark">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 18V5l12-2v13" />
+              <circle cx="6" cy="18" r="3" />
+              <circle cx="18" cy="16" r="3" />
+            </svg>
+          </div>
+          <div className="brand-text">
+            <span className="brand-name">Mario A. Guerrisi</span>
+            <span className="brand-sub">Inventario</span>
+          </div>
+        </div>
 
-    <div class="app">
+        <nav className="nav-group">
+          <div className="nav-group-label">Navegación</div>
 
+          <NavLink
+            to="/"
+            end
+            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+          >
+            <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="7" height="9" rx="1.5" />
+              <rect x="14" y="3" width="7" height="5" rx="1.5" />
+              <rect x="14" y="12" width="7" height="9" rx="1.5" />
+              <rect x="3" y="16" width="7" height="5" rx="1.5" />
+            </svg>
+            Dashboard
+          </NavLink>
 
-      <aside class="sidebar">
-    <div class="sidebar-brand">
-      <div class="brand-mark">
-        <svg viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-      </div>
-      <div class="brand-text">
-        <span class="brand-name">Mario A. Guerrisi</span>
-        <span class="brand-sub">Inventario</span>
-      </div>
-    </div>
+          <NavLink
+            to="/Catalogo_de_productos"
+            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+          >
+            <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20.59 13.41 11 3.83A2 2 0 0 0 9.59 3.24L4 3v5.59a2 2 0 0 0 .59 1.41l9.59 9.59a2 2 0 0 0 2.82 0l3.59-3.59a2 2 0 0 0 0-2.59Z" />
+              <circle cx="8" cy="8" r="1.2" />
+            </svg>
+            Catálogo
+          </NavLink>
 
-    <nav class="nav-group">
-      <div class="nav-group-label">Navegación</div>
+          <NavLink
+            to="/Inventario"
+            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+          >
+            <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 8 12 3 3 8l9 5 9-5Z" />
+              <path d="M3 8v8l9 5 9-5V8" />
+              <path d="M12 13v8" />
+            </svg>
+            Inventario
+          </NavLink>
 
-      
-      <button class="nav-item active" data-view="dashboard" onClick={() => navigate('/')}>
-        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
-        Dashboard
-      </button>
-      
+          <NavLink
+            to="/Movimientos"
+            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+          >
+            <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M7 7h13l-3-3M17 17H4l3 3" />
+            </svg>
+            Movimientos
+          </NavLink>
 
-      <button class="nav-item" data-view="catalog" onClick={() => navigate('/Catalogo_de_productos')}>
-        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41 11 3.83A2 2 0 0 0 9.59 3.24L4 3v5.59a2 2 0 0 0 .59 1.41l9.59 9.59a2 2 0 0 0 2.82 0l3.59-3.59a2 2 0 0 0 0-2.59Z"/><circle cx="8" cy="8" r="1.2"/></svg>
-        Catálogo de productos
-      </button>
+          <NavLink
+            to="/Alertas_de_stock"
+            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+          >
+            <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+            </svg>
+            Alertas y notificaciones
+            <span className="nav-item-badge">10</span>
+          </NavLink>
+        </nav>
 
-      <button class="nav-item" data-view="inventory" onClick={() => navigate('/Inventario')}>
-        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8l9 5 9-5Z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>
-        Inventario
-      </button>
-
-      <button class="nav-item" data-view="movements" onClick={() => navigate('/Movimientos')}>
-        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h13l-3-3M17 17H4l3 3"/></svg>
-        Movimientos
-      </button>
-
-      <button class="nav-item" data-view="alerts" onClick={() => navigate('/Alertas_de_stock')}>
-        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-        Alertas de stock
-      </button>
-
-      <button class="nav-item" data-view="warehouses" onClick={() => navigate('/Depositos')}>
-        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21V9l9-6 9 6v12"/><path d="M9 21v-6h6v6"/></svg>
-        Depósitos
-      </button>
-    </nav>
-
-    <nav class="nav-group">
-      <div class="nav-group-label">Administración</div>
-
-      <button class="nav-item" data-view="settings" onClick={() => navigate('/Configuracion')}>
-        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
-        Configuración
-      </button>
-
-      <button class="nav-item" data-view="users" onClick={() => navigate('/Usuarios')}>
-        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-        Usuarios
-      </button>
-
-    </nav>
-
-    <div class="sidebar-footer">
-      <div class="sidebar-footer-text">Mario A. Guerrisi<br></br>Instrumentos Musicales &copy; 2026</div>
-    </div>
+        <div className="sidebar-footer">
+          <div className="sidebar-footer-text">
+            Mario A. Guerrisi<br />
+            Instrumentos Musicales &copy; 2026<br />
+            Sprint 1 · v1.1
+          </div>
+        </div>
       </aside>
 
-
-
-  <div class="main">
-
-
-      <header class="topbar">
-      <div class="topbar-left">
-        <h1 class="topbar-title" id="topbar-title">Dashboard</h1>
-        <span class="topbar-subtitle" id="topbar-subtitle">Resumen general del inventario y el catálogo</span>
-      </div>
-      <div class="topbar-right">
-        <div class="global-search">
-          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-          <input type="text" placeholder="Buscar productos, SKU, movimientos…"></input>
-        </div>
-        <button class="icon-btn">
-          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-          <span class="dot"></span>
-        </button>
-        <button class="icon-btn">
-          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
-        </button>
-        <div class="user-menu">
-          <div class="avatar">MG</div>
-          <div class="user-meta">
-            <span class="user-name">Administrador</span>
-            <span class="user-role">Depósito Central</span>
+      {/* MAIN */}
+      <div className="main">
+        {/* TOPBAR */}
+        <header className="topbar">
+          <div className="topbar-left">
+            <h1 className="topbar-title">{currentRouteInfo.title}</h1>
+            <span className="topbar-subtitle">{currentRouteInfo.subtitle}</span>
           </div>
-          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
-        </div>
+
+          <div className="topbar-right">
+            <div className="global-search">
+              <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="7" />
+                <path d="m21 21-4.3-4.3" />
+              </svg>
+              <input
+                type="text"
+                placeholder="Buscar por producto, código interno o EAN-13…"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={handleSearchKeyDown}
+              />
+            </div>
+
+            {/* NOTIFICACIONES */}
+            <div className="topbar-item" ref={notifRef}>
+              <button
+                className="icon-btn"
+                aria-label="Notificaciones"
+                onClick={() => {
+                  setIsNotifOpen(!isNotifOpen);
+                  setIsUserOpen(false);
+                }}
+              >
+                <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+                  <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                </svg>
+                {unreadCount > 0 && <span className="count-badge">{unreadCount}</span>}
+              </button>
+
+              {isNotifOpen && (
+                <div className="dropdown-panel notif-dropdown open">
+                  <div className="dropdown-head">
+                    <h4>Notificaciones</h4>
+                    {unreadCount > 0 && (
+                      <button className="mark-read" onClick={handleMarkAllRead}>
+                        Marcar todas como leídas
+                      </button>
+                    )}
+                  </div>
+                  <div className="notif-list">
+                    {notifications.map((n) => (
+                      <div
+                        key={n.id}
+                        className={`notif-item ${n.unread ? 'unread' : ''}`}
+                        onClick={() => handleNotifClick(n.id)}
+                      >
+                        <span className={`notif-dot ${n.type}`}></span>
+                        <div className="notif-body">
+                          <div className="notif-text">
+                            <strong>{n.title}</strong> {n.text}
+                          </div>
+                          <div className="notif-time">{n.time}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="dropdown-foot">
+                    <a
+                      onClick={() => {
+                        setIsNotifOpen(false);
+                        navigate('/Alertas_de_stock');
+                      }}
+                    >
+                      Ver todas las notificaciones
+                    </a>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* MENÚ DE USUARIO */}
+            <div className="topbar-item" ref={userRef}>
+              <button
+                className="user-menu-trigger"
+                onClick={() => {
+                  setIsUserOpen(!isUserOpen);
+                  setIsNotifOpen(false);
+                }}
+              >
+                <div className="avatar">JP</div>
+                <div className="user-meta">
+                  <span className="user-name">Juan Pérez</span>
+                  <span className="user-role">Encargado de Depósito</span>
+                </div>
+                <svg className="chev" viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+              </button>
+
+              {isUserOpen && (
+                <div className="dropdown-panel user-dropdown open">
+                  <div className="user-dropdown-head">
+                    <div className="name">Juan Pérez</div>
+                    <div className="role">Encargado de Depósito · Tienda Central</div>
+                  </div>
+                  <div className="user-dropdown-list">
+                    <button
+                      className="user-dropdown-item"
+                      onClick={() => {
+                        setIsUserOpen(false);
+                        navigate('/Perfil');
+                      }}
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                        <circle cx="12" cy="7" r="4" />
+                      </svg>
+                      Mi perfil
+                    </button>
+                    <button
+                      className="user-dropdown-item danger"
+                      onClick={() => {
+                        setIsUserOpen(false);
+                        alert('Sesión cerrada.');
+                      }}
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                        <path d="M16 17l5-5-5-5" />
+                        <path d="M21 12H9" />
+                      </svg>
+                      Cerrar sesión
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </header>
+
+        {/* CONTENIDO PRINCIPAL */}
+        <main className="content">
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/Catalogo_de_productos" element={<Catalogo_de_productos />} />
+            <Route path="/Inventario" element={<Inventario />} />
+            <Route path="/Movimientos" element={<Movimientos />} />
+            <Route path="/Alertas_de_stock" element={<Alertas_de_stock />} />
+            <Route path="/Detalle_producto" element={<Detalle_producto />} />
+            <Route path="/Perfil" element={<Perfil />} />
+          </Routes>
+        </main>
       </div>
-          </header>
-
-          <main ClassName="content">
-        <div class="stats-grid">
-
-      </div>
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/Catalogo_de_productos" element={<Catalogo_de_productos />} />
-          <Route path="/Inventario" element={<Inventario />} />
-          <Route path="/Alertas_de_stock" element={<Alertas_de_stock />} />
-          <Route path="/Depositos" element={<Depositos />} />
-          <Route path="/Configuracion" element={<Configuracion />} />
-          <Route path="/Usuarios" element={<Usuarios />} />
-          <Route path="/Movimientos" element={<Movimientos />} />
-          <Route path="/Detalle_producto" element={<Detalle_producto />} />
-        </Routes>
-      </main>
-
-
-  </div>
-
-</div>
-
-
-
-      </body>
+    </div>
   );
 }
 
