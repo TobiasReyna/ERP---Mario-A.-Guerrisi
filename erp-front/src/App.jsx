@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom'
 
+
 //import './App.css';
 
 import Dashboard from './pages/Dashboard';
@@ -15,9 +16,10 @@ import Detalle_producto from './pages/Detalle_producto'
 
 function App() {
   
-
+ 
   const navigate = useNavigate();
   const location = useLocation(); //pie a la funcionalidad de que un boton se vuelva rojo. Es la base para que cambie de color. Pero no funciona esto.
+  
 
   return (
     <body>

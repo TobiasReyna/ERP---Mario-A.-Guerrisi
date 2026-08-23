@@ -1,9 +1,36 @@
-import { Link } from 'react-router-dom';
-import { useState } from 'react';
+import { data, Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 
+import { supabase } from '../config/supabaseClient.js'; // Importa el cliente de Supabase desde supabaseClient.js
 //import '../index.css';
 
-function Dashboard() {
+    
+export default function Dashboard() {
+  const [datos, setDatos] = useState([])
+  const [cargando, setCargando] = useState(true)
+  async function traerDatos() {
+    try {
+      const { data, error } = await supabase
+        .from('articulos') // Reemplaza por tu tabla real
+        .select('*')
+        
+
+      if (error) throw error
+      
+      setDatos(data) // Guardás los datos en el estado
+    } catch (error) {
+      console.error('Error:', error.message)
+    } finally {
+      setCargando(false) // Avisás que ya terminó de cargar
+    }
+  }
+
+  // 4. Usás useEffect para que la función se ejecute una sola vez al abrir la página
+  useEffect(() => {
+    traerDatos()
+  }, [])
+    
+
 
     return(
 
@@ -21,7 +48,7 @@ function Dashboard() {
               </div>
               <span class="stat-trend up">+4.2%</span>
             </div>
-            <div class="stat-value">186</div>
+            <div class="stat-value">{datos[0]?.id || 0}</div>
             <div class="stat-label">Productos en catalogo</div>
           </div>
 
@@ -234,4 +261,3 @@ function Dashboard() {
 
 }
 
-export default Dashboard;
