@@ -696,3 +696,201 @@
   .stock-preview .sp-item .n{font-size:18px;font-weight:800;color:var(--black);}
   .stock-preview .sp-item .l{font-size:10.5px;color:var(--gray-500);text-transform:uppercase;margin-top:2px;}
   .stock-preview .sp-arrow{color:var(--gray-500);font-size:16px;}
+
+  /* ===================== EFECTOS DE BOTONES (HOVER & ACTIVE) ===================== */
+
+/* Base para transiciones suaves y efecto de clic */
+button, .btn, .category-chip, .warehouse-tab, .icon-btn {
+  transition: all 0.15s ease-in-out;
+  user-select: none;
+}
+
+/* Efecto de presionado general (al hacer clic) */
+button:active, .btn:active, .category-chip:active, .warehouse-tab:active, .icon-btn:active {
+  transform: scale(0.97);
+}
+
+/* Botón Primario (Rojo) */
+.btn-primary {
+  background: var(--red);
+  color: var(--white);
+}
+.btn-primary:hover {
+  background: var(--red-dark);
+  box-shadow: 0 4px 12px rgba(227, 49, 65, 0.25);
+}
+.btn-primary:active {
+  background: #A01724;
+}
+
+/* Botón Secundario / Outline */
+.btn-outline {
+  background: var(--white);
+  color: var(--ink);
+  border: 1px solid var(--gray-300);
+}
+.btn-outline:hover {
+  background: var(--gray-100);
+  border-color: var(--gray-500);
+  color: var(--black);
+}
+.btn-outline:active {
+  background: var(--gray-200);
+}
+
+/* Botones de acción semánticos adicionales */
+.btn-success {
+  background: var(--green);
+  color: var(--white);
+}
+.btn-success:hover {
+  background: #178048;
+  box-shadow: 0 4px 12px rgba(30, 158, 90, 0.25);
+}
+.btn-success:active {
+  background: #116337;
+}
+
+.btn-danger {
+  background: var(--crit);
+  color: var(--white);
+}
+.btn-danger:hover {
+  background: var(--red-dark);
+  box-shadow: 0 4px 12px rgba(210, 46, 60, 0.25);
+}
+.btn-danger:active {
+  background: #961722;
+}
+
+/* Botón Icono (Topbar) */
+.icon-btn:hover {
+  background: var(--gray-100);
+  border-color: var(--gray-400);
+}
+.icon-btn:active {
+  background: var(--gray-200);
+}
+
+/* Chips y Pestañas al pasar el cursor */
+.category-chip:hover, .warehouse-tab:hover {
+  border-color: var(--black);
+  color: var(--black);
+}
+
+/* Animación de apertura para la ventana emergente */
+.modal {
+  animation: modalFadeIn 0.2s ease-out;
+}
+
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ===================== TOPBAR DROPDOWNS & MENUS ===================== */
+.topbar-right-item {
+  position: relative;
+}
+
+.topbar-dropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  z-index: 50;
+  overflow: hidden;
+  animation: modalFadeIn 0.15s ease-out;
+}
+
+/* Menú de notificaciones */
+.notif-dropdown {
+  width: 320px;
+}
+.notif-header {
+  padding: 12px 16px;
+  background: var(--gray-50);
+  border-bottom: 1px solid var(--gray-200);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 700;
+}
+.notif-item {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--gray-100);
+  display: flex;
+  gap: 10px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.notif-item:hover {
+  background: var(--gray-50);
+}
+.notif-item:last-child {
+  border-bottom: none;
+}
+.notif-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--black);
+}
+.notif-time {
+  font-size: 11px;
+  color: var(--gray-500);
+  margin-top: 2px;
+}
+
+/* Menú de usuario */
+.user-dropdown {
+  width: 220px;
+  padding: 6px 0;
+}
+.user-dropdown-header {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--gray-100);
+  margin-bottom: 4px;
+}
+.user-dropdown-header .email {
+  font-size: 11.5px;
+  color: var(--gray-500);
+}
+.user-menu-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 16px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--gray-700);
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+}
+.user-menu-item:hover {
+  background: var(--gray-100);
+  color: var(--black);
+}
+.user-menu-item svg {
+  width: 15px;
+  height: 15px;
+  stroke: var(--gray-500);
+}
+.user-menu-item.danger {
+  color: var(--crit);
+}
+.user-menu-item.danger svg {
+  stroke: var(--crit);
+}
