@@ -1,456 +1,419 @@
-import { useNavigate} from 'react-router-dom'
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import Modal from '../components/Modal';
+
+const INITIAL_PRODUCTS = [
+  { id: 1, name: 'Stratocaster Player', brand: 'Fender', category: 'Guitarras eléctricas', model: 'Modelo MX23 · 3-Color Sunburst', sku: 'GTR-FEN-001', price: 1250000, stock: 16, status: 'Disponible' },
+  { id: 2, name: 'Les Paul Studio', brand: 'Gibson', category: 'Guitarras eléctricas', model: 'Modelo LPS · Ebony', sku: 'GTR-GIB-002', price: 2480000, stock: 7, status: 'Disponible' },
+  { id: 3, name: 'AD810', brand: 'Cort', category: 'Guitarras acústicas', model: 'Dreadnought · Natural', sku: 'GTR-COR-007', price: 310000, stock: 27, status: 'Disponible' },
+  { id: 4, name: '214ce', brand: 'Taylor', category: 'Guitarras acústicas', model: 'Grand Auditorium · Cutaway', sku: 'GTR-TAY-008', price: 980000, stock: 4, status: 'Stock bajo' },
+  { id: 5, name: 'Player Jazz Bass', brand: 'Fender', category: 'Bajos', model: 'Modelo PJB · 3-Color Sunburst', sku: 'BAJ-FEN-009', price: 1150000, stock: 10, status: 'Disponible' },
+  { id: 6, name: 'GSR200', brand: 'Ibanez', category: 'Bajos', model: 'Modelo GSR200 · Black', sku: 'BAJ-IBA-010', price: 420000, stock: 3, status: 'Crítico' },
+  { id: 7, name: 'P-145', brand: 'Yamaha', category: 'Pianos', model: 'Piano digital 88 teclas', sku: 'KEY-YAM-003', price: 650000, stock: 19, status: 'Disponible' },
+  { id: 8, name: 'B2', brand: 'Korg', category: 'Teclados', model: 'Piano digital compacto', sku: 'KEY-KOR-011', price: 480000, stock: 12, status: 'Disponible' },
+  { id: 9, name: 'TD-17', brand: 'Roland', category: 'Baterías', model: 'Batería electrónica', sku: 'BAT-ROL-006', price: 2150000, stock: 5, status: 'Disponible' },
+  { id: 10, name: 'Export Series', brand: 'Pearl', category: 'Baterías', model: 'Batería acústica 5 piezas', sku: 'BAT-PEA-012', price: 1680000, stock: 2, status: 'Crítico' },
+  { id: 11, name: 'Cajón Peruano', brand: 'LP', category: 'Percusión', model: 'Serie Americana', sku: 'PER-LPX-013', price: 1850000, stock: 33, status: 'Disponible' },
+  { id: 12, name: 'MG30GFX', brand: 'Marshall', category: 'Amplificadores', model: 'Amplificador de guitarra 30W', sku: 'AMP-MAR-005', price: 520000, stock: 11, status: 'Disponible' },
+  { id: 13, name: 'SM58', brand: 'Shure', category: 'Micrófonos', model: 'Micrófono dinámico vocal', sku: 'MIC-SHR-004', price: 195000, stock: 44, status: 'Disponible' },
+  { id: 14, name: 'HS5', brand: 'Yamaha', category: 'Audio', model: 'Monitor de estudio activo', sku: 'AUD-YAM-014', price: 340000, stock: 7, status: 'Disponible' },
+  { id: 15, name: 'Correa + Púas Kit', brand: 'Dunlop', category: 'Accesorios', model: 'Set accesorios guitarra', sku: 'ACC-DUN-015', price: 28000, stock: 70, status: 'Disponible' },
+  { id: 16, name: 'YTR-2330', brand: 'Yamaha', category: 'Instrumentos de viento', model: 'Trompeta Bb estudiante', sku: 'VIE-YAM-016', price: 890000, stock: 3, status: 'Stock bajo' },
+];
+
+const CATEGORIES = [
+  'Todas', 'Guitarras eléctricas', 'Guitarras acústicas', 'Bajos', 'Teclados',
+  'Pianos', 'Baterías', 'Percusión', 'Amplificadores', 'Micrófonos', 'Audio',
+  'Accesorios', 'Instrumentos de viento'
+];
 
 function Catalogo_de_productos() {
+  const navigate = useNavigate();
 
-    const navigate = useNavigate();
+  // Estados de filtros y vistas
+  const [products, setProducts] = useState(INITIAL_PRODUCTS);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedBrand, setSelectedBrand] = useState('Todas');
+  const [selectedStatus, setSelectedStatus] = useState('Todas');
+  const [sortBy, setSortBy] = useState('relevantes');
+  const [activeCategory, setActiveCategory] = useState('Todas');
+  const [viewMode, setViewMode] = useState('grid'); // 'grid' o 'table'
 
-    return(
+  // Estado para el modal de nuevo producto
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [newProduct, setNewProduct] = useState({
+    name: '',
+    brand: 'Fender',
+    category: 'Guitarras eléctricas',
+    model: '',
+    sku: '',
+    price: '',
+    stock: '',
+    status: 'Disponible'
+  });
 
-        <main class="content">
+  // Filtrado y ordenamiento en tiempo real
+  const filteredProducts = useMemo(() => {
+    return products
+      .filter((item) => {
+        const matchesCategory = activeCategory === 'Todas' || item.category === activeCategory;
+        const matchesBrand = selectedBrand === 'Todas' || item.brand === selectedBrand;
+        const matchesStatus = selectedStatus === 'Todas' || item.status === selectedStatus;
+        const matchesSearch =
+          item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          item.brand.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          item.sku.toLowerCase().includes(searchTerm.toLowerCase());
 
-            <div class="catalog-toolbar">
-                <div class="search-input">
-                    <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-                    <input type="text" placeholder="Buscar por nombre, marca o SKU…"/>
-                </div>
-                <div class="select-field">
-                    Marca:
-                    <select>
-                        <option>Todas</option>
-                        <option>Fender</option>
-                        <option>Gibson</option>
-                        <option>Yamaha</option>
-                        <option>Roland</option>
-                        <option>Marshall</option>
-                        <option>Shure</option>
-                        <option>Korg</option>
-                        <option>Cort</option>
-                    </select>
-                </div>
-                <div class="select-field">
-                    Disponibilidad:
-                    <select>
-                        <option>Todas</option>
-                        <option>Disponible</option>
-                        <option>Stock bajo</option>
-                        <option>Sin stock</option>
-                    </select>
-                </div>
-                <div class="select-field">
-                    Ordenar:
-                    <select>
-                        <option>Más relevantes</option>
-                        <option>Precio: menor a mayor</option>
-                        <option>Precio: mayor a menor</option>
-                        <option>Stock disponible</option>
-                    </select>
-                </div>
-                <div class="view-toggle">
-                    <button class="active">
-                        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-                        Tarjetas
-                    </button>
-                    <button>
-                        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
-                        Tabla
-                    </button>
-                </div>
-            </div>
+        return matchesCategory && matchesBrand && matchesStatus && matchesSearch;
+      })
+      .sort((a, b) => {
+        if (sortBy === 'price-asc') return a.price - b.price;
+        if (sortBy === 'price-desc') return b.price - a.price;
+        if (sortBy === 'stock') return b.stock - a.stock;
+        return a.id - b.id; // relevantes / default
+      });
+  }, [products, searchTerm, selectedBrand, selectedStatus, sortBy, activeCategory]);
 
-            <div class="category-rail">
-                <span class="category-chip active">Todas</span>
-                <span class="category-chip">Guitarras eléctricas</span>
-                <span class="category-chip">Guitarras acústicas</span>
-                <span class="category-chip">Bajos</span>
-                <span class="category-chip">Teclados</span>
-                <span class="category-chip">Pianos</span>
-                <span class="category-chip">Baterías</span>
-                <span class="category-chip">Percusión</span>
-                <span class="category-chip">Amplificadores</span>
-                <span class="category-chip">Micrófonos</span>
-                <span class="category-chip">Audio</span>
-                <span class="category-chip">Accesorios</span>
-                <span class="category-chip">Instrumentos de viento</span>
-            </div>
+  const handleCreateProduct = (e) => {
+    e.preventDefault();
+    if (!newProduct.name || !newProduct.sku) return;
 
-            <div class="section-heading">
-                <div>
-                    <h2>Catálogo de instrumentos</h2>
-                    <span class="desc">16 productos encontrados</span>
-                </div>
-            </div>
+    const created = {
+      ...newProduct,
+      id: Date.now(),
+      price: Number(newProduct.price) || 0,
+      stock: Number(newProduct.stock) || 0,
+    };
 
-            <div class="product-grid">
+    setProducts([created, ...products]);
+    setIsModalOpen(false);
+    setNewProduct({
+      name: '',
+      brand: 'Fender',
+      category: 'Guitarras eléctricas',
+      model: '',
+      sku: '',
+      price: '',
+      stock: '',
+      status: 'Disponible'
+    });
+  };
 
-                {/*Debo investigar como realmente se va a desenvolver esta función, ya que los elementos no serán fijo, 
-                sino segun la cantidad de resultados de la base de datos y el "tipo" (dependiendo de como sea ese dato) 
-                del instrumento o articulo, es que tendrá un icono u otro
-                
-                Además, habrá que adaptar el onclick de los botones para que estos hagan la consulta de los datos*/}
+  const getBadgeClass = (status) => {
+    if (status === 'Disponible') return 'badge-green';
+    if (status === 'Stock bajo') return 'badge-amber';
+    return 'badge-red';
+  };
 
-                {/* <!-- Producto 1 -->*/}
-                <div class="product-card">
-                    <div class="product-thumb">
-                        <span class="thumb-tag">Guitarras eléctricas</span>
-                        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-                    </div>
-                    <div class="product-body">
-                        <span class="product-brand">Fender</span>
-                        <h3 class="product-name">Stratocaster Player</h3>
-                        <span class="product-model">Modelo MX23 · 3-Color Sunburst</span>
-                        <span class="product-sku">GTR-FEN-001</span>
-                        <div class="product-meta-row">
-                            <span class="product-price">$1.250.000</span>
-                            <span class="product-stock">16 uds.</span>
-                        </div>
-                        <div class="product-footer">
-                            <span class="badge badge-green"><span class="badge-dot"></span>Disponible</span>
-                        </div>
-
-                        {/*Revisar si está incluido el path de /Detalle_producto en App.jsx*/}
-                        <button class="btn btn-outline" data-open-detail="1" onClick={() => navigate('/Detalle_producto')}>Ver detalle</button>
-                    </div>
-                </div>
-
-                {/*<!-- Producto 2 -->*/}
-                <div class="product-card">
-                    <div class="product-thumb">
-                        <span class="thumb-tag">Guitarras eléctricas</span>
-                        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-                    </div>
-                    <div class="product-body">
-                        <span class="product-brand">Gibson</span>
-                        <h3 class="product-name">Les Paul Studio</h3>
-                        <span class="product-model">Modelo LPS · Ebony</span>
-                        <span class="product-sku">GTR-GIB-002</span>
-                        <div class="product-meta-row">
-                            <span class="product-price">$2.480.000</span>
-                            <span class="product-stock">7 uds.</span>
-                        </div>
-                        <div class="product-footer">
-                            <span class="badge badge-green"><span class="badge-dot"></span>Disponible</span>
-                        </div>
-                        <button class="btn btn-outline">Ver detalle</button>
-                    </div>
-                </div>
-
-                {/*<!-- Producto 3 -->*/}
-                <div class="product-card">
-                    <div class="product-thumb">
-                        <span class="thumb-tag">Guitarras acústicas</span>
-                        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-                    </div>
-                    <div class="product-body">
-                        <span class="product-brand">Cort</span>
-                        <h3 class="product-name">AD810</h3>
-                        <span class="product-model">Dreadnought · Natural</span>
-                        <span class="product-sku">GTR-COR-007</span>
-                        <div class="product-meta-row">
-                            <span class="product-price">$310.000</span>
-                            <span class="product-stock">27 uds.</span>
-                        </div>
-                        <div class="product-footer">
-                            <span class="badge badge-green"><span class="badge-dot"></span>Disponible</span>
-                        </div>
-                        <button class="btn btn-outline">Ver detalle</button>
-                    </div>
-                </div>
-
-          {/*<!------- Producto 4 --->*/}
-          <div class="product-card">
-            <div class="product-thumb">
-              <span class="thumb-tag">Guitarras acústicas</span>
-              <svg viewBox="0 0 24 24" fill="none" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-            </div>
-            <div class="product-body">
-              <span class="product-brand">Taylor</span>
-              <h3 class="product-name">214ce</h3>
-              <span class="product-model">Grand Auditorium · Cutaway</span>
-              <span class="product-sku">GTR-TAY-008</span>
-              <div class="product-meta-row">
-                <span class="product-price">$980.000</span>
-                <span class="product-stock">4 uds.</span>
-              </div>
-              <div class="product-footer">
-                <span class="badge badge-amber"><span class="badge-dot"></span>Stock bajo</span>
-              </div>
-              <button class="btn btn-outline">Ver detalle</button>
-            </div>
-          </div>
-
-          {/*<!---- Producto 5 -->*/}
-          <div class="product-card">
-            <div class="product-thumb">
-              <span class="thumb-tag">Bajos</span>
-              <svg viewBox="0 0 24 24" fill="none" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-            </div>
-            <div class="product-body">
-              <span class="product-brand">Fender</span>
-              <h3 class="product-name">Player Jazz Bass</h3>
-              <span class="product-model">Modelo PJB · 3-Color Sunburst</span>
-              <span class="product-sku">BAJ-FEN-009</span>
-              <div class="product-meta-row">
-                <span class="product-price">$1.150.000</span>
-                <span class="product-stock">10 uds.</span>
-              </div>
-              <div class="product-footer">
-                <span class="badge badge-green"><span class="badge-dot"></span>Disponible</span>
-              </div>
-              <button class="btn btn-outline">Ver detalle</button>
-            </div>
-          </div>
-
-          {/*<!-- Producto 6 -->*/}
-          <div class="product-card">
-            <div class="product-thumb">
-              <span class="thumb-tag">Bajos</span>
-              <svg viewBox="0 0 24 24" fill="none" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-            </div>
-            <div class="product-body">
-              <span class="product-brand">Ibanez</span>
-              <h3 class="product-name">GSR200</h3>
-              <span class="product-model">Modelo GSR200 · Black</span>
-              <span class="product-sku">BAJ-IBA-010</span>
-              <div class="product-meta-row">
-                <span class="product-price">$420.000</span>
-                <span class="product-stock">3 uds.</span>
-              </div>
-              <div class="product-footer">
-                <span class="badge badge-red"><span class="badge-dot"></span>Crítico</span>
-              </div>
-              <button class="btn btn-outline">Ver detalle</button>
-            </div>
-          </div>
-
-          {/*<!-- Producto 7 -->*/}
-          <div class="product-card">
-            <div class="product-thumb">
-              <span class="thumb-tag">Pianos</span>
-              <svg viewBox="0 0 24 24" fill="none" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="10" rx="1.5"/><path d="M7 7v10M11 7v6M15 7v6M19 7v10"/></svg>
-            </div>
-            <div class="product-body">
-              <span class="product-brand">Yamaha</span>
-              <h3 class="product-name">P-145</h3>
-              <span class="product-model">Piano digital 88 teclas</span>
-              <span class="product-sku">KEY-YAM-003</span>
-              <div class="product-meta-row">
-                <span class="product-price">$650.000</span>
-                <span class="product-stock">19 uds.</span>
-              </div>
-              <div class="product-footer">
-                <span class="badge badge-green"><span class="badge-dot"></span>Disponible</span>
-              </div>
-              <button class="btn btn-outline">Ver detalle</button>
-            </div>
-          </div>
-
-          {/*<!-- Producto 8 -->*/}
-          <div class="product-card">
-            <div class="product-thumb">
-              <span class="thumb-tag">Teclados</span>
-              <svg viewBox="0 0 24 24" fill="none" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="10" rx="1.5"/><path d="M7 7v10M11 7v6M15 7v6M19 7v10"/></svg>
-            </div>
-            <div class="product-body">
-              <span class="product-brand">Korg</span>
-              <h3 class="product-name">B2</h3>
-              <span class="product-model">Piano digital compacto</span>
-              <span class="product-sku">KEY-KOR-011</span>
-              <div class="product-meta-row">
-                <span class="product-price">$480.000</span>
-                <span class="product-stock">12 uds.</span>
-              </div>
-              <div class="product-footer">
-                <span class="badge badge-green"><span class="badge-dot"></span>Disponible</span>
-              </div>
-              <button class="btn btn-outline">Ver detalle</button>
-            </div>
-          </div>
-
-          {/*<!-- Producto 9 -->*/}
-          <div class="product-card">
-            <div class="product-thumb">
-              <span class="thumb-tag">Baterías</span>
-              <svg viewBox="0 0 24 24" fill="none" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v9c0 1.66 3.58 3 8 3s8-1.34 8-3V6"/></svg>
-            </div>
-            <div class="product-body">
-              <span class="product-brand">Roland</span>
-              <h3 class="product-name">TD-17</h3>
-              <span class="product-model">Batería electrónica</span>
-              <span class="product-sku">BAT-ROL-006</span>
-              <div class="product-meta-row">
-                <span class="product-price">$2.150.000</span>
-                <span class="product-stock">5 uds.</span>
-              </div>
-              <div class="product-footer">
-                <span class="badge badge-green"><span class="badge-dot"></span>Disponible</span>
-              </div>
-              <button class="btn btn-outline">Ver detalle</button>
-            </div>
-          </div>
-
-          {/*<!-- Producto 10 -->*/}
-          <div class="product-card">
-            <div class="product-thumb">
-              <span class="thumb-tag">Baterías</span>
-              <svg viewBox="0 0 24 24" fill="none" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v9c0 1.66 3.58 3 8 3s8-1.34 8-3V6"/></svg>
-            </div>
-            <div class="product-body">
-              <span class="product-brand">Pearl</span>
-              <h3 class="product-name">Export Series</h3>
-              <span class="product-model">Batería acústica 5 piezas</span>
-              <span class="product-sku">BAT-PEA-012</span>
-              <div class="product-meta-row">
-                <span class="product-price">$1.680.000</span>
-                <span class="product-stock">2 uds.</span>
-              </div>
-              <div class="product-footer">
-                <span class="badge badge-red"><span class="badge-dot"></span>Crítico</span>
-              </div>
-              <button class="btn btn-outline">Ver detalle</button>
-            </div>
-          </div>
-
-          {/*<!-- Producto 11 -->*/}
-          <div class="product-card">
-            <div class="product-thumb">
-              <span class="thumb-tag">Percusión</span>
-              <svg viewBox="0 0 24 24" fill="none" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="12" height="16" rx="2"/><path d="M6 10h12"/></svg>
-            </div>
-            <div class="product-body">
-              <span class="product-brand">LP</span>
-              <h3 class="product-name">Cajón Peruano</h3>
-              <span class="product-model">Serie Americana</span>
-              <span class="product-sku">PER-LPX-013</span>
-              <div class="product-meta-row">
-                <span class="product-price">$185.000</span>
-                <span class="product-stock">33 uds.</span>
-              </div>
-              <div class="product-footer">
-                <span class="badge badge-green"><span class="badge-dot"></span>Disponible</span>
-              </div>
-              <button class="btn btn-outline">Ver detalle</button>
-            </div>
-          </div>
-
-          {/*<!-- Producto 12 -->*/}
-          <div class="product-card">
-            <div class="product-thumb">
-              <span class="thumb-tag">Amplificadores</span>
-              <svg viewBox="0 0 24 24" fill="none" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><circle cx="9" cy="12" r="3"/><circle cx="16" cy="8" r="1"/><circle cx="16" cy="16" r="1"/></svg>
-            </div>
-            <div class="product-body">
-              <span class="product-brand">Marshall</span>
-              <h3 class="product-name">MG30GFX</h3>
-              <span class="product-model">Amplificador de guitarra 30W</span>
-              <span class="product-sku">AMP-MAR-005</span>
-              <div class="product-meta-row">
-                <span class="product-price">$520.000</span>
-                <span class="product-stock">11 uds.</span>
-              </div>
-              <div class="product-footer">
-                <span class="badge badge-green"><span class="badge-dot"></span>Disponible</span>
-              </div>
-              <button class="btn btn-outline">Ver detalle</button>
-            </div>
-          </div>
-
-          {/*<!-- Producto 13 -->*/}
-          <div class="product-card">
-            <div class="product-thumb">
-              <span class="thumb-tag">Micrófonos</span>
-              <svg viewBox="0 0 24 24" fill="none" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><path d="M12 17v5M9 22h6"/></svg>
-            </div>
-            <div class="product-body">
-              <span class="product-brand">Shure</span>
-              <h3 class="product-name">SM58</h3>
-              <span class="product-model">Micrófono dinámico vocal</span>
-              <span class="product-sku">MIC-SHR-004</span>
-              <div class="product-meta-row">
-                <span class="product-price">$195.000</span>
-                <span class="product-stock">44 uds.</span>
-              </div>
-              <div class="product-footer">
-                <span class="badge badge-green"><span class="badge-dot"></span>Disponible</span>
-              </div>
-              <button class="btn btn-outline">Ver detalle</button>
-            </div>
-          </div>
-
-          {/*<!-- Producto 14 -->*/}
-          <div class="product-card">
-            <div class="product-thumb">
-              <span class="thumb-tag">Audio</span>
-              <svg viewBox="0 0 24 24" fill="none" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="2"/><circle cx="12" cy="8" r="2.5"/><circle cx="12" cy="16" r="1.3"/></svg>
-            </div>
-            <div class="product-body">
-              <span class="product-brand">Yamaha</span>
-              <h3 class="product-name">HS5</h3>
-              <span class="product-model">Monitor de estudio activo</span>
-              <span class="product-sku">AUD-YAM-014</span>
-              <div class="product-meta-row">
-                <span class="product-price">$340.000</span>
-                <span class="product-stock">7 uds.</span>
-              </div>
-              <div class="product-footer">
-                <span class="badge badge-green"><span class="badge-dot"></span>Disponible</span>
-              </div>
-              <button class="btn btn-outline">Ver detalle</button>
-            </div>
-          </div>
-
-          {/*<!-- Producto 15 -->*/}
-          <div class="product-card">
-            <div class="product-thumb">
-              <span class="thumb-tag">Accesorios</span>
-              <svg viewBox="0 0 24 24" fill="none" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v0a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4v0Z"/><path d="M8 11V9a4 4 0 0 1 8 0v2"/></svg>
-            </div>
-            <div class="product-body">
-              <span class="product-brand">Dunlop</span>
-              <h3 class="product-name">Correa + Púas Kit</h3>
-              <span class="product-model">Set accesorios guitarra</span>
-              <span class="product-sku">ACC-DUN-015</span>
-              <div class="product-meta-row">
-                <span class="product-price">$28.000</span>
-                <span class="product-stock">70 uds.</span>
-              </div>
-              <div class="product-footer">
-                <span class="badge badge-green"><span class="badge-dot"></span>Disponible</span>
-              </div>
-              <button class="btn btn-outline">Ver detalle</button>
-            </div>
-          </div>
-
-          {/*<!-- Producto 16 -->*/}
-          <div class="product-card">
-            <div class="product-thumb">
-              <span class="thumb-tag">Instrumentos de viento</span>
-              <svg viewBox="0 0 24 24" fill="none" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h11l3-3 3 3-3 3-3-3"/><circle cx="6" cy="12" r="2.5"/></svg>
-            </div>
-            <div class="product-body">
-              <span class="product-brand">Yamaha</span>
-              <h3 class="product-name">YTR-2330</h3>
-              <span class="product-model">Trompeta Bb estudiante</span>
-              <span class="product-sku">VIE-YAM-016</span>
-              <div class="product-meta-row">
-                <span class="product-price">$890.000</span>
-                <span class="product-stock">3 uds.</span>
-              </div>
-              <div class="product-footer">
-                <span class="badge badge-amber"><span class="badge-dot"></span>Stock bajo</span>
-              </div>
-              <button class="btn btn-outline">Ver detalle</button>
-            </div>
-          </div>
-
+  return (
+    <div>
+      {/* TOOLBAR */}
+      <div className="catalog-toolbar">
+        <div className="search-input">
+          <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="7" />
+            <path d="m21 21-4.3-4.3" />
+          </svg>
+          <input
+            type="text"
+            placeholder="Buscar por nombre, marca o SKU…"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
         </div>
 
+        <div className="select-field">
+          Marca:
+          <select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)}>
+            <option>Todas</option>
+            <option>Fender</option>
+            <option>Gibson</option>
+            <option>Yamaha</option>
+            <option>Roland</option>
+            <option>Marshall</option>
+            <option>Shure</option>
+            <option>Korg</option>
+            <option>Cort</option>
+            <option>Taylor</option>
+            <option>Ibanez</option>
+            <option>Pearl</option>
+            <option>LP</option>
+            <option>Dunlop</option>
+          </select>
+        </div>
 
+        <div className="select-field">
+          Disponibilidad:
+          <select value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value)}>
+            <option>Todas</option>
+            <option>Disponible</option>
+            <option>Stock bajo</option>
+            <option>Crítico</option>
+          </select>
+        </div>
 
-        </main>
+        <div className="select-field">
+          Ordenar:
+          <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+            <option value="relevantes">Más relevantes</option>
+            <option value="price-asc">Precio: menor a mayor</option>
+            <option value="price-desc">Precio: mayor a menor</option>
+            <option value="stock">Mayor stock disponible</option>
+          </select>
+        </div>
 
-    );
+        {/* ALTERNADOR DE VISTA */}
+        <div className="view-toggle">
+          <button
+            className={viewMode === 'grid' ? 'active' : ''}
+            onClick={() => setViewMode('grid')}
+          >
+            <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="7" height="7" rx="1" />
+              <rect x="14" y="3" width="7" height="7" rx="1" />
+              <rect x="3" y="14" width="7" height="7" rx="1" />
+              <rect x="14" y="14" width="7" height="7" rx="1" />
+            </svg>
+            Tarjetas
+          </button>
+          <button
+            className={viewMode === 'table' ? 'active' : ''}
+            onClick={() => setViewMode('table')}
+          >
+            <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 6h18M3 12h18M3 18h18" />
+            </svg>
+            Tabla
+          </button>
+        </div>
+      </div>
 
+      {/* CATEGORY RAIL */}
+      <div className="category-rail">
+        {CATEGORIES.map((cat) => (
+          <button
+            key={cat}
+            className={`category-chip ${activeCategory === cat ? 'active' : ''}`}
+            onClick={() => setActiveCategory(cat)}
+          >
+            {cat}
+          </button>
+        ))}
+      </div>
+
+      {/* ENCABEZADO Y BOTÓN DE NUEVO PRODUCTO */}
+      <div className="section-heading">
+        <div>
+          <h2>Catálogo de instrumentos</h2>
+          <span className="desc">
+            {filteredProducts.length} {filteredProducts.length === 1 ? 'producto encontrado' : 'productos encontrados'}
+          </span>
+        </div>
+        <button className="btn btn-primary" onClick={() => setIsModalOpen(true)}>
+          <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+          Nuevo producto
+        </button>
+      </div>
+
+      {/* VISTA EN TARJETAS (GRID) */}
+      {viewMode === 'grid' && (
+        <div className="product-grid">
+          {filteredProducts.map((prod) => (
+            <div className="product-card" key={prod.id}>
+              <div className="product-thumb">
+                <span className="thumb-tag">{prod.category}</span>
+                <svg viewBox="0 0 24 24" fill="none" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 18V5l12-2v13" />
+                  <circle cx="6" cy="18" r="3" />
+                  <circle cx="18" cy="16" r="3" />
+                </svg>
+              </div>
+              <div className="product-body">
+                <span className="product-brand">{prod.brand}</span>
+                <h3 className="product-name">{prod.name}</h3>
+                <span className="product-model">{prod.model}</span>
+                <span className="product-sku">{prod.sku}</span>
+                <div className="product-meta-row">
+                  <span className="product-price">${prod.price.toLocaleString('es-AR')}</span>
+                  <span className="product-stock">{prod.stock} uds.</span>
+                </div>
+                <div className="product-footer">
+                  <span className={`badge ${getBadgeClass(prod.status)}`}>
+                    <span className="badge-dot"></span>
+                    {prod.status}
+                  </span>
+                </div>
+                <button
+                  className="btn btn-outline"
+                  onClick={() => navigate('/Detalle_producto')}
+                >
+                  Ver detalle
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* VISTA EN TABLA */}
+      {viewMode === 'table' && (
+        <div className="table-panel">
+          <div className="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Producto</th>
+                  <th>Marca</th>
+                  <th>Categoría</th>
+                  <th>SKU</th>
+                  <th>Precio</th>
+                  <th>Stock</th>
+                  <th>Estado</th>
+                  <th>Acción</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredProducts.map((prod) => (
+                  <tr key={prod.id}>
+                    <td className="cell-strong">
+                      {prod.name}
+                      <div className="cell-sub">{prod.model}</div>
+                    </td>
+                    <td>{prod.brand}</td>
+                    <td>{prod.category}</td>
+                    <td style={{ fontFamily: 'monospace' }}>{prod.sku}</td>
+                    <td className="cell-strong">${prod.price.toLocaleString('es-AR')}</td>
+                    <td>{prod.stock} uds.</td>
+                    <td>
+                      <span className={`badge ${getBadgeClass(prod.status)}`}>
+                        <span className="badge-dot"></span>
+                        {prod.status}
+                      </span>
+                    </td>
+                    <td>
+                      <button
+                        className="btn btn-outline btn-sm"
+                        onClick={() => navigate('/Detalle_producto')}
+                      >
+                        Ver detalle
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL PARA AGREGAR NUEVO PRODUCTO */}
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title="Crear Nuevo Producto"
+        footer={
+          <>
+            <button className="btn btn-outline" onClick={() => setIsModalOpen(false)}>
+              Cancelar
+            </button>
+            <button className="btn btn-primary" onClick={handleCreateProduct}>
+              Guardar Producto
+            </button>
+          </>
+        }
+      >
+        <form onSubmit={handleCreateProduct}>
+          <div className="form-row">
+            <div className="form-field">
+              <label>Nombre del Producto *</label>
+              <input
+                type="text"
+                placeholder="Ej. Telecaster Custom"
+                required
+                value={newProduct.name}
+                onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
+              />
+            </div>
+            <div className="form-field">
+              <label>Marca *</label>
+              <select
+                value={newProduct.brand}
+                onChange={(e) => setNewProduct({ ...newProduct, brand: e.target.value })}
+              >
+                <option>Fender</option>
+                <option>Gibson</option>
+                <option>Yamaha</option>
+                <option>Roland</option>
+                <option>Marshall</option>
+                <option>Shure</option>
+                <option>Korg</option>
+                <option>Cort</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className="form-field">
+              <label>Categoría</label>
+              <select
+                value={newProduct.category}
+                onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })}
+              >
+                {CATEGORIES.filter(c => c !== 'Todas').map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-field">
+              <label>SKU / Código *</label>
+              <input
+                type="text"
+                placeholder="Ej. GTR-FEN-099"
+                required
+                value={newProduct.sku}
+                onChange={(e) => setNewProduct({ ...newProduct, sku: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className="form-field">
+              <label>Precio ($ ARS)</label>
+              <input
+                type="number"
+                placeholder="Ej. 1500000"
+                value={newProduct.price}
+                onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value })}
+              />
+            </div>
+            <div className="form-field">
+              <label>Stock Inicial</label>
+              <input
+                type="number"
+                placeholder="Ej. 10"
+                value={newProduct.stock}
+                onChange={(e) => setNewProduct({ ...newProduct, stock: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className="form-field full">
+              <label>Modelo / Descripción Corta</label>
+              <input
+                type="text"
+                placeholder="Ej. Edición especial 2026, color Butterscotch"
+                value={newProduct.model}
+                onChange={(e) => setNewProduct({ ...newProduct, model: e.target.value })}
+              />
+            </div>
+          </div>
+        </form>
+      </Modal>
+    </div>
+  );
 }
 
 export default Catalogo_de_productos;
