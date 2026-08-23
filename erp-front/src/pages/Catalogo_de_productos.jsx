@@ -3,22 +3,22 @@ import { useNavigate } from 'react-router-dom';
 import Modal from '../components/Modal';
 
 const INITIAL_PRODUCTS = [
-  { id: 1, code: 'COD-0001', name: 'Stratocaster Player', brand: 'Fender', model: 'MX23', ean: '7791234500011', category: 'Guitarras eléctricas', price: 1250000, status: 'Normal', central: 8, margalef: 3 },
-  { id: 2, code: 'COD-0002', name: 'Les Paul Studio', brand: 'Gibson', model: 'LPS', ean: '7791234500028', category: 'Guitarras eléctricas', price: 2480000, status: 'Reposición', central: 4, margalef: 2 },
-  { id: 3, code: 'COD-0003', name: 'AD810', brand: 'Cort', model: 'AD810', ean: '7791234500035', category: 'Guitarras acústicas', price: 310000, status: 'Normal', central: 12, margalef: 9 },
-  { id: 4, code: 'COD-0004', name: '214ce', brand: 'Taylor', model: '214ce', ean: '7791234500042', category: 'Guitarras acústicas', price: 980000, status: 'Crítico', central: 3, margalef: 1 },
-  { id: 5, code: 'COD-0005', name: 'Player Jazz Bass', brand: 'Fender', model: 'PJB', ean: '7791234500059', category: 'Bajos', price: 1150000, status: 'Reposición', central: 5, margalef: 3 },
-  { id: 6, code: 'COD-0006', name: 'GSR200', brand: 'Ibanez', model: 'GSR200', ean: '7791234500066', category: 'Bajos', price: 420000, status: 'Crítico', central: 2, margalef: 1 },
-  { id: 7, code: 'COD-0007', name: 'P-145', brand: 'Yamaha', model: 'P-145', ean: '7791234500073', category: 'Pianos', price: 650000, status: 'Crítico', central: 1, margalef: 1 },
-  { id: 8, code: 'COD-0008', name: 'B2', brand: 'Korg', model: 'B2', ean: '7791234500080', category: 'Teclados', price: 480000, status: 'Normal', central: 7, margalef: 3 },
-  { id: 9, code: 'COD-0009', name: 'TD-17', brand: 'Roland', model: 'TD-17', ean: '7791234500097', category: 'Baterías', price: 2150000, status: 'Crítico', central: 3, margalef: 1 },
-  { id: 10, code: 'COD-0010', name: 'Export Series', brand: 'Pearl', model: 'Export', ean: '7791234500103', category: 'Baterías', price: 1680000, status: 'Crítico', central: 2, margalef: 0 },
-  { id: 11, code: 'COD-0011', name: 'Cajón Peruano', brand: 'LP', model: 'Serie Americana', ean: '7791234500110', category: 'Percusión', price: 185000, status: 'Normal', central: 15, margalef: 10 },
-  { id: 12, code: 'COD-0012', name: 'MG30GFX', brand: 'Marshall', model: 'MG30GFX', ean: '7791234500127', category: 'Amplificadores', price: 520000, status: 'Reposición', central: 6, margalef: 3 },
-  { id: 13, code: 'COD-0013', name: 'SM58', brand: 'Shure', model: 'SM58', ean: '7791234500134', category: 'Micrófonos', price: 195000, status: 'Normal', central: 20, margalef: 12 },
-  { id: 14, code: 'COD-0014', name: 'HS5', brand: 'Yamaha', model: 'HS5', ean: '7791234500141', category: 'Audio', price: 340000, status: 'Reposición', central: 4, margalef: 2 },
-  { id: 15, code: 'COD-0015', name: 'Correa + Púas Kit', brand: 'Dunlop', model: 'Kit', ean: '7791234500158', category: 'Accesorios', price: 28000, status: 'Normal', central: 30, margalef: 22 },
-  { id: 16, code: 'COD-0016', name: 'YTR-2330', brand: 'Yamaha', model: 'YTR-2330', ean: '7791234500165', category: 'Instrumentos de viento', price: 890000, status: 'Crítico', central: 2, margalef: 0 },
+  { id: 1, code: 'COD-0001', name: 'Stratocaster Player', brand: 'Fender', model: 'MX23', ean: '7791234500011', category: 'Guitarras eléctricas', price: 1250000, status: 'Normal', central: 8, margalef: 3, active: true },
+  { id: 2, code: 'COD-0002', name: 'Les Paul Studio', brand: 'Gibson', model: 'LPS', ean: '7791234500028', category: 'Guitarras eléctricas', price: 2480000, status: 'Reposición', central: 4, margalef: 2, active: true },
+  { id: 3, code: 'COD-0003', name: 'AD810', brand: 'Cort', model: 'AD810', ean: '7791234500035', category: 'Guitarras acústicas', price: 310000, status: 'Normal', central: 12, margalef: 9, active: true },
+  { id: 4, code: 'COD-0004', name: '214ce', brand: 'Taylor', model: '214ce', ean: '7791234500042', category: 'Guitarras acústicas', price: 980000, status: 'Crítico', central: 3, margalef: 1, active: true },
+  { id: 5, code: 'COD-0005', name: 'Player Jazz Bass', brand: 'Fender', model: 'PJB', ean: '7791234500059', category: 'Bajos', price: 1150000, status: 'Reposición', central: 5, margalef: 3, active: true },
+  { id: 6, code: 'COD-0006', name: 'GSR200', brand: 'Ibanez', model: 'GSR200', ean: '7791234500066', category: 'Bajos', price: 420000, status: 'Crítico', central: 2, margalef: 1, active: true },
+  { id: 7, code: 'COD-0007', name: 'P-145', brand: 'Yamaha', model: 'P-145', ean: '7791234500073', category: 'Pianos', price: 650000, status: 'Crítico', central: 1, margalef: 1, active: true },
+  { id: 8, code: 'COD-0008', name: 'B2', brand: 'Korg', model: 'B2', ean: '7791234500080', category: 'Teclados', price: 480000, status: 'Normal', central: 7, margalef: 3, active: true },
+  { id: 9, code: 'COD-0009', name: 'TD-17', brand: 'Roland', model: 'TD-17', ean: '7791234500097', category: 'Baterías', price: 2150000, status: 'Crítico', central: 3, margalef: 1, active: true },
+  { id: 10, code: 'COD-0010', name: 'Export Series', brand: 'Pearl', model: 'Export', ean: '7791234500103', category: 'Baterías', price: 1680000, status: 'Crítico', central: 2, margalef: 0, active: true },
+  { id: 11, code: 'COD-0011', name: 'Cajón Peruano', brand: 'LP', model: 'Serie Americana', ean: '7791234500110', category: 'Percusión', price: 185000, status: 'Normal', central: 15, margalef: 10, active: true },
+  { id: 12, code: 'COD-0012', name: 'MG30GFX', brand: 'Marshall', model: 'MG30GFX', ean: '7791234500127', category: 'Amplificadores', price: 520000, status: 'Reposición', central: 6, margalef: 3, active: true },
+  { id: 13, code: 'COD-0013', name: 'SM58', brand: 'Shure', model: 'SM58', ean: '7791234500134', category: 'Micrófonos', price: 195000, status: 'Normal', central: 20, margalef: 12, active: true },
+  { id: 14, code: 'COD-0014', name: 'HS5', brand: 'Yamaha', model: 'HS5', ean: '7791234500141', category: 'Audio', price: 340000, status: 'Reposición', central: 4, margalef: 2, active: true },
+  { id: 15, code: 'COD-0015', name: 'Correa + Púas Kit', brand: 'Dunlop', model: 'Kit', ean: '7791234500158', category: 'Accesorios', price: 28000, status: 'Normal', central: 30, margalef: 22, active: true },
+  { id: 16, code: 'COD-0016', name: 'YTR-2330', brand: 'Yamaha', model: 'YTR-2330', ean: '7791234500165', category: 'Instrumentos de viento', price: 890000, status: 'Crítico', central: 2, margalef: 0, active: false },
 ];
 
 const CATEGORIES = [
@@ -34,6 +34,7 @@ function Catalogo_de_productos() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBrand, setSelectedBrand] = useState('Todas');
   const [selectedStatus, setSelectedStatus] = useState('Todas');
+  const [lifecycleFilter, setLifecycleFilter] = useState('activos'); // 'activos' | 'bajas' | 'todos'
   const [sortBy, setSortBy] = useState('relevantes');
   const [activeCategory, setActiveCategory] = useState('Todas');
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'table'
@@ -55,11 +56,16 @@ function Catalogo_de_productos() {
     initialStock: 0
   });
 
-  // Modal Eliminar Producto
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [productToDelete, setProductToDelete] = useState(null);
+  // Modal Dar de Baja
+  const [isDeactivateModalOpen, setIsDeactivateModalOpen] = useState(false);
+  const [productToDeactivate, setProductToDeactivate] = useState(null);
+  const [deactivateReason, setDeactivateReason] = useState('Discontinuado por el fabricante');
 
-  // Validación de EAN-13 en vivo
+  // Modal Reactivar
+  const [isReactivateModalOpen, setIsReactivateModalOpen] = useState(false);
+  const [productToReactivate, setProductToReactivate] = useState(null);
+
+  // Validación de EAN-13
   const eanValidation = useMemo(() => {
     const val = newProduct.ean.trim();
     if (val.length === 0) return { state: 'empty' };
@@ -70,20 +76,25 @@ function Catalogo_de_productos() {
     return { state: 'valid', message: 'Código EAN-13 válido y disponible.' };
   }, [newProduct.ean, products]);
 
-  // Filtrado y ordenamiento en tiempo real
+  // Filtrado reactivo
   const filteredProducts = useMemo(() => {
     return products
       .filter((item) => {
         const matchesCategory = activeCategory === 'Todas' || item.category === activeCategory;
         const matchesBrand = selectedBrand === 'Todas' || item.brand === selectedBrand;
         const matchesStatus = selectedStatus === 'Todas' || item.status === selectedStatus;
+        const matchesLifecycle =
+          lifecycleFilter === 'todos' ||
+          (lifecycleFilter === 'activos' && item.active) ||
+          (lifecycleFilter === 'bajas' && !item.active);
+
         const matchesSearch =
           item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
           item.brand.toLowerCase().includes(searchTerm.toLowerCase()) ||
           item.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
           item.ean.includes(searchTerm);
 
-        return matchesCategory && matchesBrand && matchesStatus && matchesSearch;
+        return matchesCategory && matchesBrand && matchesStatus && matchesLifecycle && matchesSearch;
       })
       .sort((a, b) => {
         if (sortBy === 'price-asc') return a.price - b.price;
@@ -91,7 +102,7 @@ function Catalogo_de_productos() {
         if (sortBy === 'stock') return (b.central + b.margalef) - (a.central + a.margalef);
         return a.id - b.id;
       });
-  }, [products, searchTerm, selectedBrand, selectedStatus, sortBy, activeCategory]);
+  }, [products, searchTerm, selectedBrand, selectedStatus, lifecycleFilter, sortBy, activeCategory]);
 
   const showToast = (message) => {
     setConfirmToast(message);
@@ -113,7 +124,8 @@ function Catalogo_de_productos() {
       price: Number(String(newProduct.price).replace(/[^0-9]/g, '')) || 0,
       status: newProduct.status,
       central: Number(newProduct.initialStock) || 0,
-      margalef: 0
+      margalef: 0,
+      active: true
     };
 
     setProducts([created, ...products]);
@@ -133,17 +145,28 @@ function Catalogo_de_productos() {
     });
   };
 
-  const handleDeleteProduct = () => {
-    if (!productToDelete) return;
-    setProducts(products.filter(p => p.id !== productToDelete.id));
-    setIsDeleteModalOpen(false);
-    showToast(`Producto "${productToDelete.name}" eliminado del catálogo.`);
-    setProductToDelete(null);
+  // Dar de baja (Soft Delete)
+  const handleConfirmDeactivate = () => {
+    if (!productToDeactivate) return;
+    setProducts(products.map(p => p.id === productToDeactivate.id ? { ...p, active: false } : p));
+    setIsDeactivateModalOpen(false);
+    showToast(`El producto "${productToDeactivate.name}" fue dado de baja. Podés consultarlo o reactivarlo filtrando por "Dados de baja".`);
+    setProductToDeactivate(null);
   };
 
-  const getBadge = (status) => {
-    if (status === 'Normal') return <span className="badge badge-green"><span className="badge-dot"></span>Normal</span>;
-    if (status === 'Reposición') return <span className="badge badge-amber"><span className="badge-dot"></span>Reposición</span>;
+  // Reactivar producto
+  const handleConfirmReactivate = () => {
+    if (!productToReactivate) return;
+    setProducts(products.map(p => p.id === productToReactivate.id ? { ...p, active: true } : p));
+    setIsReactivateModalOpen(false);
+    showToast(`El producto "${productToReactivate.name}" fue reactivado en el catálogo activo.`);
+    setProductToReactivate(null);
+  };
+
+  const getBadge = (prod) => {
+    if (!prod.active) return <span className="badge badge-gray"><span className="badge-dot"></span>Dado de baja</span>;
+    if (prod.status === 'Normal') return <span className="badge badge-green"><span className="badge-dot"></span>Normal</span>;
+    if (prod.status === 'Reposición') return <span className="badge badge-amber"><span className="badge-dot"></span>Reposición</span>;
     return <span className="badge badge-red"><span className="badge-dot"></span>Crítico</span>;
   };
 
@@ -164,7 +187,7 @@ function Catalogo_de_productos() {
         <div>
           <h2>Catálogo centralizado de productos</h2>
           <span className="desc">
-            Base maestra de la que dependen inventario, movimientos y alertas — {filteredProducts.length} productos
+            Base maestra de productos — {filteredProducts.length} registros ({lifecycleFilter === 'activos' ? 'activos' : lifecycleFilter === 'bajas' ? 'dados de baja' : 'totales'})
           </span>
         </div>
         <button className="btn btn-primary" onClick={() => setIsNewModalOpen(true)}>
@@ -188,6 +211,16 @@ function Catalogo_de_productos() {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
+        </div>
+
+        {/* FILTRO DE ESTADO OPERATIVO (ACTIVOS / BAJAS) */}
+        <div className="select-field">
+          Catálogo:
+          <select value={lifecycleFilter} onChange={(e) => setLifecycleFilter(e.target.value)}>
+            <option value="activos">Productos Activos</option>
+            <option value="bajas">Dados de baja</option>
+            <option value="todos">Todos los registros</option>
+          </select>
         </div>
 
         <div className="select-field">
@@ -271,63 +304,89 @@ function Catalogo_de_productos() {
       {/* VISTA EN TARJETAS (GRID) */}
       {viewMode === 'grid' && (
         <div className="product-grid">
-          {filteredProducts.map((prod) => (
-            <div className="product-card" key={prod.id}>
-              <div className="product-thumb">
-                <span className="thumb-tag">{prod.category}</span>
-                <span className="thumb-code">{prod.code}</span>
-                <svg viewBox="0 0 24 24" fill="none" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M9 18V5l12-2v13" />
-                  <circle cx="6" cy="18" r="3" />
-                  <circle cx="18" cy="16" r="3" />
-                </svg>
-              </div>
-
-              <div className="product-body">
-                <span className="product-brand">{prod.brand}</span>
-                <h3 className="product-name">{prod.name}</h3>
-                <span className="product-model">Modelo {prod.model} · EAN {prod.ean}</span>
-
-                <div className="product-meta-row">
-                  <span className="product-price">${prod.price.toLocaleString('es-AR')}</span>
-                  {getBadge(prod.status)}
-                </div>
-
-                <div className="product-stock-split">
-                  <span>Central: <b>{prod.central}</b></span>
-                  <span>·</span>
-                  <span>Margalef: <b>{prod.margalef}</b></span>
-                  <span>·</span>
-                  <span>Consol.: <b>{prod.central + prod.margalef}</b></span>
-                </div>
-
-                <div className="product-card-actions">
-                  <button
-                    className="btn btn-outline"
-                    onClick={() => navigate('/Detalle_producto')}
-                  >
-                    Ver detalle
-                  </button>
-                  <button
-                    className="icon-btn btn-icon-only"
-                    title="Eliminar"
-                    onClick={() => {
-                      setProductToDelete(prod);
-                      setIsDeleteModalOpen(true);
-                    }}
-                  >
-                    <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
+          {filteredProducts.length === 0 ? (
+            <div style={{ gridColumn: '1 / -1', padding: '36px', textAlign: 'center', color: 'var(--gray-500)' }}>
+              No se encontraron productos para los filtros seleccionados.
             </div>
-          ))}
+          ) : (
+            filteredProducts.map((prod) => (
+              <div
+                className="product-card"
+                key={prod.id}
+                style={{ opacity: prod.active ? 1 : 0.72 }}
+              >
+                <div className="product-thumb">
+                  <span className="thumb-tag">{prod.category}</span>
+                  <span className="thumb-code">{prod.code}</span>
+                  <svg viewBox="0 0 24 24" fill="none" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M9 18V5l12-2v13" />
+                    <circle cx="6" cy="18" r="3" />
+                    <circle cx="18" cy="16" r="3" />
+                  </svg>
+                </div>
+
+                <div className="product-body">
+                  <span className="product-brand">{prod.brand}</span>
+                  <h3 className="product-name">{prod.name}</h3>
+                  <span className="product-model">Modelo {prod.model} · EAN {prod.ean}</span>
+
+                  <div className="product-meta-row">
+                    <span className="product-price">${prod.price.toLocaleString('es-AR')}</span>
+                    {getBadge(prod)}
+                  </div>
+
+                  <div className="product-stock-split">
+                    <span>Central: <b>{prod.central}</b></span>
+                    <span>·</span>
+                    <span>Margalef: <b>{prod.margalef}</b></span>
+                    <span>·</span>
+                    <span>Consol.: <b>{prod.central + prod.margalef}</b></span>
+                  </div>
+
+                  <div className="product-card-actions">
+                    <button
+                      className="btn btn-outline"
+                      onClick={() => navigate('/Detalle_producto')}
+                    >
+                      Ver detalle
+                    </button>
+
+                    {prod.active ? (
+                      <button
+                        className="icon-btn btn-icon-only"
+                        title="Dar de baja producto"
+                        onClick={() => {
+                          setProductToDeactivate(prod);
+                          setIsDeactivateModalOpen(true);
+                        }}
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="12" cy="12" r="10" />
+                          <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+                        </svg>
+                      </button>
+                    ) : (
+                      <button
+                        className="btn btn-outline btn-sm"
+                        style={{ color: 'var(--green)', borderColor: 'var(--green)' }}
+                        title="Reactivar producto en catálogo activo"
+                        onClick={() => {
+                          setProductToReactivate(prod);
+                          setIsReactivateModalOpen(true);
+                        }}
+                      >
+                        Reactivar
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       )}
 
-      {/* VISTA EN TABLA (HU-07 EXACTA) */}
+      {/* VISTA EN TABLA */}
       {viewMode === 'table' && (
         <div className="table-panel">
           <div className="table-scroll">
@@ -346,44 +405,67 @@ function Catalogo_de_productos() {
                 </tr>
               </thead>
               <tbody>
-                {filteredProducts.map((prod) => (
-                  <tr key={prod.id}>
-                    <td className="cell-mono">{prod.code}</td>
-                    <td className="cell-strong">{prod.name}</td>
-                    <td>{prod.brand}</td>
-                    <td>{prod.model}</td>
-                    <td className="cell-mono">{prod.ean}</td>
-                    <td>{prod.category}</td>
-                    <td className="cell-strong">${prod.price.toLocaleString('es-AR')}</td>
-                    <td>{getBadge(prod.status)}</td>
-                    <td>
-                      <div className="row-actions">
-                        <button
-                          className="icon-btn"
-                          title="Ver detalle"
-                          onClick={() => navigate('/Detalle_producto')}
-                        >
-                          <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z" />
-                            <circle cx="12" cy="12" r="3" />
-                          </svg>
-                        </button>
-                        <button
-                          className="icon-btn"
-                          title="Eliminar"
-                          onClick={() => {
-                            setProductToDelete(prod);
-                            setIsDeleteModalOpen(true);
-                          }}
-                        >
-                          <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6" />
-                          </svg>
-                        </button>
-                      </div>
+                {filteredProducts.length === 0 ? (
+                  <tr>
+                    <td colSpan="9" style={{ textAlign: 'center', padding: '32px', color: 'var(--gray-500)' }}>
+                      No se encontraron productos registrados bajo estos filtros.
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  filteredProducts.map((prod) => (
+                    <tr key={prod.id} style={{ opacity: prod.active ? 1 : 0.65 }}>
+                      <td className="cell-mono">{prod.code}</td>
+                      <td className="cell-strong">{prod.name}</td>
+                      <td>{prod.brand}</td>
+                      <td>{prod.model}</td>
+                      <td className="cell-mono">{prod.ean}</td>
+                      <td>{prod.category}</td>
+                      <td className="cell-strong">${prod.price.toLocaleString('es-AR')}</td>
+                      <td>{getBadge(prod)}</td>
+                      <td>
+                        <div className="row-actions">
+                          <button
+                            className="icon-btn"
+                            title="Ver detalle"
+                            onClick={() => navigate('/Detalle_producto')}
+                          >
+                            <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z" />
+                              <circle cx="12" cy="12" r="3" />
+                            </svg>
+                          </button>
+
+                          {prod.active ? (
+                            <button
+                              className="icon-btn"
+                              title="Dar de baja producto"
+                              onClick={() => {
+                                setProductToDeactivate(prod);
+                                setIsDeactivateModalOpen(true);
+                              }}
+                            >
+                              <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <circle cx="12" cy="12" r="10" />
+                                <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+                              </svg>
+                            </button>
+                          ) : (
+                            <button
+                              className="btn btn-outline btn-sm"
+                              style={{ color: 'var(--green)', borderColor: 'var(--green)' }}
+                              onClick={() => {
+                                setProductToReactivate(prod);
+                                setIsReactivateModalOpen(true);
+                              }}
+                            >
+                              Reactivar
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -553,28 +635,70 @@ function Catalogo_de_productos() {
         </form>
       </Modal>
 
-      {/* MODAL ELIMINAR PRODUCTO */}
+      {/* MODAL DAR DE BAJA PRODUCTO (SOFT DELETE) */}
       <Modal
-        isOpen={isDeleteModalOpen}
-        onClose={() => setIsDeleteModalOpen(false)}
-        title="Eliminar producto"
+        isOpen={isDeactivateModalOpen}
+        onClose={() => setIsDeactivateModalOpen(false)}
+        title="Dar de baja producto"
         footer={
           <>
-            <button className="btn btn-outline" onClick={() => setIsDeleteModalOpen(false)}>
+            <button className="btn btn-outline" onClick={() => setIsDeactivateModalOpen(false)}>
               Cancelar
             </button>
             <button
               className="btn btn-primary"
-              style={{ background: 'var(--crit)' }}
-              onClick={handleDeleteProduct}
+              style={{ background: 'var(--amber)' }}
+              onClick={handleConfirmDeactivate}
             >
-              Eliminar producto
+              Confirmar baja
+            </button>
+          </>
+        }
+      >
+        <div>
+          <p style={{ fontSize: '13.5px', color: 'var(--gray-700)', lineHeight: '1.6', marginBottom: '14px' }}>
+            ¿Confirmás que querés dar de baja a <strong>{productToDeactivate?.name} ({productToDeactivate?.code})</strong>?
+          </p>
+          <div className="form-field">
+            <label>Motivo de la baja</label>
+            <select
+              value={deactivateReason}
+              onChange={(e) => setDeactivateReason(e.target.value)}
+            >
+              <option value="Discontinuado por el fabricante">Discontinuado por el fabricante</option>
+              <option value="Fin de comercialización">Fin de comercialización</option>
+              <option value="Reemplazado por nuevo modelo">Reemplazado por nuevo modelo</option>
+              <option value="Sin stock proyectado">Sin stock proyectado</option>
+            </select>
+          </div>
+          <p style={{ fontSize: '12px', color: 'var(--gray-500)', marginTop: '12px' }}>
+            * Esta acción no borrará los movimientos históricos y podrás reactivar el producto en cualquier momento.
+          </p>
+        </div>
+      </Modal>
+
+      {/* MODAL REACTIVAR PRODUCTO */}
+      <Modal
+        isOpen={isReactivateModalOpen}
+        onClose={() => setIsReactivateModalOpen(false)}
+        title="Reactivar producto en catálogo"
+        footer={
+          <>
+            <button className="btn btn-outline" onClick={() => setIsReactivateModalOpen(false)}>
+              Cancelar
+            </button>
+            <button
+              className="btn btn-primary"
+              style={{ background: 'var(--green)' }}
+              onClick={handleConfirmReactivate}
+            >
+              Reactivar producto
             </button>
           </>
         }
       >
         <p style={{ fontSize: '13.5px', color: 'var(--gray-700)', lineHeight: '1.6' }}>
-          ¿Confirmás que querés eliminar <strong>{productToDelete?.name} ({productToDelete?.code})</strong> del catálogo? Esta acción no afecta el historial de movimientos ya registrado.
+          ¿Deseás reactivar <strong>{productToReactivate?.name} ({productToReactivate?.code})</strong>? El producto volverá a estar disponible para movimientos y consultas en el catálogo activo.
         </p>
       </Modal>
     </div>
