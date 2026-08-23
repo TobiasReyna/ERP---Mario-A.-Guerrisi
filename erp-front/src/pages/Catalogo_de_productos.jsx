@@ -3,22 +3,22 @@ import { useNavigate } from 'react-router-dom';
 import Modal from '../components/Modal';
 
 const INITIAL_PRODUCTS = [
-  { id: 1, name: 'Stratocaster Player', brand: 'Fender', category: 'Guitarras eléctricas', model: 'Modelo MX23 · 3-Color Sunburst', sku: 'GTR-FEN-001', price: 1250000, stock: 16, status: 'Disponible' },
-  { id: 2, name: 'Les Paul Studio', brand: 'Gibson', category: 'Guitarras eléctricas', model: 'Modelo LPS · Ebony', sku: 'GTR-GIB-002', price: 2480000, stock: 7, status: 'Disponible' },
-  { id: 3, name: 'AD810', brand: 'Cort', category: 'Guitarras acústicas', model: 'Dreadnought · Natural', sku: 'GTR-COR-007', price: 310000, stock: 27, status: 'Disponible' },
-  { id: 4, name: '214ce', brand: 'Taylor', category: 'Guitarras acústicas', model: 'Grand Auditorium · Cutaway', sku: 'GTR-TAY-008', price: 980000, stock: 4, status: 'Stock bajo' },
-  { id: 5, name: 'Player Jazz Bass', brand: 'Fender', category: 'Bajos', model: 'Modelo PJB · 3-Color Sunburst', sku: 'BAJ-FEN-009', price: 1150000, stock: 10, status: 'Disponible' },
-  { id: 6, name: 'GSR200', brand: 'Ibanez', category: 'Bajos', model: 'Modelo GSR200 · Black', sku: 'BAJ-IBA-010', price: 420000, stock: 3, status: 'Crítico' },
-  { id: 7, name: 'P-145', brand: 'Yamaha', category: 'Pianos', model: 'Piano digital 88 teclas', sku: 'KEY-YAM-003', price: 650000, stock: 19, status: 'Disponible' },
-  { id: 8, name: 'B2', brand: 'Korg', category: 'Teclados', model: 'Piano digital compacto', sku: 'KEY-KOR-011', price: 480000, stock: 12, status: 'Disponible' },
-  { id: 9, name: 'TD-17', brand: 'Roland', category: 'Baterías', model: 'Batería electrónica', sku: 'BAT-ROL-006', price: 2150000, stock: 5, status: 'Disponible' },
-  { id: 10, name: 'Export Series', brand: 'Pearl', category: 'Baterías', model: 'Batería acústica 5 piezas', sku: 'BAT-PEA-012', price: 1680000, stock: 2, status: 'Crítico' },
-  { id: 11, name: 'Cajón Peruano', brand: 'LP', category: 'Percusión', model: 'Serie Americana', sku: 'PER-LPX-013', price: 1850000, stock: 33, status: 'Disponible' },
-  { id: 12, name: 'MG30GFX', brand: 'Marshall', category: 'Amplificadores', model: 'Amplificador de guitarra 30W', sku: 'AMP-MAR-005', price: 520000, stock: 11, status: 'Disponible' },
-  { id: 13, name: 'SM58', brand: 'Shure', category: 'Micrófonos', model: 'Micrófono dinámico vocal', sku: 'MIC-SHR-004', price: 195000, stock: 44, status: 'Disponible' },
-  { id: 14, name: 'HS5', brand: 'Yamaha', category: 'Audio', model: 'Monitor de estudio activo', sku: 'AUD-YAM-014', price: 340000, stock: 7, status: 'Disponible' },
-  { id: 15, name: 'Correa + Púas Kit', brand: 'Dunlop', category: 'Accesorios', model: 'Set accesorios guitarra', sku: 'ACC-DUN-015', price: 28000, stock: 70, status: 'Disponible' },
-  { id: 16, name: 'YTR-2330', brand: 'Yamaha', category: 'Instrumentos de viento', model: 'Trompeta Bb estudiante', sku: 'VIE-YAM-016', price: 890000, stock: 3, status: 'Stock bajo' },
+  { id: 1, code: 'COD-0001', name: 'Stratocaster Player', brand: 'Fender', model: 'MX23', ean: '7791234500011', category: 'Guitarras eléctricas', price: 1250000, status: 'Normal', central: 8, margalef: 3 },
+  { id: 2, code: 'COD-0002', name: 'Les Paul Studio', brand: 'Gibson', model: 'LPS', ean: '7791234500028', category: 'Guitarras eléctricas', price: 2480000, status: 'Reposición', central: 4, margalef: 2 },
+  { id: 3, code: 'COD-0003', name: 'AD810', brand: 'Cort', model: 'AD810', ean: '7791234500035', category: 'Guitarras acústicas', price: 310000, status: 'Normal', central: 12, margalef: 9 },
+  { id: 4, code: 'COD-0004', name: '214ce', brand: 'Taylor', model: '214ce', ean: '7791234500042', category: 'Guitarras acústicas', price: 980000, status: 'Crítico', central: 3, margalef: 1 },
+  { id: 5, code: 'COD-0005', name: 'Player Jazz Bass', brand: 'Fender', model: 'PJB', ean: '7791234500059', category: 'Bajos', price: 1150000, status: 'Reposición', central: 5, margalef: 3 },
+  { id: 6, code: 'COD-0006', name: 'GSR200', brand: 'Ibanez', model: 'GSR200', ean: '7791234500066', category: 'Bajos', price: 420000, status: 'Crítico', central: 2, margalef: 1 },
+  { id: 7, code: 'COD-0007', name: 'P-145', brand: 'Yamaha', model: 'P-145', ean: '7791234500073', category: 'Pianos', price: 650000, status: 'Crítico', central: 1, margalef: 1 },
+  { id: 8, code: 'COD-0008', name: 'B2', brand: 'Korg', model: 'B2', ean: '7791234500080', category: 'Teclados', price: 480000, status: 'Normal', central: 7, margalef: 3 },
+  { id: 9, code: 'COD-0009', name: 'TD-17', brand: 'Roland', model: 'TD-17', ean: '7791234500097', category: 'Baterías', price: 2150000, status: 'Crítico', central: 3, margalef: 1 },
+  { id: 10, code: 'COD-0010', name: 'Export Series', brand: 'Pearl', model: 'Export', ean: '7791234500103', category: 'Baterías', price: 1680000, status: 'Crítico', central: 2, margalef: 0 },
+  { id: 11, code: 'COD-0011', name: 'Cajón Peruano', brand: 'LP', model: 'Serie Americana', ean: '7791234500110', category: 'Percusión', price: 185000, status: 'Normal', central: 15, margalef: 10 },
+  { id: 12, code: 'COD-0012', name: 'MG30GFX', brand: 'Marshall', model: 'MG30GFX', ean: '7791234500127', category: 'Amplificadores', price: 520000, status: 'Reposición', central: 6, margalef: 3 },
+  { id: 13, code: 'COD-0013', name: 'SM58', brand: 'Shure', model: 'SM58', ean: '7791234500134', category: 'Micrófonos', price: 195000, status: 'Normal', central: 20, margalef: 12 },
+  { id: 14, code: 'COD-0014', name: 'HS5', brand: 'Yamaha', model: 'HS5', ean: '7791234500141', category: 'Audio', price: 340000, status: 'Reposición', central: 4, margalef: 2 },
+  { id: 15, code: 'COD-0015', name: 'Correa + Púas Kit', brand: 'Dunlop', model: 'Kit', ean: '7791234500158', category: 'Accesorios', price: 28000, status: 'Normal', central: 30, margalef: 22 },
+  { id: 16, code: 'COD-0016', name: 'YTR-2330', brand: 'Yamaha', model: 'YTR-2330', ean: '7791234500165', category: 'Instrumentos de viento', price: 890000, status: 'Crítico', central: 2, margalef: 0 },
 ];
 
 const CATEGORIES = [
@@ -30,27 +30,45 @@ const CATEGORIES = [
 function Catalogo_de_productos() {
   const navigate = useNavigate();
 
-  // Estados de filtros y vistas
   const [products, setProducts] = useState(INITIAL_PRODUCTS);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBrand, setSelectedBrand] = useState('Todas');
   const [selectedStatus, setSelectedStatus] = useState('Todas');
   const [sortBy, setSortBy] = useState('relevantes');
   const [activeCategory, setActiveCategory] = useState('Todas');
-  const [viewMode, setViewMode] = useState('grid'); // 'grid' o 'table'
+  const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'table'
 
-  // Estado para el modal de nuevo producto
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  // Toast de confirmación
+  const [confirmToast, setConfirmToast] = useState(null);
+
+  // Modal Nuevo Producto
+  const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   const [newProduct, setNewProduct] = useState({
-    name: '',
-    brand: 'Fender',
+    code: 'COD-0017',
     category: 'Guitarras eléctricas',
+    description: '',
+    brand: 'Fender',
     model: '',
-    sku: '',
+    ean: '',
     price: '',
-    stock: '',
-    status: 'Disponible'
+    status: 'Normal',
+    initialStock: 0
   });
+
+  // Modal Eliminar Producto
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [productToDelete, setProductToDelete] = useState(null);
+
+  // Validación de EAN-13 en vivo
+  const eanValidation = useMemo(() => {
+    const val = newProduct.ean.trim();
+    if (val.length === 0) return { state: 'empty' };
+    const isNumeric = /^[0-9]+$/.test(val);
+    if (val.length !== 13 || !isNumeric) return { state: 'invalid', message: 'El código EAN-13 no es válido (debe tener 13 dígitos numéricos).' };
+    const isDuplicate = products.some(p => p.ean === val);
+    if (isDuplicate) return { state: 'duplicate', message: 'Este EAN-13 ya se encuentra registrado en el catálogo.' };
+    return { state: 'valid', message: 'Código EAN-13 válido y disponible.' };
+  }, [newProduct.ean, products]);
 
   // Filtrado y ordenamiento en tiempo real
   const filteredProducts = useMemo(() => {
@@ -62,51 +80,101 @@ function Catalogo_de_productos() {
         const matchesSearch =
           item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
           item.brand.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          item.sku.toLowerCase().includes(searchTerm.toLowerCase());
+          item.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          item.ean.includes(searchTerm);
 
         return matchesCategory && matchesBrand && matchesStatus && matchesSearch;
       })
       .sort((a, b) => {
         if (sortBy === 'price-asc') return a.price - b.price;
         if (sortBy === 'price-desc') return b.price - a.price;
-        if (sortBy === 'stock') return b.stock - a.stock;
-        return a.id - b.id; // relevantes / default
+        if (sortBy === 'stock') return (b.central + b.margalef) - (a.central + a.margalef);
+        return a.id - b.id;
       });
   }, [products, searchTerm, selectedBrand, selectedStatus, sortBy, activeCategory]);
 
+  const showToast = (message) => {
+    setConfirmToast(message);
+    setTimeout(() => setConfirmToast(null), 4000);
+  };
+
   const handleCreateProduct = (e) => {
     e.preventDefault();
-    if (!newProduct.name || !newProduct.sku) return;
+    if (!newProduct.description.trim() || eanValidation.state !== 'valid') return;
 
     const created = {
-      ...newProduct,
       id: Date.now(),
-      price: Number(newProduct.price) || 0,
-      stock: Number(newProduct.stock) || 0,
+      code: newProduct.code,
+      name: newProduct.description,
+      brand: newProduct.brand,
+      model: newProduct.model || newProduct.code,
+      ean: newProduct.ean,
+      category: newProduct.category,
+      price: Number(String(newProduct.price).replace(/[^0-9]/g, '')) || 0,
+      status: newProduct.status,
+      central: Number(newProduct.initialStock) || 0,
+      margalef: 0
     };
 
     setProducts([created, ...products]);
-    setIsModalOpen(false);
+    setIsNewModalOpen(false);
+    showToast('Producto guardado correctamente en el catálogo.');
+
     setNewProduct({
-      name: '',
-      brand: 'Fender',
+      code: `COD-${String(products.length + 2).padStart(4, '0')}`,
       category: 'Guitarras eléctricas',
+      description: '',
+      brand: 'Fender',
       model: '',
-      sku: '',
+      ean: '',
       price: '',
-      stock: '',
-      status: 'Disponible'
+      status: 'Normal',
+      initialStock: 0
     });
   };
 
-  const getBadgeClass = (status) => {
-    if (status === 'Disponible') return 'badge-green';
-    if (status === 'Stock bajo') return 'badge-amber';
-    return 'badge-red';
+  const handleDeleteProduct = () => {
+    if (!productToDelete) return;
+    setProducts(products.filter(p => p.id !== productToDelete.id));
+    setIsDeleteModalOpen(false);
+    showToast(`Producto "${productToDelete.name}" eliminado del catálogo.`);
+    setProductToDelete(null);
+  };
+
+  const getBadge = (status) => {
+    if (status === 'Normal') return <span className="badge badge-green"><span className="badge-dot"></span>Normal</span>;
+    if (status === 'Reposición') return <span className="badge badge-amber"><span className="badge-dot"></span>Reposición</span>;
+    return <span className="badge badge-red"><span className="badge-dot"></span>Crítico</span>;
   };
 
   return (
     <div>
+      {/* BANNER DE CONFIRMACIÓN */}
+      {confirmToast && (
+        <div className="confirm-banner">
+          <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M20 6 9 17l-5-5" />
+          </svg>
+          <span>{confirmToast}</span>
+        </div>
+      )}
+
+      {/* ENCABEZADO */}
+      <div className="section-heading">
+        <div>
+          <h2>Catálogo centralizado de productos</h2>
+          <span className="desc">
+            Base maestra de la que dependen inventario, movimientos y alertas — {filteredProducts.length} productos
+          </span>
+        </div>
+        <button className="btn btn-primary" onClick={() => setIsNewModalOpen(true)}>
+          <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+          Nuevo producto
+        </button>
+      </div>
+
       {/* TOOLBAR */}
       <div className="catalog-toolbar">
         <div className="search-input">
@@ -116,7 +184,7 @@ function Catalogo_de_productos() {
           </svg>
           <input
             type="text"
-            placeholder="Buscar por nombre, marca o SKU…"
+            placeholder="Buscar por nombre, marca, código interno o EAN-13…"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -146,8 +214,8 @@ function Catalogo_de_productos() {
           Disponibilidad:
           <select value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value)}>
             <option>Todas</option>
-            <option>Disponible</option>
-            <option>Stock bajo</option>
+            <option>Normal</option>
+            <option>Reposición</option>
             <option>Crítico</option>
           </select>
         </div>
@@ -158,11 +226,10 @@ function Catalogo_de_productos() {
             <option value="relevantes">Más relevantes</option>
             <option value="price-asc">Precio: menor a mayor</option>
             <option value="price-desc">Precio: mayor a menor</option>
-            <option value="stock">Mayor stock disponible</option>
+            <option value="stock">Stock consolidado</option>
           </select>
         </div>
 
-        {/* ALTERNADOR DE VISTA */}
         <div className="view-toggle">
           <button
             className={viewMode === 'grid' ? 'active' : ''}
@@ -201,22 +268,6 @@ function Catalogo_de_productos() {
         ))}
       </div>
 
-      {/* ENCABEZADO Y BOTÓN DE NUEVO PRODUCTO */}
-      <div className="section-heading">
-        <div>
-          <h2>Catálogo de instrumentos</h2>
-          <span className="desc">
-            {filteredProducts.length} {filteredProducts.length === 1 ? 'producto encontrado' : 'productos encontrados'}
-          </span>
-        </div>
-        <button className="btn btn-primary" onClick={() => setIsModalOpen(true)}>
-          <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 5v14M5 12h14" />
-          </svg>
-          Nuevo producto
-        </button>
-      </div>
-
       {/* VISTA EN TARJETAS (GRID) */}
       {viewMode === 'grid' && (
         <div className="product-grid">
@@ -224,81 +275,112 @@ function Catalogo_de_productos() {
             <div className="product-card" key={prod.id}>
               <div className="product-thumb">
                 <span className="thumb-tag">{prod.category}</span>
+                <span className="thumb-code">{prod.code}</span>
                 <svg viewBox="0 0 24 24" fill="none" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M9 18V5l12-2v13" />
                   <circle cx="6" cy="18" r="3" />
                   <circle cx="18" cy="16" r="3" />
                 </svg>
               </div>
+
               <div className="product-body">
                 <span className="product-brand">{prod.brand}</span>
                 <h3 className="product-name">{prod.name}</h3>
-                <span className="product-model">{prod.model}</span>
-                <span className="product-sku">{prod.sku}</span>
+                <span className="product-model">Modelo {prod.model} · EAN {prod.ean}</span>
+
                 <div className="product-meta-row">
                   <span className="product-price">${prod.price.toLocaleString('es-AR')}</span>
-                  <span className="product-stock">{prod.stock} uds.</span>
+                  {getBadge(prod.status)}
                 </div>
-                <div className="product-footer">
-                  <span className={`badge ${getBadgeClass(prod.status)}`}>
-                    <span className="badge-dot"></span>
-                    {prod.status}
-                  </span>
+
+                <div className="product-stock-split">
+                  <span>Central: <b>{prod.central}</b></span>
+                  <span>·</span>
+                  <span>Margalef: <b>{prod.margalef}</b></span>
+                  <span>·</span>
+                  <span>Consol.: <b>{prod.central + prod.margalef}</b></span>
                 </div>
-                <button
-                  className="btn btn-outline"
-                  onClick={() => navigate('/Detalle_producto')}
-                >
-                  Ver detalle
-                </button>
+
+                <div className="product-card-actions">
+                  <button
+                    className="btn btn-outline"
+                    onClick={() => navigate('/Detalle_producto')}
+                  >
+                    Ver detalle
+                  </button>
+                  <button
+                    className="icon-btn btn-icon-only"
+                    title="Eliminar"
+                    onClick={() => {
+                      setProductToDelete(prod);
+                      setIsDeleteModalOpen(true);
+                    }}
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6" />
+                    </svg>
+                  </button>
+                </div>
               </div>
             </div>
           ))}
         </div>
       )}
 
-      {/* VISTA EN TABLA */}
+      {/* VISTA EN TABLA (HU-07 EXACTA) */}
       {viewMode === 'table' && (
         <div className="table-panel">
           <div className="table-scroll">
             <table>
               <thead>
                 <tr>
-                  <th>Producto</th>
+                  <th>Código interno</th>
+                  <th>Nombre / descripción</th>
                   <th>Marca</th>
+                  <th>Modelo</th>
+                  <th>EAN-13</th>
                   <th>Categoría</th>
-                  <th>SKU</th>
-                  <th>Precio</th>
-                  <th>Stock</th>
+                  <th>Precio actual</th>
                   <th>Estado</th>
-                  <th>Acción</th>
+                  <th>Acciones</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredProducts.map((prod) => (
                   <tr key={prod.id}>
-                    <td className="cell-strong">
-                      {prod.name}
-                      <div className="cell-sub">{prod.model}</div>
-                    </td>
+                    <td className="cell-mono">{prod.code}</td>
+                    <td className="cell-strong">{prod.name}</td>
                     <td>{prod.brand}</td>
+                    <td>{prod.model}</td>
+                    <td className="cell-mono">{prod.ean}</td>
                     <td>{prod.category}</td>
-                    <td style={{ fontFamily: 'monospace' }}>{prod.sku}</td>
                     <td className="cell-strong">${prod.price.toLocaleString('es-AR')}</td>
-                    <td>{prod.stock} uds.</td>
+                    <td>{getBadge(prod.status)}</td>
                     <td>
-                      <span className={`badge ${getBadgeClass(prod.status)}`}>
-                        <span className="badge-dot"></span>
-                        {prod.status}
-                      </span>
-                    </td>
-                    <td>
-                      <button
-                        className="btn btn-outline btn-sm"
-                        onClick={() => navigate('/Detalle_producto')}
-                      >
-                        Ver detalle
-                      </button>
+                      <div className="row-actions">
+                        <button
+                          className="icon-btn"
+                          title="Ver detalle"
+                          onClick={() => navigate('/Detalle_producto')}
+                        >
+                          <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z" />
+                            <circle cx="12" cy="12" r="3" />
+                          </svg>
+                        </button>
+                        <button
+                          className="icon-btn"
+                          title="Eliminar"
+                          onClick={() => {
+                            setProductToDelete(prod);
+                            setIsDeleteModalOpen(true);
+                          }}
+                        >
+                          <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6" />
+                          </svg>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -308,55 +390,47 @@ function Catalogo_de_productos() {
         </div>
       )}
 
-      {/* MODAL PARA AGREGAR NUEVO PRODUCTO */}
+      {/* MODAL NUEVO PRODUCTO (HU-07) */}
       <Modal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        title="Crear Nuevo Producto"
+        isOpen={isNewModalOpen}
+        onClose={() => setIsNewModalOpen(false)}
+        title="Nuevo producto"
         footer={
           <>
-            <button className="btn btn-outline" onClick={() => setIsModalOpen(false)}>
+            <button className="btn btn-outline" onClick={() => setIsNewModalOpen(false)}>
               Cancelar
             </button>
-            <button className="btn btn-primary" onClick={handleCreateProduct}>
-              Guardar Producto
+            <button
+              className="btn btn-primary"
+              disabled={eanValidation.state !== 'valid'}
+              onClick={handleCreateProduct}
+            >
+              Guardar producto
             </button>
           </>
         }
       >
         <form onSubmit={handleCreateProduct}>
-          <div className="form-row">
-            <div className="form-field">
-              <label>Nombre del Producto *</label>
-              <input
-                type="text"
-                placeholder="Ej. Telecaster Custom"
-                required
-                value={newProduct.name}
-                onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
-              />
-            </div>
-            <div className="form-field">
-              <label>Marca *</label>
-              <select
-                value={newProduct.brand}
-                onChange={(e) => setNewProduct({ ...newProduct, brand: e.target.value })}
-              >
-                <option>Fender</option>
-                <option>Gibson</option>
-                <option>Yamaha</option>
-                <option>Roland</option>
-                <option>Marshall</option>
-                <option>Shure</option>
-                <option>Korg</option>
-                <option>Cort</option>
-              </select>
-            </div>
+          <div className="modal-notice">
+            <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <path d="M12 16v-4M12 8h.01" />
+            </svg>
+            Los campos marcados con <strong>*</strong> son obligatorios.
           </div>
 
           <div className="form-row">
             <div className="form-field">
-              <label>Categoría</label>
+              <label>Código interno<span className="req">*</span></label>
+              <input
+                type="text"
+                required
+                value={newProduct.code}
+                onChange={(e) => setNewProduct({ ...newProduct, code: e.target.value })}
+              />
+            </div>
+            <div className="form-field">
+              <label>Categoría<span className="req">*</span></label>
               <select
                 value={newProduct.category}
                 onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })}
@@ -366,51 +440,142 @@ function Catalogo_de_productos() {
                 ))}
               </select>
             </div>
-            <div className="form-field">
-              <label>SKU / Código *</label>
-              <input
-                type="text"
-                placeholder="Ej. GTR-FEN-099"
-                required
-                value={newProduct.sku}
-                onChange={(e) => setNewProduct({ ...newProduct, sku: e.target.value })}
-              />
-            </div>
-          </div>
-
-          <div className="form-row">
-            <div className="form-field">
-              <label>Precio ($ ARS)</label>
-              <input
-                type="number"
-                placeholder="Ej. 1500000"
-                value={newProduct.price}
-                onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value })}
-              />
-            </div>
-            <div className="form-field">
-              <label>Stock Inicial</label>
-              <input
-                type="number"
-                placeholder="Ej. 10"
-                value={newProduct.stock}
-                onChange={(e) => setNewProduct({ ...newProduct, stock: e.target.value })}
-              />
-            </div>
           </div>
 
           <div className="form-row">
             <div className="form-field full">
-              <label>Modelo / Descripción Corta</label>
+              <label>Descripción / Nombre<span className="req">*</span></label>
               <input
                 type="text"
-                placeholder="Ej. Edición especial 2026, color Butterscotch"
+                placeholder="Ej: Guitarra eléctrica Stratocaster, cuerpo tilo…"
+                required
+                value={newProduct.description}
+                onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className="form-field">
+              <label>Marca<span className="req">*</span></label>
+              <input
+                type="text"
+                placeholder="Ej: Fender"
+                required
+                value={newProduct.brand}
+                onChange={(e) => setNewProduct({ ...newProduct, brand: e.target.value })}
+              />
+            </div>
+            <div className="form-field">
+              <label>Modelo</label>
+              <input
+                type="text"
+                placeholder="Ej: MX23"
                 value={newProduct.model}
                 onChange={(e) => setNewProduct({ ...newProduct, model: e.target.value })}
               />
             </div>
           </div>
+
+          <div className="form-row">
+            <div className="form-field">
+              <label>EAN-13<span className="req">*</span></label>
+              <input
+                type="text"
+                maxLength={13}
+                placeholder="Ej: 7791234500017"
+                required
+                value={newProduct.ean}
+                onChange={(e) => setNewProduct({ ...newProduct, ean: e.target.value })}
+              />
+              {eanValidation.state === 'invalid' && (
+                <span className="field-error">
+                  <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" />
+                    <path d="M12 8v4M12 16h.01" />
+                  </svg>
+                  {eanValidation.message}
+                </span>
+              )}
+              {eanValidation.state === 'duplicate' && (
+                <span className="field-error">
+                  <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" />
+                    <path d="M12 8v4M12 16h.01" />
+                  </svg>
+                  {eanValidation.message}
+                </span>
+              )}
+              {eanValidation.state === 'valid' && (
+                <span className="field-success">
+                  <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20 6 9 17l-5-5" />
+                  </svg>
+                  {eanValidation.message}
+                </span>
+              )}
+            </div>
+
+            <div className="form-field">
+              <label>Precio ($ ARS)<span className="req">*</span></label>
+              <input
+                type="number"
+                placeholder="Ej: 650000"
+                required
+                value={newProduct.price}
+                onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className="form-field">
+              <label>Estado<span className="req">*</span></label>
+              <select
+                value={newProduct.status}
+                onChange={(e) => setNewProduct({ ...newProduct, status: e.target.value })}
+              >
+                <option value="Normal">Normal</option>
+                <option value="Reposición">Reposición</option>
+                <option value="Crítico">Crítico</option>
+              </select>
+            </div>
+            <div className="form-field">
+              <label>Stock inicial (Tienda Central)</label>
+              <input
+                type="number"
+                min={0}
+                value={newProduct.initialStock}
+                onChange={(e) => setNewProduct({ ...newProduct, initialStock: e.target.value })}
+              />
+            </div>
+          </div>
         </form>
+      </Modal>
+
+      {/* MODAL ELIMINAR PRODUCTO */}
+      <Modal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        title="Eliminar producto"
+        footer={
+          <>
+            <button className="btn btn-outline" onClick={() => setIsDeleteModalOpen(false)}>
+              Cancelar
+            </button>
+            <button
+              className="btn btn-primary"
+              style={{ background: 'var(--crit)' }}
+              onClick={handleDeleteProduct}
+            >
+              Eliminar producto
+            </button>
+          </>
+        }
+      >
+        <p style={{ fontSize: '13.5px', color: 'var(--gray-700)', lineHeight: '1.6' }}>
+          ¿Confirmás que querés eliminar <strong>{productToDelete?.name} ({productToDelete?.code})</strong> del catálogo? Esta acción no afecta el historial de movimientos ya registrado.
+        </p>
       </Modal>
     </div>
   );

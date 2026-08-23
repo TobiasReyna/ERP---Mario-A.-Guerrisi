@@ -2,138 +2,130 @@ import { useState, useMemo } from 'react';
 import Modal from '../components/Modal';
 
 const INITIAL_INVENTORY = [
-  { id: 1, name: 'Fender Stratocaster Player', sku: 'GTR-FEN-001', brand: 'Fender', category: 'Guitarras eléctricas', central: 10, norte: 3, sur: 3 },
-  { id: 2, name: 'Gibson Les Paul Studio', sku: 'GTR-GIB-002', brand: 'Gibson', category: 'Guitarras eléctricas', central: 4, norte: 1, sur: 2 },
-  { id: 3, name: 'Cort AD810', sku: 'GTR-COR-007', brand: 'Cort', category: 'Guitarras acústicas', central: 12, norte: 6, sur: 9 },
-  { id: 4, name: 'Taylor 214ce', sku: 'GTR-TAY-008', brand: 'Taylor', category: 'Guitarras acústicas', central: 3, norte: 0, sur: 1 },
-  { id: 5, name: 'Fender Player Jazz Bass', sku: 'BAJ-FEN-009', brand: 'Fender', category: 'Bajos', central: 5, norte: 2, sur: 3 },
-  { id: 6, name: 'Ibanez GSR200', sku: 'BAJ-IBA-010', brand: 'Ibanez', category: 'Bajos', central: 2, norte: 1, sur: 0 },
-  { id: 7, name: 'Yamaha P-145', sku: 'KEY-YAM-003', brand: 'Yamaha', category: 'Pianos', central: 9, norte: 4, sur: 6 },
-  { id: 8, name: 'Korg B2', sku: 'KEY-KOR-011', brand: 'Korg', category: 'Teclados', central: 7, norte: 3, sur: 2 },
-  { id: 9, name: 'Roland TD-17', sku: 'BAT-ROL-006', brand: 'Roland', category: 'Baterías', central: 3, norte: 1, sur: 1 },
-  { id: 10, name: 'Pearl Export Series', sku: 'BAT-PEA-012', brand: 'Pearl', category: 'Baterías', central: 2, norte: 0, sur: 0 },
-  { id: 11, name: 'LP Cajón Peruano', sku: 'PER-LPX-013', brand: 'LP', category: 'Percusión', central: 15, norte: 8, sur: 10 },
-  { id: 12, name: 'Marshall MG30GFX', sku: 'AMP-MAR-005', brand: 'Marshall', category: 'Amplificadores', central: 6, norte: 2, sur: 3 },
-  { id: 13, name: 'Shure SM58', sku: 'MIC-SHR-004', brand: 'Shure', category: 'Micrófonos', central: 20, norte: 10, sur: 14 },
-  { id: 14, name: 'Yamaha HS5', sku: 'AUD-YAM-014', brand: 'Yamaha', category: 'Audio', central: 4, norte: 2, sur: 1 },
-  { id: 15, name: 'Dunlop Correa + Púas Kit', sku: 'ACC-DUN-015', brand: 'Dunlop', category: 'Accesorios', central: 30, norte: 18, sur: 22 },
-  { id: 16, name: 'Yamaha YTR-2330', sku: 'VIE-YAM-016', brand: 'Yamaha', category: 'Viento', central: 2, norte: 1, sur: 0 },
+  { id: 1, name: 'Fender Stratocaster Player', code: 'COD-0001', category: 'Guitarras eléctricas', central: 8, margalef: 3, status: 'Normal' },
+  { id: 2, name: 'Gibson Les Paul Studio', code: 'COD-0002', category: 'Guitarras eléctricas', central: 4, margalef: 2, status: 'Reposición' },
+  { id: 3, name: 'Cort AD810', code: 'COD-0003', category: 'Guitarras acústicas', central: 12, margalef: 9, status: 'Normal' },
+  { id: 4, name: 'Taylor 214ce', code: 'COD-0004', category: 'Guitarras acústicas', central: 3, margalef: 1, status: 'Crítico' },
+  { id: 5, name: 'Fender Player Jazz Bass', code: 'COD-0005', category: 'Bajos', central: 5, margalef: 3, status: 'Reposición' },
+  { id: 6, name: 'Ibanez GSR200', code: 'COD-0006', category: 'Bajos', central: 2, margalef: 1, status: 'Crítico' },
+  { id: 7, name: 'Yamaha P-145', code: 'COD-0007', category: 'Teclados / Pianos', central: 1, margalef: 1, status: 'Crítico' },
+  { id: 8, name: 'Korg B2', code: 'COD-0008', category: 'Teclados / Pianos', central: 7, margalef: 3, status: 'Normal' },
+  { id: 9, name: 'Roland TD-17', code: 'COD-0009', category: 'Baterías / Percusión', central: 3, margalef: 1, status: 'Crítico' },
+  { id: 10, name: 'Pearl Export Series', code: 'COD-0010', category: 'Baterías / Percusión', central: 2, margalef: 0, status: 'Crítico' },
+  { id: 11, name: 'LP Cajón Peruano', code: 'COD-0011', category: 'Baterías / Percusión', central: 15, margalef: 10, status: 'Normal' },
+  { id: 12, name: 'Marshall MG30GFX', code: 'COD-0012', category: 'Amplificadores', central: 6, margalef: 3, status: 'Reposición' },
+  { id: 13, name: 'Shure SM58', code: 'COD-0013', category: 'Micrófonos / Audio', central: 20, margalef: 12, status: 'Normal' },
+  { id: 14, name: 'Yamaha HS5', code: 'COD-0014', category: 'Micrófonos / Audio', central: 4, margalef: 2, status: 'Reposición' },
+  { id: 15, name: 'Dunlop Correa + Púas Kit', code: 'COD-0015', category: 'Accesorios', central: 30, margalef: 22, status: 'Normal' },
+  { id: 16, name: 'Yamaha YTR-2330', code: 'COD-0016', category: 'Viento', central: 2, margalef: 0, status: 'Crítico' },
 ];
-
-const WAREHOUSE_MAP = {
-  'Depósito Central': 'central',
-  'Depósito Norte': 'norte',
-  'Depósito Sur': 'sur',
-};
 
 function Inventario() {
   const [items, setItems] = useState(INITIAL_INVENTORY);
-  const [activeTab, setActiveTab] = useState('Todos los depósitos');
+  const [activeTab, setActiveTab] = useState('Ambos depósitos');
   const [selectedCategory, setSelectedCategory] = useState('Todas');
-  const [selectedBrand, setSelectedBrand] = useState('Todas');
   const [selectedStatus, setSelectedStatus] = useState('Todos');
 
-  // Modal de Ajuste
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedItem, setSelectedItem] = useState(null);
-  const [adjustmentData, setAdjustmentData] = useState({
-    deposito: 'central',
-    tipoOperacion: 'sumar',
-    cantidad: 1,
-    motivo: 'Ajuste de inventario'
+  // Banner de confirmación
+  const [confirmBanner, setConfirmBanner] = useState(null);
+
+  // Modal Transferencia
+  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
+  const [selectedProductIndex, setSelectedProductIndex] = useState(0);
+  const [transferData, setTransferData] = useState({
+    origen: 'central',
+    destino: 'margalef',
+    cantidad: 3,
+    motivo: 'Rebalanceo de stock',
+    responsable: 'Juan Pérez'
   });
 
-  // Determina el estado del stock según la cantidad
-  const calculateStatus = (qty) => {
-    if (qty === 0) return { label: 'Sin stock', badgeClass: 'badge-red' };
-    if (qty <= 2) return { label: 'Crítico', badgeClass: 'badge-red' };
-    if (qty <= 4) return { label: 'Stock bajo', badgeClass: 'badge-amber' };
-    return { label: 'Disponible', badgeClass: 'badge-green' };
+  const selectedItem = items[selectedProductIndex] || items[0];
+
+  const showConfirm = (text) => {
+    setConfirmBanner(text);
+    setTimeout(() => setConfirmBanner(null), 4500);
   };
 
-  // Filtrado estricto por depósito, categoría, marca y estado
+  // Filtrado reactivo
   const filteredItems = useMemo(() => {
-    const isSingleWarehouse = activeTab !== 'Todos los depósitos';
-    const whKey = isSingleWarehouse ? WAREHOUSE_MAP[activeTab] : null;
-
     return items.filter((item) => {
       const matchCategory = selectedCategory === 'Todas' || item.category === selectedCategory;
-      const matchBrand = selectedBrand === 'Todas' || item.brand === selectedBrand;
+      const matchStatus = selectedStatus === 'Todos' || item.status === selectedStatus;
 
-      // Cantidad a evaluar (del depósito puntual o la suma de los 3)
-      const currentStock = isSingleWarehouse ? item[whKey] : item.central + item.norte + item.sur;
-      const { label: itemStatus } = calculateStatus(currentStock);
+      let matchWarehouse = true;
+      if (activeTab === 'Tienda Central') matchWarehouse = item.central > 0;
+      if (activeTab === 'Galería Margalef') matchWarehouse = item.margalef > 0;
 
-      const matchStatus = selectedStatus === 'Todos' || itemStatus === selectedStatus;
-
-      // FILTRO CLAVE: si hay un depósito seleccionado, solo mostramos productos con stock > 0 en ese depósito
-      const matchWarehouse = isSingleWarehouse ? item[whKey] > 0 : true;
-
-      return matchCategory && matchBrand && matchStatus && matchWarehouse;
+      return matchCategory && matchStatus && matchWarehouse;
     });
-  }, [items, activeTab, selectedCategory, selectedBrand, selectedStatus]);
+  }, [items, activeTab, selectedCategory, selectedStatus]);
 
-  const handleOpenAdjustModal = (item) => {
-    const defaultWh = activeTab !== 'Todos los depósitos' ? WAREHOUSE_MAP[activeTab] : 'central';
-    setSelectedItem(item);
-    setAdjustmentData({
-      deposito: defaultWh,
-      tipoOperacion: 'sumar',
-      cantidad: 1,
-      motivo: 'Recuento físico / corrección'
-    });
-    setIsModalOpen(true);
-  };
-
-  const handleSaveAdjustment = (e) => {
+  const handleConfirmTransfer = (e) => {
     e.preventDefault();
-    if (!selectedItem) return;
+    const qty = Number(transferData.cantidad) || 0;
 
-    const qty = Number(adjustmentData.cantidad) || 0;
-    const delta = adjustmentData.tipoOperacion === 'sumar' ? qty : -qty;
+    if (transferData.origen === 'central' && qty > selectedItem.central) {
+      alert(`Stock insuficiente en Tienda Central (disponibles: ${selectedItem.central}).`);
+      return;
+    }
+    if (transferData.origen === 'margalef' && qty > selectedItem.margalef) {
+      alert(`Stock insuficiente en Galería Margalef (disponibles: ${selectedItem.margalef}).`);
+      return;
+    }
 
-    setItems((prevItems) =>
-      prevItems.map((item) => {
-        if (item.id !== selectedItem.id) return item;
-        const newQty = Math.max(0, item[adjustmentData.deposito] + delta);
+    setItems((prev) =>
+      prev.map((it, idx) => {
+        if (idx !== selectedProductIndex) return it;
         return {
-          ...item,
-          [adjustmentData.deposito]: newQty
+          ...it,
+          central: transferData.origen === 'central' ? it.central - qty : it.central + qty,
+          margalef: transferData.origen === 'central' ? it.margalef + qty : it.margalef - qty,
         };
       })
     );
 
-    setIsModalOpen(false);
+    setIsTransferModalOpen(false);
+    showConfirm('Transferencia realizada correctamente. El stock consolidado no se modifica, solo se redistribuye.');
   };
 
-  const getStockCellClass = (qty) => {
-    if (qty === 0) return 'stock-cell zero';
-    if (qty <= 2) return 'stock-cell crit';
-    if (qty <= 4) return 'stock-cell low';
-    return 'stock-cell';
+  const getStatusBadge = (status) => {
+    if (status === 'Normal') return <span className="badge badge-green"><span className="badge-dot"></span>Normal</span>;
+    if (status === 'Reposición') return <span className="badge badge-amber"><span className="badge-dot"></span>Reposición</span>;
+    return <span className="badge badge-red"><span className="badge-dot"></span>Crítico</span>;
   };
-
-  const isSpecificWarehouse = activeTab !== 'Todos los depósitos';
-  const currentWhKey = isSpecificWarehouse ? WAREHOUSE_MAP[activeTab] : null;
 
   return (
     <div>
+      {/* ENCABEZADO Y ACCIONES */}
       <div className="section-heading">
         <div>
-          <h2>
-            {isSpecificWarehouse ? `Inventario — ${activeTab}` : 'Inventario multi-depósito'}
-          </h2>
+          <h2>Inventario multi-depósito</h2>
           <span className="desc">
-            {isSpecificWarehouse
-              ? `Mostrando ${filteredItems.length} productos con existencias en ${activeTab}`
-              : 'Comparación consolidada de stock entre los 3 depósitos activos'}
+            Cada producto puede tener cantidades distintas en Tienda Central y Galería Margalef — el stock consolidado es la suma de ambas
           </span>
         </div>
+        <button className="btn btn-outline" onClick={() => setIsTransferModalOpen(true)}>
+          <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M7 7h13l-3-3M17 17H4l3 3" />
+          </svg>
+          Transferir stock
+        </button>
       </div>
 
-      {/* PESTAÑAS DE FILTRADO POR DEPÓSITO */}
+      {/* BANNER DE CONFIRMACIÓN */}
+      {confirmBanner && (
+        <div className="confirm-banner">
+          <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M20 6 9 17l-5-5" />
+          </svg>
+          <span>{confirmBanner}</span>
+        </div>
+      )}
+
+      {/* PESTAÑAS DE DEPÓSITO */}
       <div className="warehouse-tabs">
-        {['Todos los depósitos', 'Depósito Central', 'Depósito Norte', 'Depósito Sur'].map((tab) => (
+        {['Ambos depósitos', 'Tienda Central', 'Galería Margalef'].map((tab) => (
           <button
             key={tab}
             className={`warehouse-tab ${activeTab === tab ? 'active' : ''}`}
@@ -144,7 +136,27 @@ function Inventario() {
         ))}
       </div>
 
-      {/* FILTROS SECUNDARIOS */}
+      {/* LEYENDA VISUAL */}
+      <div className="inventory-legend">
+        <div className="legend-item">
+          <span className="legend-swatch" style={{ background: 'var(--white)', border: '1px solid var(--gray-300)' }}></span>
+          Stock por depósito
+        </div>
+        <div className="legend-item">
+          <span className="legend-swatch" style={{ background: 'var(--gray-50)', border: '2px solid var(--gray-300)' }}></span>
+          Stock consolidado (suma)
+        </div>
+        <div className="legend-item">
+          <span className="legend-swatch" style={{ background: 'var(--crit)' }}></span>
+          Crítico (≤ mínimo)
+        </div>
+        <div className="legend-item">
+          <span className="legend-swatch" style={{ background: 'var(--amber)' }}></span>
+          Requiere reposición
+        </div>
+      </div>
+
+      {/* FILTROS */}
       <div className="filter-bar">
         <div className="select-field">
           Categoría:
@@ -153,34 +165,12 @@ function Inventario() {
             <option>Guitarras eléctricas</option>
             <option>Guitarras acústicas</option>
             <option>Bajos</option>
-            <option>Teclados</option>
-            <option>Pianos</option>
-            <option>Baterías</option>
-            <option>Percusión</option>
+            <option>Teclados / Pianos</option>
+            <option>Baterías / Percusión</option>
             <option>Amplificadores</option>
-            <option>Micrófonos</option>
-            <option>Audio</option>
+            <option>Micrófonos / Audio</option>
             <option>Accesorios</option>
             <option>Viento</option>
-          </select>
-        </div>
-
-        <div className="select-field">
-          Marca:
-          <select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)}>
-            <option>Todas</option>
-            <option>Fender</option>
-            <option>Gibson</option>
-            <option>Yamaha</option>
-            <option>Roland</option>
-            <option>Cort</option>
-            <option>Taylor</option>
-            <option>Ibanez</option>
-            <option>Pearl</option>
-            <option>LP</option>
-            <option>Marshall</option>
-            <option>Shure</option>
-            <option>Dunlop</option>
           </select>
         </div>
 
@@ -188,85 +178,75 @@ function Inventario() {
           Estado:
           <select value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value)}>
             <option>Todos</option>
-            <option>Disponible</option>
-            <option>Stock bajo</option>
+            <option>Normal</option>
+            <option>Reposición</option>
             <option>Crítico</option>
-            <option>Sin stock</option>
           </select>
         </div>
       </div>
 
-      {/* TABLA ADAPTADA DINÁMICAMENTE */}
+      {/* TABLA MULTI-DEPÓSITO */}
       <div className="table-panel">
         <div className="table-scroll">
           <table>
             <thead>
               <tr>
                 <th>Producto</th>
-                <th>SKU</th>
-                {!isSpecificWarehouse ? (
+                <th>Código</th>
+                {activeTab === 'Ambos depósitos' && (
                   <>
-                    <th>Central</th>
-                    <th>Norte</th>
-                    <th>Sur</th>
-                    <th>Stock total</th>
+                    <th>Tienda Central</th>
+                    <th>Galería Margalef</th>
                   </>
-                ) : (
-                  <th>Stock en {activeTab.replace('Depósito ', '')}</th>
                 )}
+                {activeTab === 'Tienda Central' && <th>Tienda Central</th>}
+                {activeTab === 'Galería Margalef' && <th>Galería Margalef</th>}
+                <th>Stock consolidado</th>
                 <th>Estado</th>
-                <th>Acción</th>
               </tr>
             </thead>
             <tbody>
               {filteredItems.length === 0 ? (
                 <tr>
-                  <td colSpan={isSpecificWarehouse ? 5 : 8} style={{ textAlign: 'center', padding: '32px', color: 'var(--gray-500)' }}>
-                    No se encontraron productos con stock en este depósito bajo los filtros seleccionados.
+                  <td colSpan="6" style={{ textAlign: 'center', padding: '32px', color: 'var(--gray-500)' }}>
+                    No se encontraron productos para los filtros seleccionados.
                   </td>
                 </tr>
               ) : (
                 filteredItems.map((item) => {
-                  const stockEvaluated = isSpecificWarehouse
-                    ? item[currentWhKey]
-                    : item.central + item.norte + item.sur;
-                  const statusInfo = calculateStatus(stockEvaluated);
-
+                  const consol = item.central + item.margalef;
                   return (
                     <tr key={item.id}>
-                      <td className="cell-strong">
-                        {item.name}
-                        <div className="cell-sub">{item.brand} · {item.category}</div>
-                      </td>
-                      <td style={{ fontFamily: 'monospace' }}>{item.sku}</td>
+                      <td className="cell-strong">{item.name}</td>
+                      <td className="cell-mono">{item.code}</td>
 
-                      {!isSpecificWarehouse ? (
+                      {activeTab === 'Ambos depósitos' && (
                         <>
-                          <td className={getStockCellClass(item.central)}>{item.central}</td>
-                          <td className={getStockCellClass(item.norte)}>{item.norte}</td>
-                          <td className={getStockCellClass(item.sur)}>{item.sur}</td>
-                          <td className="cell-strong">{stockEvaluated}</td>
+                          <td className={`stock-cell ${item.central === 0 ? 'zero' : item.central <= 2 ? 'low' : ''}`}>
+                            {item.central}
+                          </td>
+                          <td className={`stock-cell ${item.margalef === 0 ? 'zero' : item.margalef <= 1 ? 'low' : ''}`}>
+                            {item.margalef}
+                          </td>
                         </>
-                      ) : (
-                        <td className={`cell-strong ${getStockCellClass(item[currentWhKey])}`}>
-                          {item[currentWhKey]} uds.
+                      )}
+
+                      {activeTab === 'Tienda Central' && (
+                        <td className={`stock-cell ${item.central === 0 ? 'zero' : item.central <= 2 ? 'low' : ''}`}>
+                          {item.central}
                         </td>
                       )}
 
-                      <td>
-                        <span className={`badge ${statusInfo.badgeClass}`}>
-                          <span className="badge-dot"></span>
-                          {statusInfo.label}
-                        </span>
+                      {activeTab === 'Galería Margalef' && (
+                        <td className={`stock-cell ${item.margalef === 0 ? 'zero' : item.margalef <= 1 ? 'low' : ''}`}>
+                          {item.margalef}
+                        </td>
+                      )}
+
+                      <td className={`stock-cell consolidated-cell ${item.status === 'Crítico' ? 'crit' : ''}`}>
+                        {consol}
                       </td>
-                      <td>
-                        <button
-                          className="btn btn-outline btn-sm"
-                          onClick={() => handleOpenAdjustModal(item)}
-                        >
-                          Ajustar
-                        </button>
-                      </td>
+                      <td>{getStatusBadge(item.status)}</td>
                     </tr>
                   );
                 })
@@ -276,94 +256,135 @@ function Inventario() {
         </div>
       </div>
 
-      {/* MODAL DE AJUSTE */}
+      {/* MODAL TRANSFERIR STOCK (HU-01) */}
       <Modal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        title={selectedItem ? `Ajustar Stock: ${selectedItem.name}` : 'Ajustar Inventario'}
+        isOpen={isTransferModalOpen}
+        onClose={() => setIsTransferModalOpen(false)}
+        title="Transferir stock entre depósitos"
         footer={
           <>
-            <button className="btn btn-outline" onClick={() => setIsModalOpen(false)}>
+            <button className="btn btn-outline" onClick={() => setIsTransferModalOpen(false)}>
               Cancelar
             </button>
-            <button className="btn btn-primary" onClick={handleSaveAdjustment}>
-              Aplicar Corrección
+            <button className="btn btn-primary" onClick={handleConfirmTransfer}>
+              Confirmar transferencia
             </button>
           </>
         }
       >
-        {selectedItem && (
-          <form onSubmit={handleSaveAdjustment}>
-            <div className="stock-preview" style={{ marginBottom: '16px' }}>
+        <form onSubmit={handleConfirmTransfer}>
+          <div className="form-row">
+            <div className="form-field full">
+              <label>Producto *</label>
+              <select
+                value={selectedProductIndex}
+                onChange={(e) => setSelectedProductIndex(Number(e.target.value))}
+              >
+                {items.map((prod, idx) => (
+                  <option key={prod.id} value={idx}>
+                    {prod.name} — Consolidado: {prod.central + prod.margalef}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className="form-field">
+              <label>Depósito origen *</label>
+              <select
+                value={transferData.origen}
+                onChange={(e) => {
+                  const orig = e.target.value;
+                  setTransferData({
+                    ...transferData,
+                    origen: orig,
+                    destino: orig === 'central' ? 'margalef' : 'central'
+                  });
+                }}
+              >
+                <option value="central">Tienda Central ({selectedItem.central} uds.)</option>
+                <option value="margalef">Galería Margalef ({selectedItem.margalef} uds.)</option>
+              </select>
+            </div>
+
+            <div className="form-field">
+              <label>Depósito destino *</label>
+              <select
+                value={transferData.destino}
+                onChange={(e) => setTransferData({ ...transferData, destino: e.target.value })}
+              >
+                <option value="margalef">Galería Margalef</option>
+                <option value="central">Tienda Central</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className="form-field">
+              <label>Cantidad *</label>
+              <input
+                type="number"
+                min="1"
+                required
+                value={transferData.cantidad}
+                onChange={(e) => setTransferData({ ...transferData, cantidad: Number(e.target.value) })}
+              />
+            </div>
+            <div className="form-field">
+              <label>Usuario responsable</label>
+              <select
+                value={transferData.responsable}
+                onChange={(e) => setTransferData({ ...transferData, responsable: e.target.value })}
+              >
+                <option>Juan Pérez</option>
+                <option>María Gómez</option>
+                <option>Carlos Ruiz</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className="form-field full">
+              <label>Motivo / observación</label>
+              <textarea
+                placeholder="Ej: Rebalanceo de stock, solicitud de sucursal…"
+                value={transferData.motivo}
+                onChange={(e) => setTransferData({ ...transferData, motivo: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div className="form-field">
+            <label>Vista previa de la redistribución</label>
+            <div className="stock-preview">
               <div className="sp-item">
-                <div className="n">{selectedItem.central}</div>
-                <div className="l">Central</div>
-              </div>
-              <div className="sp-item">
-                <div className="n">{selectedItem.norte}</div>
-                <div className="l">Norte</div>
-              </div>
-              <div className="sp-item">
-                <div className="n">{selectedItem.sur}</div>
-                <div className="l">Sur</div>
-              </div>
-              <div className="sp-item">
-                <div className="n" style={{ color: 'var(--red)' }}>
-                  {selectedItem.central + selectedItem.norte + selectedItem.sur}
+                <div className="n">
+                  {transferData.origen === 'central'
+                    ? `${selectedItem.central} → ${Math.max(0, selectedItem.central - transferData.cantidad)}`
+                    : `${selectedItem.margalef} → ${Math.max(0, selectedItem.margalef - transferData.cantidad)}`}
                 </div>
-                <div className="l">Total Consolidado</div>
+                <div className="l">{transferData.origen === 'central' ? 'Tienda Central' : 'Galería Margalef'}</div>
+              </div>
+              <div className="sp-arrow">→</div>
+              <div className="sp-item">
+                <div className="n">
+                  {transferData.origen === 'central'
+                    ? `${selectedItem.margalef} → ${selectedItem.margalef + Number(transferData.cantidad || 0)}`
+                    : `${selectedItem.central} → ${selectedItem.central + Number(transferData.cantidad || 0)}`}
+                </div>
+                <div className="l">{transferData.destino === 'margalef' ? 'Galería Margalef' : 'Tienda Central'}</div>
+              </div>
+              <div className="sp-arrow">=</div>
+              <div className="sp-item">
+                <div className="n" style={{ color: 'var(--black)' }}>
+                  {selectedItem.central + selectedItem.margalef}
+                </div>
+                <div className="l">Consolidado (sin cambios)</div>
               </div>
             </div>
-
-            <div className="form-row">
-              <div className="form-field">
-                <label>Depósito a Modificar</label>
-                <select
-                  value={adjustmentData.deposito}
-                  onChange={(e) => setAdjustmentData({ ...adjustmentData, deposito: e.target.value })}
-                >
-                  <option value="central">Depósito Central</option>
-                  <option value="norte">Depósito Norte</option>
-                  <option value="sur">Depósito Sur</option>
-                </select>
-              </div>
-
-              <div className="form-field">
-                <label>Operación</label>
-                <select
-                  value={adjustmentData.tipoOperacion}
-                  onChange={(e) => setAdjustmentData({ ...adjustmentData, tipoOperacion: e.target.value })}
-                >
-                  <option value="sumar">Sumar existencias (+)</option>
-                  <option value="restar">Restar existencias (-)</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="form-row">
-              <div className="form-field">
-                <label>Cantidad de Unidades</label>
-                <input
-                  type="number"
-                  min="1"
-                  required
-                  value={adjustmentData.cantidad}
-                  onChange={(e) => setAdjustmentData({ ...adjustmentData, cantidad: e.target.value })}
-                />
-              </div>
-
-              <div className="form-field">
-                <label>Motivo</label>
-                <input
-                  type="text"
-                  placeholder="Ej. Recuento físico, merma..."
-                  value={adjustmentData.motivo}
-                  onChange={(e) => setAdjustmentData({ ...adjustmentData, motivo: e.target.value })}
-                />
-              </div>
-            </div>
-          </form>
-        )}
+          </div>
+        </form>
       </Modal>
     </div>
   );

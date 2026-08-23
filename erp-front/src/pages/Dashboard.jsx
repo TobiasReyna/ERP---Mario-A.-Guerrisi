@@ -1,26 +1,20 @@
 import { Link } from 'react-router-dom';
-import { useMemo } from 'react';
 
 const CATEGORY_DATA = [
-  { name: 'Guitarras eléctricas', value: 612, alt: false },
-  { name: 'Guitarras acústicas', value: 398, alt: true },
-  { name: 'Bajos', value: 211, alt: false },
-  { name: 'Teclados y pianos', value: 487, alt: true },
-  { name: 'Baterías y percusión', value: 318, alt: false },
-  { name: 'Amplificadores', value: 267, alt: true },
-  { name: 'Micrófonos y audio', value: 743, alt: false },
-  { name: 'Accesorios', value: 806, alt: true },
+  { name: 'Guitarras eléctricas', value: 17, percentage: 37, alt: false },
+  { name: 'Guitarras acústicas', value: 25, percentage: 56, alt: true },
+  { name: 'Bajos', value: 11, percentage: 26, alt: false },
+  { name: 'Teclados y pianos', value: 12, percentage: 27, alt: true },
+  { name: 'Baterías y percusión', value: 31, percentage: 70, alt: false },
+  { name: 'Amplificadores', value: 9, percentage: 20, alt: true },
+  { name: 'Micrófonos y audio', value: 38, percentage: 86, alt: false },
+  { name: 'Accesorios', value: 52, percentage: 100, alt: true },
 ];
 
 function Dashboard() {
-  // Calculamos el valor más alto para escalar las barras de 0 a 100%
-  const maxCategoryValue = useMemo(() => {
-    return Math.max(...CATEGORY_DATA.map((c) => c.value));
-  }, []);
-
   return (
     <div>
-      {/* TARJETAS DE ESTADÍSTICAS */}
+      {/* 4 TARJETAS DE MÉTRICAS */}
       <div className="stats-grid">
         <div className="stat-card">
           <div className="stat-card-top">
@@ -31,7 +25,7 @@ function Dashboard() {
             </div>
             <span className="stat-trend up">+4.2%</span>
           </div>
-          <div className="stat-value">186</div>
+          <div className="stat-value">16</div>
           <div className="stat-label">Productos en catálogo</div>
         </div>
 
@@ -45,7 +39,7 @@ function Dashboard() {
             </div>
             <span className="stat-trend flat">estable</span>
           </div>
-          <div className="stat-value">3.842</div>
+          <div className="stat-value">227</div>
           <div className="stat-label">Unidades — stock consolidado</div>
         </div>
 
@@ -59,7 +53,7 @@ function Dashboard() {
             </div>
             <span className="stat-trend down">+2 hoy</span>
           </div>
-          <div className="stat-value">12</div>
+          <div className="stat-value">10</div>
           <div className="stat-label">Productos que requieren atención</div>
         </div>
 
@@ -72,41 +66,35 @@ function Dashboard() {
             </div>
             <span className="stat-trend up">+18%</span>
           </div>
-          <div className="stat-value">27</div>
+          <div className="stat-value">9</div>
           <div className="stat-label">Movimientos del día</div>
         </div>
       </div>
 
-      {/* FILA DE GRÁFICOS Y ALERTAS */}
+      {/* FILA DE BARRAS DE CATEGORÍA Y ALERTAS RECIENTES */}
       <div className="dashboard-row">
-        {/* GRÁFICO DE BARRAS PROPORCIONAL */}
+        {/* STOCK CONSOLIDADO POR CATEGORÍA */}
         <div className="panel">
           <div className="panel-header">
             <h3>Stock consolidado por categoría</h3>
-            <Link to="/Inventario">
-              <span className="link">Ver inventario</span>
+            <Link to="/Inventario" className="link">
+              Ver inventario
             </Link>
           </div>
           <div className="panel-body">
             <div className="bar-chart">
-              {CATEGORY_DATA.map((item) => {
-                const percentage = Math.round((item.value / maxCategoryValue) * 100);
-                return (
-                  <div className="bar-row" key={item.name}>
-                    <span className="bar-row-label">{item.name}</span>
-                    <div className="bar-track">
-                      <div
-                        className={`bar-fill ${item.alt ? 'alt' : ''}`}
-                        style={{
-                          width: `${percentage}%`,
-                          transition: 'width 0.4s ease-in-out',
-                        }}
-                      ></div>
-                    </div>
-                    <span className="bar-row-value">{item.value}</span>
+              {CATEGORY_DATA.map((item) => (
+                <div className="bar-row" key={item.name}>
+                  <span className="bar-row-label">{item.name}</span>
+                  <div className="bar-track">
+                    <div
+                      className={`bar-fill ${item.alt ? 'alt' : ''}`}
+                      style={{ width: `${item.percentage}%`, transition: 'width 0.4s ease' }}
+                    ></div>
                   </div>
-                );
-              })}
+                  <span className="bar-row-value">{item.value}</span>
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -115,8 +103,8 @@ function Dashboard() {
         <div className="panel">
           <div className="panel-header">
             <h3>Alertas recientes</h3>
-            <Link to="/Alertas_de_stock">
-              <span className="link">Ver todas</span>
+            <Link to="/Alertas_de_stock" className="link">
+              Ver todas
             </Link>
           </div>
           <div className="panel-body">
@@ -124,7 +112,7 @@ function Dashboard() {
               <span className="alert-mini-dot crit"></span>
               <div className="alert-mini-info">
                 <div className="alert-mini-name">Pearl Export Series</div>
-                <div className="alert-mini-sub">Depósito Central · mínimo 4</div>
+                <div className="alert-mini-sub">Tienda Central · mínimo 4</div>
               </div>
               <span className="alert-mini-stock">2 uds.</span>
             </div>
@@ -133,47 +121,47 @@ function Dashboard() {
               <span className="alert-mini-dot crit"></span>
               <div className="alert-mini-info">
                 <div className="alert-mini-name">Ibanez GSR200</div>
-                <div className="alert-mini-sub">Depósito Sur · mínimo 6</div>
+                <div className="alert-mini-sub">Consolidado · mínimo 6</div>
               </div>
               <span className="alert-mini-stock">3 uds.</span>
             </div>
 
             <div className="alert-mini">
-              <span className="alert-mini-dot low"></span>
+              <span className="alert-mini-dot crit"></span>
               <div className="alert-mini-info">
-                <div className="alert-mini-name">Fender Stratocaster Player</div>
-                <div className="alert-mini-sub">Depósito Norte · mínimo 5</div>
+                <div className="alert-mini-name">Yamaha P-145</div>
+                <div className="alert-mini-sub">Consolidado · mínimo 3</div>
               </div>
-              <span className="alert-mini-stock low">3 uds.</span>
+              <span className="alert-mini-stock">2 uds.</span>
             </div>
 
             <div className="alert-mini">
               <span className="alert-mini-dot low"></span>
               <div className="alert-mini-info">
-                <div className="alert-mini-name">Taylor 214ce</div>
-                <div className="alert-mini-sub">Depósito Sur · mínimo 6</div>
+                <div className="alert-mini-name">Gibson Les Paul Studio</div>
+                <div className="alert-mini-sub">Sugerido: reponer 4 uds.</div>
               </div>
-              <span className="alert-mini-stock low">4 uds.</span>
+              <span className="alert-mini-stock low">6 uds.</span>
             </div>
 
             <div className="alert-mini">
               <span className="alert-mini-dot low"></span>
               <div className="alert-mini-info">
                 <div className="alert-mini-name">Yamaha YTR-2330</div>
-                <div className="alert-mini-sub">Depósito Norte · mínimo 5</div>
+                <div className="alert-mini-sub">Consolidado · mínimo 5</div>
               </div>
-              <span className="alert-mini-stock low">3 uds.</span>
+              <span className="alert-mini-stock low">2 uds.</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* PANEL DE ÚLTIMOS MOVIMIENTOS */}
+      {/* ÚLTIMOS MOVIMIENTOS */}
       <div className="panel">
         <div className="panel-header">
           <h3>Últimos movimientos</h3>
-          <Link to="/Movimientos">
-            <span className="link">Ver historial completo</span>
+          <Link to="/Movimientos" className="link">
+            Ver historial completo
           </Link>
         </div>
         <div className="table-scroll">
@@ -192,42 +180,42 @@ function Dashboard() {
               <tr>
                 <td className="cell-strong">Fender Stratocaster Player</td>
                 <td><span className="type-pill type-entrada">ENTRADA</span></td>
-                <td>Depósito Central</td>
-                <td>+12</td>
+                <td>Tienda Central</td>
+                <td className="cell-strong">+8</td>
                 <td>Juan Pérez</td>
-                <td>15/08/2026 · 09:14</td>
+                <td>21/08/2026 · 09:14</td>
               </tr>
               <tr>
                 <td className="cell-strong">Shure SM58</td>
                 <td><span className="type-pill type-salida">SALIDA</span></td>
-                <td>Depósito Norte</td>
-                <td>-6</td>
+                <td>Galería Margalef</td>
+                <td className="cell-strong">-4</td>
                 <td>María Gómez</td>
-                <td>15/08/2026 · 08:52</td>
+                <td>21/08/2026 · 08:52</td>
               </tr>
               <tr>
                 <td className="cell-strong">Roland TD-17</td>
                 <td><span className="type-pill type-transferencia">TRANSFERENCIA</span></td>
-                <td>Central → Sur</td>
-                <td>2</td>
+                <td>Central → Margalef</td>
+                <td className="cell-strong">2</td>
                 <td>Carlos Ruiz</td>
-                <td>14/08/2026 · 17:30</td>
+                <td>20/08/2026 · 17:30</td>
               </tr>
               <tr>
                 <td className="cell-strong">Ibanez GSR200</td>
                 <td><span className="type-pill type-ajuste-neg">AJUSTE NEG.</span></td>
-                <td>Depósito Sur</td>
-                <td>-1</td>
+                <td>Galería Margalef</td>
+                <td className="cell-strong">-1</td>
                 <td>Carlos Ruiz</td>
-                <td>14/08/2026 · 16:05</td>
+                <td>20/08/2026 · 16:05</td>
               </tr>
               <tr>
                 <td className="cell-strong">Yamaha P-145</td>
                 <td><span className="type-pill type-entrada">ENTRADA</span></td>
-                <td>Depósito Central</td>
-                <td>+9</td>
+                <td>Tienda Central</td>
+                <td className="cell-strong">+1</td>
                 <td>Juan Pérez</td>
-                <td>14/08/2026 · 11:20</td>
+                <td>20/08/2026 · 11:20</td>
               </tr>
             </tbody>
           </table>
