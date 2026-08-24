@@ -46,6 +46,44 @@ const transferir = async (req, res) => {
   }
 };
 
+const ajustar = async (req, res) => {
+  try {
+    const { articulo_id, deposito_id, cantidad_anterior, cantidad_nueva, motivo_id } = req.body;
+
+    if (!articulo_id || !deposito_id || cantidad_anterior === undefined || cantidad_nueva === undefined || !motivo_id) {
+      return res.status(400).json({ error: 'Faltan campos obligatorios en el request.' });
+    }
+
+    if (cantidad_anterior === cantidad_nueva) {
+      return res.status(400).json({ error: 'La cantidad nueva debe ser diferente a la cantidad anterior.' });
+    }
+
+    const ip_origen = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
+
+    const ajuste = await StockService.ajustarStock({
+      articulo_id,
+      deposito_id,
+      cantidad_anterior,
+      cantidad_nueva,
+      motivo_id,
+      usuario_id: TEST_USER_ID,
+      ip_origen
+    });
+
+    return res.status(201).json({
+      message: 'Ajuste registrado con éxito.',
+      data: ajuste
+    });
+
+  } catch (error) {
+    console.error('[API] Error POST /api/stock/adjust:', error);
+    return res.status(500).json({ 
+      error: error.message || 'Error interno procesando el ajuste.' 
+    });
+  }
+};
+
 module.exports = {
-  transferir
+  transferir,
+  ajustar
 };

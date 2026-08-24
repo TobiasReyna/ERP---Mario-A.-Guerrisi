@@ -80,7 +80,7 @@ CREATE TABLE public.existencias (
   deposito_id uuid NOT NULL,
   cantidad integer NOT NULL DEFAULT 0,
   fecha_hora_actualizacion timestamp without time zone NOT NULL DEFAULT now(),
-  id_art_x_dep uuid NOT NULL,
+  id_art_x_dep uuid NOT NULL DEFAULT gen_random_uuid(),
   stock_min smallint,
   stock_max smallint,
   CONSTRAINT existencias_pkey PRIMARY KEY (id_art_x_dep),

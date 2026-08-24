@@ -5,4 +5,7 @@ const stockController = require('../controllers/stockController');
 // POST /api/stock/transfer
 router.post('/transfer', stockController.transferir);
 
+// POST /api/stock/adjust
+router.post('/adjust', stockController.ajustar);
+
 module.exports = router;
