@@ -27,6 +27,16 @@ const CATEGORIES = [
   'Accesorios', 'Instrumentos de viento'
 ];
 
+const calcularDigitoVerificador = (ean12) => {
+  let suma = 0;
+  for (let i = 0; i < 12; i++) {
+    // Los índices pares del array (0, 2...) son las posiciones impares del código (1°, 3°...)
+    const multiplicador = i % 2 === 0 ? 1 : 3;
+    suma += parseInt(ean12[i], 10) * multiplicador;
+  }
+  return (10 - (suma % 10)) % 10;
+};
+
 function Catalogo_de_productos() {
   const navigate = useNavigate();
 
@@ -65,15 +75,24 @@ function Catalogo_de_productos() {
   const [isReactivateModalOpen, setIsReactivateModalOpen] = useState(false);
   const [productToReactivate, setProductToReactivate] = useState(null);
 
-  // Validación de EAN-13
+  // Nueva Validación de EAN-13 - donde primeramente ingresamos los 12 nuermos y calcula el 13vo
   const eanValidation = useMemo(() => {
     const val = newProduct.ean.trim();
     if (val.length === 0) return { state: 'empty' };
+    
     const isNumeric = /^[0-9]+$/.test(val);
-    if (val.length !== 13 || !isNumeric) return { state: 'invalid', message: 'El código EAN-13 no es válido (debe tener 13 dígitos numéricos).' };
-    const isDuplicate = products.some(p => p.ean === val);
-    if (isDuplicate) return { state: 'duplicate', message: 'Este EAN-13 ya se encuentra registrado en el catálogo.' };
-    return { state: 'valid', message: 'Código EAN-13 válido y disponible.' };
+    if (val.length !== 12 || !isNumeric) {
+      return { state: 'invalid', message: 'Ingresá los primeros 12 dígitos numéricos.' };
+    }
+    
+    // Calculamos el dígito 13 y armamos el EAN completo
+    const checkDigit = calcularDigitoVerificador(val);
+    const fullEan = `${val}${checkDigit}`;
+    
+    const isDuplicate = products.some(p => p.ean === fullEan);
+    if (isDuplicate) return { state: 'duplicate', message: `El EAN ${fullEan} ya se encuentra registrado.` };
+    
+    return { state: 'valid', message: `EAN completo: ${fullEan}`, fullEan };
   }, [newProduct.ean, products]);
 
   // Filtrado reactivo
@@ -119,7 +138,7 @@ function Catalogo_de_productos() {
       name: newProduct.description,
       brand: newProduct.brand,
       model: newProduct.model || newProduct.code,
-      ean: newProduct.ean,
+      ean: eanValidation.fullEan,
       category: newProduct.category,
       price: Number(String(newProduct.price).replace(/[^0-9]/g, '')) || 0,
       status: newProduct.status,
@@ -561,15 +580,29 @@ function Catalogo_de_productos() {
 
           <div className="form-row">
             <div className="form-field">
-              <label>EAN-13<span className="req">*</span></label>
-              <input
-                type="text"
-                maxLength={13}
-                placeholder="Ej: 7791234500017"
-                required
-                value={newProduct.ean}
-                onChange={(e) => setNewProduct({ ...newProduct, ean: e.target.value })}
-              />
+              <label>EAN-13 (Ingresar 12 dígitos)<span className="req">*</span></label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input
+                  type="text"
+                  maxLength={12}
+                  placeholder="Ej: 779123450001"
+                  required
+                  value={newProduct.ean}
+                  onChange={(e) => setNewProduct({ ...newProduct, ean: e.target.value })}
+                />
+                
+                {/* Cuadro dinámico que muestra el dígito verificador */}
+                {newProduct.ean.length === 12 && eanValidation.state !== 'invalid' && (
+                  <div style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    padding: '0 16px', backgroundColor: 'var(--gray-100)', 
+                    border: '1px solid var(--gray-300)', borderRadius: '6px',
+                    fontWeight: '600', color: 'var(--gray-700)'
+                  }}>
+                    - {calcularDigitoVerificador(newProduct.ean)}
+                  </div>
+                )}
+              </div>
               {eanValidation.state === 'invalid' && (
                 <span className="field-error">
                   <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
