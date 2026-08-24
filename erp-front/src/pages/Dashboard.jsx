@@ -1,5 +1,3 @@
-import { Link } from 'react-router-dom';
-
 
 import { data, Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
@@ -7,6 +5,17 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../config/supabaseClient.js'; // Importa el cliente de Supabase desde supabaseClient.js
 //import '../index.css';
 
+
+const CATEGORY_DATA = [
+  { name: 'Guitarras eléctricas', value: 17, percentage: 37, alt: false },
+  { name: 'Guitarras acústicas', value: 25, percentage: 56, alt: true },
+  { name: 'Bajos', value: 11, percentage: 26, alt: false },
+  { name: 'Teclados y pianos', value: 12, percentage: 27, alt: true },
+  { name: 'Baterías y percusión', value: 31, percentage: 70, alt: false },
+  { name: 'Amplificadores', value: 9, percentage: 20, alt: true },
+  { name: 'Micrófonos y audio', value: 38, percentage: 86, alt: false },
+  { name: 'Accesorios', value: 52, percentage: 100, alt: true },
+];
     
 export default function Dashboard() {
   const [datos, setDatos] = useState([])
@@ -14,8 +23,10 @@ export default function Dashboard() {
   async function traerDatos() {
     try {
       const { data, error } = await supabase
-        .from('articulos') // Reemplaza por tu tabla real
+        .from('paises_origen') // Reemplaza por tu tabla real
         .select('*')
+        .order('nombre', { ascending: true }) // Ordenar por nombre de manera ascendente
+
         
 
       if (error) throw error
@@ -43,12 +54,11 @@ export default function Dashboard() {
             <div className="stat-icon tint-red">
               <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M20.59 13.41 11 3.83A2 2 0 0 0 9.59 3.24L4 3v5.59a2 2 0 0 0 .59 1.41l9.59 9.59a2 2 0 0 0 2.82 0l3.59-3.59a2 2 0 0 0 0-2.59Z" />
-              </svg>
+               </svg>
             </div>
-            <div class="stat-value">{datos[0]?.id || 0}</div>
-            <div class="stat-label">Productos en catalogo</div>
+            <span className="stat-trend up">+4.2%</span>
           </div>
-          <div className="stat-value">16</div>
+          <div className="stat-value">{datos[0]?.nombre || 0}</div>
           <div className="stat-label">Productos en catálogo</div>
         </div>
 
