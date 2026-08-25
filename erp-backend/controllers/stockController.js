@@ -83,7 +83,29 @@ const ajustar = async (req, res) => {
   }
 };
 
+const consultarDisponibilidad = async (req, res) => {
+    try {
+        const { articulo_id } = req.params;
+        
+        if (!articulo_id) {
+            return res.status(400).json({ error: 'Falta el ID del artículo.' });
+        }
+
+        const disponibilidad = await StockService.obtenerDisponibilidad(articulo_id);
+
+        return res.status(200).json({
+            data: disponibilidad
+        });
+    } catch (error) {
+        console.error('[API] Error GET /api/stock/:articulo_id:', error);
+        return res.status(500).json({ 
+            error: error.message || 'Error interno consultando disponibilidad.' 
+        });
+    }
+};
+
 module.exports = {
   transferir,
-  ajustar
+  ajustar,
+  consultarDisponibilidad
 };
