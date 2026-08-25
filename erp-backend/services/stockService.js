@@ -140,5 +140,70 @@ class StockService {
 
         return historial;
     }
+
+    static async actualizarPoliticas(articulo_id, payload) {
+        const { deposito_id, stock_minimo, stock_maximo, usuario_id } = payload;
+        
+        const { data, error } = await supabaseAdmin
+            .from('politicas_reposicion_deposito')
+            .upsert({
+                articulo_id,
+                deposito_id,
+                stock_minimo,
+                stock_maximo,
+                actualizado_por: usuario_id
+            }, { onConflict: 'articulo_id, deposito_id' })
+            .select()
+            .single();
+
+        if (error) {
+            throw new Error(`Error al actualizar políticas: ${error.message}`);
+        }
+        return data;
+    }
+
+    static async obtenerAlertas() {
+        // Traemos existencias con nombres de artículo y depósito
+        const { data: existencias, error: errExt } = await supabaseAdmin
+            .from('existencias')
+            .select('articulo_id, deposito_id, cantidad, articulos(descripcion), depositos(nombre)');
+            
+        if (errExt) throw new Error(`Error consultando existencias: ${errExt.message}`);
+
+        // Traemos las políticas configuradas
+        const { data: politicas, error: errPol } = await supabaseAdmin
+            .from('politicas_reposicion_deposito')
+            .select('*');
+
+        if (errPol) throw new Error(`Error consultando políticas: ${errPol.message}`);
+
+        // Armamos un mapa en memoria para cruzar datos rápido
+        const polMap = {};
+        for (const p of politicas) {
+            polMap[`${p.articulo_id}_${p.deposito_id}`] = p;
+        }
+
+        const alertas = [];
+        for (const ext of existencias) {
+            const key = `${ext.articulo_id}_${ext.deposito_id}`;
+            const pol = polMap[key];
+
+            // Si hay una política configurada y el stock actual perforó el mínimo
+            if (pol && ext.cantidad <= pol.stock_minimo) {
+                alertas.push({
+                    articulo_id: ext.articulo_id,
+                    articulo_nombre: ext.articulos?.descripcion || 'Desconocido',
+                    deposito_id: ext.deposito_id,
+                    deposito_nombre: ext.depositos?.nombre || 'Desconocido',
+                    stock_actual: ext.cantidad,
+                    stock_minimo: pol.stock_minimo,
+                    stock_maximo: pol.stock_maximo,
+                    cantidad_sugerida: pol.stock_maximo - ext.cantidad
+                });
+            }
+        }
+
+        return alertas;
+    }
 }
 module.exports = StockService;

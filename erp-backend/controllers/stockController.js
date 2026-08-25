@@ -124,9 +124,47 @@ const obtenerHistorial = async (req, res) => {
     }
 };
 
+const actualizarPoliticas = async (req, res) => {
+    try {
+        const { articulo_id } = req.params;
+        const { deposito_id, stock_minimo, stock_maximo } = req.body;
+
+        if (!deposito_id || stock_minimo === undefined || stock_maximo === undefined) {
+            return res.status(400).json({ error: 'Faltan campos (deposito_id, stock_minimo, stock_maximo).' });
+        }
+
+        const politicas = await StockService.actualizarPoliticas(articulo_id, {
+            deposito_id,
+            stock_minimo,
+            stock_maximo,
+            usuario_id: TEST_USER_ID
+        });
+
+        return res.status(200).json({
+            message: 'Políticas actualizadas correctamente.',
+            data: politicas 
+        });
+    } catch (error) {
+        console.error('[API] Error PUT /api/stock/policies/:articulo_id:', error);
+        return res.status(500).json({ error: error.message || 'Error actualizando políticas.' });
+    }
+};
+
+const obtenerAlertas = async (req, res) => {
+    try {
+        const alertas = await StockService.obtenerAlertas();
+        return res.status(200).json({ data: alertas });
+    } catch (error) {
+        console.error('[API] Error GET /api/stock/alerts:', error);
+        return res.status(500).json({ error: error.message || 'Error obteniendo alertas.' });
+    }
+};
+
 module.exports = {
   transferir,
   ajustar,
   consultarDisponibilidad,
-  obtenerHistorial
+  obtenerHistorial,
+  actualizarPoliticas,
+  obtenerAlertas
 };
