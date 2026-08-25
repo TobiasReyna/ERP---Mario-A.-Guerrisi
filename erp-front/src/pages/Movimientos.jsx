@@ -1,32 +1,9 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Modal from '../components/Modal';
 
-const INITIAL_MOVEMENTS = [
-  { id: 1, date: '21/08/2026 09:42', product: 'Fender Stratocaster Player', type: 'AJUSTE NEG.', typeClass: 'type-ajuste-neg', warehouse: 'Tienda Central', qty: '-2', reason: 'Rotura', user: 'Juan Pérez', stockChange: '10 → 8' },
-  { id: 2, date: '21/08/2026 09:14', product: 'Fender Stratocaster Player', type: 'ENTRADA', typeClass: 'type-entrada', warehouse: 'Tienda Central', qty: '+10', reason: 'Reposición de proveedor', user: 'Juan Pérez', stockChange: '0 → 10' },
-  { id: 3, date: '21/08/2026 08:52', product: 'Shure SM58', type: 'SALIDA', typeClass: 'type-salida', warehouse: 'Galería Margalef', qty: '-4', reason: 'Venta mostrador', user: 'María Gómez', stockChange: '16 → 12' },
-  { id: 4, date: '20/08/2026 17:30', product: 'Roland TD-17', type: 'TRANSFERENCIA', typeClass: 'type-transferencia', warehouse: 'Central → Margalef', qty: '2', reason: 'Rebalanceo de stock', user: 'Carlos Ruiz', stockChange: '5 → 3 / -1 → 1' },
-  { id: 5, date: '20/08/2026 16:05', product: 'Ibanez GSR200', type: 'AJUSTE NEG.', typeClass: 'type-ajuste-neg', warehouse: 'Galería Margalef', qty: '-1', reason: 'Diferencia de recuento', user: 'Carlos Ruiz', stockChange: '2 → 1' },
-  { id: 6, date: '20/08/2026 11:20', product: 'Yamaha P-145', type: 'ENTRADA', typeClass: 'type-entrada', warehouse: 'Tienda Central', qty: '+1', reason: 'Reposición de proveedor', user: 'Juan Pérez', stockChange: '0 → 1' },
-  { id: 7, date: '19/08/2026 15:41', product: 'Marshall MG30GFX', type: 'AJUSTE POS.', typeClass: 'type-ajuste-pos', warehouse: 'Tienda Central', qty: '+2', reason: 'Diferencia de recuento', user: 'María Gómez', stockChange: '4 → 6' },
-  { id: 8, date: '19/08/2026 10:02', product: 'Pearl Export Series', type: 'SALIDA', typeClass: 'type-salida', warehouse: 'Tienda Central', qty: '-3', reason: 'Venta a cliente corporativo', user: 'Juan Pérez', stockChange: '5 → 2' },
-  { id: 9, date: '18/08/2026 14:18', product: 'Cort AD810', type: 'TRANSFERENCIA', typeClass: 'type-transferencia', warehouse: 'Margalef → Central', qty: '4', reason: 'Solicitud de sucursal', user: 'Carlos Ruiz', stockChange: '13 → 9 / 8 → 12' },
-  { id: 10, date: '17/08/2026 09:30', product: 'Yamaha YTR-2330', type: 'AJUSTE NEG.', typeClass: 'type-ajuste-neg', warehouse: 'Galería Margalef', qty: '-1', reason: 'Vencimiento', user: 'María Gómez', stockChange: '1 → 0' },
-  { id: 11, date: '16/08/2026 12:00', product: 'Korg B2', type: 'ENTRADA', typeClass: 'type-entrada', warehouse: 'Tienda Central', qty: '+5', reason: 'Reposición de proveedor', user: 'Juan Pérez', stockChange: '2 → 7' },
-];
-
-const PRODUCTS_LIST = [
-  { name: 'Fender Stratocaster Player', code: 'COD-0001', stockCentral: 8, stockMargalef: 3 },
-  { name: 'Gibson Les Paul Studio', code: 'COD-0002', stockCentral: 4, stockMargalef: 2 },
-  { name: 'Cort AD810', code: 'COD-0003', stockCentral: 12, stockMargalef: 9 },
-  { name: 'Yamaha P-145', code: 'COD-0007', stockCentral: 1, stockMargalef: 1 },
-  { name: 'Shure SM58', code: 'COD-0013', stockCentral: 20, stockMargalef: 12 },
-  { name: 'Marshall MG30GFX', code: 'COD-0012', stockCentral: 6, stockMargalef: 3 },
-  { name: 'Roland TD-17', code: 'COD-0009', stockCentral: 3, stockMargalef: 1 },
-];
-
 function Movimientos() {
-  const [movements, setMovements] = useState(INITIAL_MOVEMENTS);
+  const [movements, setMovements] = useState([]);
+
 
   // Filtros
   const [selectedType, setSelectedType] = useState('Todos');
@@ -39,25 +16,161 @@ function Movimientos() {
 
   // Modal registrar movimiento
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [productIndex, setProductIndex] = useState(0);
-  const [warehouse, setWarehouse] = useState('Tienda Central');
+  
+  // Real DB States
+  const [dbArticles, setDbArticles] = useState([]);
+  const [dbDeposits, setDbDeposits] = useState([]);
+  const [dbReasons, setDbReasons] = useState([]);
+
+const [selectedArticleId, setSelectedArticleId] = useState('');
+  const [selectedDepositId, setSelectedDepositId] = useState('');
+  const [selectedReasonId, setSelectedReasonId] = useState('');
+  const [baseStock, setBaseStock] = useState(0);
+
   const [movementType, setMovementType] = useState('entrada');
   const [qty, setQty] = useState(5);
   const [user, setUser] = useState('Juan Pérez');
-  const [reason, setReason] = useState('');
   const [hasReasonError, setHasReasonError] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
+
+  const fetchHistory = async (articles) => {
+    try {
+      const allHistories = await Promise.all(
+        articles.map(art =>
+          fetch(`http://localhost:3001/api/stock/${art.id}/history`)
+            .then(res => res.json())
+            .then(json => (json.data || []).map(m => ({ ...m, product: art.descripcion })))
+            .catch(() => [])
+        )
+      );
+
+      const combined = allHistories.flat();
+      
+      const formatted = combined.map((m, i) => {
+        const dateObj = new Date(m.fecha);
+        const dateFormatted = `${String(dateObj.getDate()).padStart(2, '0')}/${String(dateObj.getMonth() + 1).padStart(2, '0')}/${dateObj.getFullYear()} ${String(dateObj.getHours()).padStart(2, '0')}:${String(dateObj.getMinutes()).padStart(2, '0')}`;
+        
+        let typeLabel = m.tipo_movimiento;
+        let typeClass = '';
+        let qtyStr = '';
+        let reason = '';
+        let warehouse = '';
+        let stockChange = '-';
+
+        if (m.tipo_movimiento === 'AJUSTE') {
+           if (m.cantidad_afectada >= 0) {
+             typeLabel = 'AJUSTE POS.';
+             typeClass = 'type-ajuste-pos';
+             qtyStr = `+${m.cantidad_afectada}`;
+           } else {
+             typeLabel = 'AJUSTE NEG.';
+             typeClass = 'type-ajuste-neg';
+             qtyStr = `${m.cantidad_afectada}`;
+           }
+           const motivoMatch = m.detalle.match(/Motivo: (.+?) en (.+?)\. Stock anterior/);
+           if (motivoMatch) {
+              reason = motivoMatch[1];
+              warehouse = motivoMatch[2];
+           } else {
+              reason = m.detalle;
+           }
+           const stockMatch = m.detalle.match(/Stock anterior: (.+?) -> Nuevo: (.+)/);
+           if (stockMatch) {
+              stockChange = `${stockMatch[1]} → ${stockMatch[2]}`;
+           }
+        } else if (m.tipo_movimiento === 'TRANSFERENCIA') {
+           typeLabel = 'TRANSFERENCIA';
+           typeClass = 'type-transferencia';
+           qtyStr = `${m.cantidad_afectada}`;
+           const depMatch = m.detalle.match(/De: (.+?) Hacia: (.+)/);
+           if (depMatch) {
+             warehouse = `${depMatch[1]} → ${depMatch[2]}`;
+           }
+           reason = 'Transferencia'; 
+           stockChange = '-';
+        }
+
+        return {
+           id: `hist-${i}-${dateObj.getTime()}`,
+           date: dateFormatted,
+           rawDate: dateObj,
+           product: m.product,
+           type: typeLabel,
+           typeClass,
+           warehouse,
+           qty: qtyStr,
+           reason,
+           user: 'Juan Pérez',
+           stockChange
+        };
+      });
+
+      formatted.sort((a, b) => b.rawDate - a.rawDate);
+      setMovements(formatted);
+    } catch (err) {
+      console.error('Error fetching history:', err);
+    }
+  };
+
+  useEffect(() => {
+    const fetchMasterData = async () => {
+      try {
+        const [resArt, resDep, resRea] = await Promise.all([
+          fetch('http://localhost:3001/api/articles'),
+          fetch('http://localhost:3001/api/deposits'),
+          fetch('http://localhost:3001/api/adjustment-reasons')
+        ]);
+        const art = await resArt.json();
+        const dep = await resDep.json();
+        const rea = await resRea.json();
+        
+        setDbArticles(art.data || []);
+        setDbDeposits(dep.data || []);
+        setDbReasons(rea.data || []);
+
+        if (art.data?.length > 0) setSelectedArticleId(art.data[0].id);
+        if (dep.data?.length > 0) setSelectedDepositId(dep.data[0].id);
+
+        if (art.data && art.data.length > 0) {
+          await fetchHistory(art.data);
+        }
+      } catch (err) {
+        console.error('Error cargando catálogos:', err);
+      }
+    };
+    fetchMasterData();
+  }, []);
+
+  useEffect(() => {
+    if (selectedArticleId && selectedDepositId) {
+      fetch(`http://localhost:3001/api/stock/${selectedArticleId}`)
+        .then(res => res.json())
+        .then(json => {
+          if (json.data && json.data.desglose) {
+            const depStock = json.data.desglose.find(d => d.deposito_id === selectedDepositId);
+            setBaseStock(depStock ? depStock.cantidad : 0);
+          } else {
+            setBaseStock(0);
+          }
+        })
+        .catch(err => {
+          console.error('Error fetching stock:', err);
+          setBaseStock(0);
+        });
+    }
+  }, [selectedArticleId, selectedDepositId]);
 
   const isAdjustment = movementType === 'ajuste-pos' || movementType === 'ajuste-neg';
-  const currentProduct = PRODUCTS_LIST[productIndex] || PRODUCTS_LIST[0];
-  const baseStock = warehouse === 'Tienda Central' ? currentProduct.stockCentral : currentProduct.stockMargalef;
 
-  // Cálculo vista previa de stock
   const calculatedResultStock = useMemo(() => {
     const numQty = Number(qty) || 0;
     if (movementType === 'entrada' || movementType === 'ajuste-pos') return baseStock + numQty;
-    if (movementType === 'salida' || movementType === 'ajuste-neg') return Math.max(0, baseStock - numQty);
+    if (['salida', 'ajuste-neg', 'transferencia'].includes(movementType)) return baseStock - numQty;
     return baseStock;
   }, [baseStock, qty, movementType]);
+
+  const isNegativeStock = calculatedResultStock < 0;
 
   const showToast = (msg) => {
     setConfirmToast(msg);
@@ -86,68 +199,82 @@ function Movimientos() {
   }, [movements, selectedType, selectedWarehouse, selectedUser, searchQuery]);
 
   const handleOpenModal = () => {
-    setProductIndex(0);
-    setWarehouse('Tienda Central');
+    if (dbArticles.length > 0) setSelectedArticleId(dbArticles[0].id);
+    if (dbDeposits.length > 0) setSelectedDepositId(dbDeposits[0].id);
+    setSelectedReasonId('');
     setMovementType('entrada');
     setQty(5);
     setUser('Juan Pérez');
-    setReason('');
     setHasReasonError(false);
+    setSubmitError(null);
     setIsModalOpen(true);
   };
 
-  const handleConfirmMovement = (e) => {
+  const handleConfirmMovement = async (e) => {
     e.preventDefault();
 
     // Validación HU-02: Motivo obligatorio para ajustes
-    if (isAdjustment && !reason.trim()) {
+    if (isAdjustment && !selectedReasonId) {
       setHasReasonError(true);
       return;
     }
 
     setHasReasonError(false);
+    setSubmitError(null);
+    setIsSubmitting(true);
 
-    let typeLabel = 'ENTRADA';
-    let typeClass = 'type-entrada';
-    let qtyDisplay = `+${qty}`;
+    try {
+      let endpoint = 'http://localhost:3001/api/stock/adjust';
+      let payload = {
+        articulo_id: selectedArticleId, 
+        deposito_id: selectedDepositId,          
+        cantidad_anterior: baseStock,
+        cantidad_nueva: calculatedResultStock,
+        motivo_id: selectedReasonId || null                
+      };
 
-    if (movementType === 'salida') {
-      typeLabel = 'SALIDA';
-      typeClass = 'type-salida';
-      qtyDisplay = `-${qty}`;
-    } else if (movementType === 'ajuste-pos') {
-      typeLabel = 'AJUSTE POS.';
-      typeClass = 'type-ajuste-pos';
-      qtyDisplay = `+${qty}`;
-    } else if (movementType === 'ajuste-neg') {
-      typeLabel = 'AJUSTE NEG.';
-      typeClass = 'type-ajuste-neg';
-      qtyDisplay = `-${qty}`;
-    } else if (movementType === 'transferencia') {
-      typeLabel = 'TRANSFERENCIA';
-      typeClass = 'type-transferencia';
-      qtyDisplay = `${qty}`;
+      if (!isAdjustment) {
+        endpoint = 'http://localhost:3001/api/stock/transfer';
+        const targetDeposit = dbDeposits.find(d => d.id !== selectedDepositId);
+        const targetId = targetDeposit ? targetDeposit.id : selectedDepositId;
+        payload = {
+           articulo_id: selectedArticleId,
+           deposito_origen_id: selectedDepositId,
+           deposito_destino_id: targetId,
+           cantidad: Number(qty)
+        };
+      }
+
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Ocurrió un error al registrar el movimiento en el servidor.');
+      }
+
+      // -- Actualizamos el historial real --
+      await fetchHistory(dbArticles);
+
+      // Limpiamos el formulario y cerramos
+      if (dbArticles.length > 0) setSelectedArticleId(dbArticles[0].id);
+      if (dbDeposits.length > 0) setSelectedDepositId(dbDeposits[0].id);
+      setSelectedReasonId('');
+      setMovementType('entrada');
+      setQty(5);
+      setUser('Juan Pérez');
+
+      setIsModalOpen(false);
+      showToast('Movimiento registrado correctamente en la base de datos.');
+
+    } catch (err) {
+      setSubmitError(err.message);
+    } finally {
+      setIsSubmitting(false);
     }
-
-    const now = new Date();
-    const dateFormatted = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-
-    const newMov = {
-      id: Date.now(),
-      date: dateFormatted,
-      product: currentProduct.name,
-      type: typeLabel,
-      typeClass,
-      warehouse,
-      qty: qtyDisplay,
-      reason: reason || (movementType === 'entrada' ? 'Reposición de proveedor' : 'Venta mostrador'),
-      user,
-      stockChange: `${baseStock} → ${calculatedResultStock}`,
-    };
-
-    setMovements([newMov, ...movements]);
-    setIsModalOpen(false);
-    showToast('Movimiento registrado correctamente.');
   };
 
   return (
@@ -272,26 +399,31 @@ function Movimientos() {
         title="Registrar movimiento de stock"
         footer={
           <>
-            <button className="btn btn-outline" onClick={() => setIsModalOpen(false)}>
+            <button className="btn btn-outline" onClick={() => setIsModalOpen(false)} disabled={isSubmitting}>
               Cancelar
             </button>
-            <button className="btn btn-primary" onClick={handleConfirmMovement}>
-              Registrar movimiento
+            <button className="btn btn-primary" onClick={handleConfirmMovement} disabled={isSubmitting || isNegativeStock}>
+              {isSubmitting ? 'Registrando...' : 'Registrar movimiento'}
             </button>
           </>
         }
       >
         <form onSubmit={handleConfirmMovement}>
+          {submitError && (
+            <div style={{ marginBottom: '16px', padding: '12px', background: '#ffebee', color: 'var(--red)', borderRadius: '4px', fontSize: '13px' }}>
+              <strong>Error:</strong> {submitError}
+            </div>
+          )}
           <div className="form-row">
             <div className="form-field full">
               <label>Producto<span className="req">*</span></label>
               <select
-                value={productIndex}
-                onChange={(e) => setProductIndex(Number(e.target.value))}
+                value={selectedArticleId}
+                onChange={(e) => setSelectedArticleId(e.target.value)}
               >
-                {PRODUCTS_LIST.map((p, idx) => (
-                  <option key={p.code} value={idx}>
-                    {p.name} — {p.code}
+                {dbArticles.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.descripcion} — {p.codigo_interno}
                   </option>
                 ))}
               </select>
@@ -302,11 +434,14 @@ function Movimientos() {
             <div className="form-field">
               <label>Depósito<span className="req">*</span></label>
               <select
-                value={warehouse}
-                onChange={(e) => setWarehouse(e.target.value)}
+                value={selectedDepositId}
+                onChange={(e) => setSelectedDepositId(e.target.value)}
               >
-                <option>Tienda Central</option>
-                <option>Galería Margalef</option>
+                {dbDeposits.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.nombre}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -357,19 +492,16 @@ function Movimientos() {
                 Motivo {isAdjustment && <span className="req">*</span>}
               </label>
               <select
-                value={reason}
+                value={selectedReasonId}
                 onChange={(e) => {
-                  setReason(e.target.value);
+                  setSelectedReasonId(e.target.value);
                   setHasReasonError(false);
                 }}
               >
                 <option value="">Seleccionar motivo…</option>
-                <option value="Rotura">Rotura</option>
-                <option value="Pérdida">Pérdida</option>
-                <option value="Vencimiento">Vencimiento</option>
-                <option value="Diferencia de recuento">Diferencia de recuento</option>
-                <option value="Reposición de proveedor">Reposición de proveedor</option>
-                <option value="Venta mostrador">Venta mostrador</option>
+                {dbReasons.map(r => (
+                  <option key={r.id} value={r.id}>{r.nombre}</option>
+                ))}
               </select>
 
               {!isAdjustment && (
@@ -397,12 +529,21 @@ function Movimientos() {
               </div>
               <div className="sp-arrow">→</div>
               <div className="sp-item">
-                <div className="n" style={{ color: movementType.includes('neg') || movementType === 'salida' ? 'var(--crit)' : 'var(--green)' }}>
+                <div className="n" style={{ color: movementType.includes('neg') || movementType === 'salida' || movementType === 'transferencia' ? 'var(--crit)' : 'var(--green)' }}>
                   {calculatedResultStock}
                 </div>
                 <div className="l">Stock resultante</div>
               </div>
             </div>
+            {isNegativeStock && (
+              <span className="field-error" style={{ marginTop: '8px', display: 'block' }}>
+                <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '16px', height: '16px', marginRight: '4px', verticalAlign: 'middle', display: 'inline-block' }}>
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M12 8v4M12 16h.01" />
+                </svg>
+                Stock insuficiente.
+              </span>
+            )}
           </div>
         </form>
       </Modal>

@@ -23,7 +23,16 @@ const transferir = async (req, res) => {
     // 2. Extraer IP del origen
     const ip_origen = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
 
-    // 3. Delegar al servicio (Inyectando el TEST_USER_ID transparente al Frontend)
+    // 3. Validación estricta: Stock insuficiente
+    const disponibilidad = await StockService.obtenerDisponibilidad(articulo_id);
+    const desgloseOrigen = disponibilidad.desglose.find(d => d.deposito_id === deposito_origen_id);
+    const stockActual = desgloseOrigen ? desgloseOrigen.cantidad : 0;
+
+    if (stockActual - cantidad < 0) {
+      return res.status(400).json({ error: 'Stock insuficiente en el depósito de origen' });
+    }
+
+    // 4. Delegar al servicio (Inyectando el TEST_USER_ID transparente al Frontend)
     const transferencia = await StockService.transferirStock({
       articulo_id,
       deposito_origen_id,
@@ -56,6 +65,10 @@ const ajustar = async (req, res) => {
 
     if (cantidad_anterior === cantidad_nueva) {
       return res.status(400).json({ error: 'La cantidad nueva debe ser diferente a la cantidad anterior.' });
+    }
+
+    if (cantidad_nueva < 0) {
+      return res.status(400).json({ error: 'Stock insuficiente en el depósito de origen' });
     }
 
     const ip_origen = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
