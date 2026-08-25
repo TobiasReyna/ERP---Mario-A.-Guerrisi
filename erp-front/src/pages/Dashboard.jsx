@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 
 const CATEGORY_DATA = [
@@ -12,6 +13,26 @@ const CATEGORY_DATA = [
 ];
 
 function Dashboard() {
+  const [alertas, setAlertas] = useState([]);
+  const [loadingAlertas, setLoadingAlertas] = useState(true);
+  const [errorAlertas, setErrorAlertas] = useState(null);
+
+  useEffect(() => {
+    const fetchAlertas = async () => {
+      try {
+        const res = await fetch('http://localhost:3001/api/stock/alerts');
+        if (!res.ok) throw new Error('Error al obtener alertas');
+        const json = await res.json();
+        setAlertas(json.data || []);
+      } catch (err) {
+        setErrorAlertas(err.message);
+      } finally {
+        setLoadingAlertas(false);
+      }
+    };
+    fetchAlertas();
+  }, []);
+
   return (
     <div>
       {/* 4 TARJETAS DE MÉTRICAS */}
@@ -108,50 +129,25 @@ function Dashboard() {
             </Link>
           </div>
           <div className="panel-body">
-            <div className="alert-mini">
-              <span className="alert-mini-dot crit"></span>
-              <div className="alert-mini-info">
-                <div className="alert-mini-name">Pearl Export Series</div>
-                <div className="alert-mini-sub">Tienda Central · mínimo 4</div>
-              </div>
-              <span className="alert-mini-stock">2 uds.</span>
-            </div>
-
-            <div className="alert-mini">
-              <span className="alert-mini-dot crit"></span>
-              <div className="alert-mini-info">
-                <div className="alert-mini-name">Ibanez GSR200</div>
-                <div className="alert-mini-sub">Consolidado · mínimo 6</div>
-              </div>
-              <span className="alert-mini-stock">3 uds.</span>
-            </div>
-
-            <div className="alert-mini">
-              <span className="alert-mini-dot crit"></span>
-              <div className="alert-mini-info">
-                <div className="alert-mini-name">Yamaha P-145</div>
-                <div className="alert-mini-sub">Consolidado · mínimo 3</div>
-              </div>
-              <span className="alert-mini-stock">2 uds.</span>
-            </div>
-
-            <div className="alert-mini">
-              <span className="alert-mini-dot low"></span>
-              <div className="alert-mini-info">
-                <div className="alert-mini-name">Gibson Les Paul Studio</div>
-                <div className="alert-mini-sub">Sugerido: reponer 4 uds.</div>
-              </div>
-              <span className="alert-mini-stock low">6 uds.</span>
-            </div>
-
-            <div className="alert-mini">
-              <span className="alert-mini-dot low"></span>
-              <div className="alert-mini-info">
-                <div className="alert-mini-name">Yamaha YTR-2330</div>
-                <div className="alert-mini-sub">Consolidado · mínimo 5</div>
-              </div>
-              <span className="alert-mini-stock low">2 uds.</span>
-            </div>
+            {loadingAlertas && <div style={{ padding: '16px', color: 'var(--gray-500)', fontSize: '13px' }}>Cargando alertas...</div>}
+            {errorAlertas && <div style={{ padding: '16px', color: 'var(--red)', fontSize: '13px' }}>Error: {errorAlertas}</div>}
+            {!loadingAlertas && !errorAlertas && alertas.length === 0 && (
+               <div style={{ padding: '16px', color: 'var(--gray-500)', fontSize: '13px' }}>No hay alertas de stock recientes.</div>
+            )}
+            {!loadingAlertas && !errorAlertas && alertas.slice(0, 5).map((alerta, idx) => {
+              const isCrit = alerta.stock_actual <= (alerta.stock_minimo / 2);
+              const dotClass = isCrit ? 'crit' : 'low';
+              return (
+                <div className="alert-mini" key={idx}>
+                  <span className={`alert-mini-dot ${dotClass}`}></span>
+                  <div className="alert-mini-info">
+                    <div className="alert-mini-name">{alerta.articulo_nombre}</div>
+                    <div className="alert-mini-sub">{alerta.deposito_nombre} · mínimo {alerta.stock_minimo}</div>
+                  </div>
+                  <span className={`alert-mini-stock ${dotClass === 'low' ? 'low' : ''}`}>{alerta.stock_actual} uds.</span>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
