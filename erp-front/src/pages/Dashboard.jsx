@@ -1,4 +1,6 @@
 import { Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { supabase } from '../config/supabaseClient';
 
 const CATEGORY_DATA = [
   { name: 'Guitarras eléctricas', value: 17, percentage: 37, alt: false },
@@ -11,7 +13,48 @@ const CATEGORY_DATA = [
   { name: 'Accesorios', value: 52, percentage: 100, alt: true },
 ];
 
-function Dashboard() {
+export default function Dashboard() {
+    const [datos, setDatos] = useState([])
+  const [datos_stock, setDatosStock] = useState([])
+  const [cargando, setCargando] = useState(true) // Estado para controlar la carga de datos
+  async function traerDatos() {
+    try {
+      const { data, error } = await supabase
+        .from('articulos')
+        .select('*')
+
+      if (error) throw error
+
+      setDatos(data)
+
+    } catch (error) {
+      console.error('Error:', error.message)
+    } finally {
+      setCargando(false) // Avisás que ya terminó de cargar
+    }
+  }
+  async function traerDatosStock() {
+    try {
+      const { data, error } = await supabase
+        .from('articulos') //CAMBIAR
+        .select('*')
+
+      if (error) throw error
+
+      setDatosStock(data)
+
+    } catch (error) {
+      console.error('Error:', error.message)
+    } finally {
+      setCargando(false) // Avisás que ya terminó de cargar
+    }
+  }
+
+    useEffect(() => {
+    traerDatos()
+    traerDatosStock()
+  }, [])
+
   return (
     <div>
       {/* 4 TARJETAS DE MÉTRICAS */}
@@ -25,7 +68,7 @@ function Dashboard() {
             </div>
             <span className="stat-trend up">+4.2%</span>
           </div>
-          <div className="stat-value">16</div>
+          <div className="stat-value">{datos.length}</div>
           <div className="stat-label">Productos en catálogo</div>
         </div>
 
@@ -225,4 +268,3 @@ function Dashboard() {
   );
 }
 
-export default Dashboard;
