@@ -104,8 +104,29 @@ const consultarDisponibilidad = async (req, res) => {
     }
 };
 
+const obtenerHistorial = async (req, res) => {
+    try {
+        const { articulo_id } = req.params;
+        if (!articulo_id) {
+            return res.status(400).json({ error: 'Falta el ID del artículo.' });
+        }
+
+        const historial = await StockService.obtenerHistorial(articulo_id);
+
+        return res.status(200).json({
+            data: historial
+        });
+    } catch (error) {
+        console.error('[API] Error GET /api/stock/:articulo_id/history:', error);
+        return res.status(500).json({ 
+            error: error.message || 'Error interno consultando el historial.' 
+        });
+    }
+};
+
 module.exports = {
   transferir,
   ajustar,
-  consultarDisponibilidad
+  consultarDisponibilidad,
+  obtenerHistorial
 };

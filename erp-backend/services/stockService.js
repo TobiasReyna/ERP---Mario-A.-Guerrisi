@@ -86,5 +86,59 @@ class StockService {
             desglose
         };
     }
+
+    static async obtenerHistorial(articulo_id) {
+        // 1. Obtener diccionarios auxiliares para mapear IDs a nombres rápidamente (sin joins complejos)
+        const [{ data: depositos }, { data: motivos }] = await Promise.all([
+            supabaseAdmin.from('depositos').select('id, nombre'),
+            supabaseAdmin.from('motivos_ajustes').select('id, nombre')
+        ]);
+        
+        const depDict = depositos ? depositos.reduce((acc, d) => ({ ...acc, [d.id]: d.nombre }), {}) : {};
+        const motDict = motivos ? motivos.reduce((acc, m) => ({ ...acc, [m.id]: m.nombre }), {}) : {};
+
+        // 2. Obtener ajustes y transferencias del artículo de forma paralela
+        const [{ data: ajustes }, { data: transferencias }] = await Promise.all([
+            supabaseAdmin.from('ajustes_stock').select('*').eq('articulo_id', articulo_id),
+            supabaseAdmin.from('transferencias_stock').select('*').eq('articulo_id', articulo_id)
+        ]);
+
+        let historial = [];
+
+        // 3. Mapear Ajustes
+        if (ajustes) {
+            historial = historial.concat(ajustes.map(a => {
+                const nombreMotivo = motDict[a.motivo_id] || 'Desconocido';
+                const deposito = depDict[a.deposito_id] || 'Depósito Desconocido';
+                return {
+                    fecha: a.fecha_hora_registro,
+                    tipo_movimiento: 'AJUSTE',
+                    cantidad_afectada: a.cantidad_nueva - a.cantidad_anterior,
+                    detalle: `Motivo: ${nombreMotivo} en ${deposito}. Stock anterior: ${a.cantidad_anterior} -> Nuevo: ${a.cantidad_nueva}`,
+                    usuario_id: a.usuario_id
+                };
+            }));
+        }
+
+        // 4. Mapear Transferencias
+        if (transferencias) {
+            historial = historial.concat(transferencias.map(t => {
+                const origen = depDict[t.deposito_origen_id] || 'Desconocido';
+                const destino = depDict[t.deposito_destino_id] || 'Desconocido';
+                return {
+                    fecha: t.fecha_hora_registro,
+                    tipo_movimiento: 'TRANSFERENCIA',
+                    cantidad_afectada: t.cantidad,
+                    detalle: `De: ${origen} Hacia: ${destino}`,
+                    usuario_id: t.usuario_id
+                };
+            }));
+        }
+
+        // 5. Ordenar por fecha descendente (más recientes primero)
+        historial.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+
+        return historial;
+    }
 }
 module.exports = StockService;
