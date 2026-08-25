@@ -1,6 +1,12 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Modal from '../components/Modal';
+
+
+import { supabase } from '../config/supabaseClient.js';
+
+// formato tabla
+// id, codigo_interno, decripcion, codigo_ean13, categoria_id, marca_id, pais_origen, precio_actul, estado, fecha_hora_registro, fecha_hora_actualizacion
 
 const INITIAL_PRODUCTS = [
   { id: 1, code: 'COD-0001', name: 'Stratocaster Player', brand: 'Fender', model: 'MX23', ean: '7791234500011', category: 'Guitarras eléctricas', price: 1250000, status: 'Normal', central: 8, margalef: 3, active: true },
@@ -19,7 +25,7 @@ const INITIAL_PRODUCTS = [
   { id: 14, code: 'COD-0014', name: 'HS5', brand: 'Yamaha', model: 'HS5', ean: '7791234500141', category: 'Audio', price: 340000, status: 'Reposición', central: 4, margalef: 2, active: true },
   { id: 15, code: 'COD-0015', name: 'Correa + Púas Kit', brand: 'Dunlop', model: 'Kit', ean: '7791234500158', category: 'Accesorios', price: 28000, status: 'Normal', central: 30, margalef: 22, active: true },
   { id: 16, code: 'COD-0016', name: 'YTR-2330', brand: 'Yamaha', model: 'YTR-2330', ean: '7791234500165', category: 'Instrumentos de viento', price: 890000, status: 'Crítico', central: 2, margalef: 0, active: false },
-];
+]; 
 
 const CATEGORIES = [
   'Todas', 'Guitarras eléctricas', 'Guitarras acústicas', 'Bajos', 'Teclados',
@@ -40,7 +46,18 @@ const calcularDigitoVerificador = (ean12) => {
 function Catalogo_de_productos() {
   const navigate = useNavigate();
 
-  const [products, setProducts] = useState(INITIAL_PRODUCTS);
+  // Forma inicial para cargar los datos de los productos hardcodeados
+  const [products, setProducts] = useState([INITIAL_PRODUCTS]);
+
+  // EL ESTADO INICIA VACÍO, necesario para en un futuro consultar los productos.
+  //const [products, setProducts] = useState([]);
+
+  // Estado para la lista dinámica de paises
+  const [paisesOrigen, setPaisesOrigen] = useState([]);
+
+  // ESTADO PARA MANEJAR LA CARGA
+  //const [loading, setLoading] = useState(true);
+
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBrand, setSelectedBrand] = useState('Todas');
   const [selectedStatus, setSelectedStatus] = useState('Todas');
@@ -48,6 +65,77 @@ function Catalogo_de_productos() {
   const [sortBy, setSortBy] = useState('relevantes');
   const [activeCategory, setActiveCategory] = useState('Todas');
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'table'
+
+  /*
+  // LA FUNCIÓN QUE TRAE LOS DATOS DE SUPABASE
+  async function fetchProductos() {
+    try {
+      setLoading(true);
+      
+      const { data, error } = await supabase
+        .from('articulos') // <-- REEMPLAZA ESTO POR EL NOMBRE EXACTO DE TU TABLA
+        .select('*')
+        .order('id', { ascending: true }); // Ordena por ID o por 'name', como prefieras
+
+      if (error) {
+        throw error;
+      }
+      
+      // Si todo sale bien, procedemos a mapear
+      if (data) {
+        const productosMapeados = data.map((itemDb) => {
+          return {
+            id: itemDb.id, // O el nombre que tenga tu clave primaria
+            code: itemDb.codigo_interno, // Ejemplo: mapeando 'codigo_interno' a 'code'
+            name: "Guitarra piola", // En la tabla no algo como un nombre en sí. Preguntar y verificar de como proseguir
+            brand: itemDb.marca_id, // Ejemplo: 'marca' a 'brand'
+            model: itemDb.modelo, // Recientemente agregado
+            ean: itemDb.codigo_ean13, // Ejemplo: 'codigo_barras_ean' a 'ean'
+            category: itemDb.categoria_id, // Ejemplo: 'categoria' a 'category'
+            price: itemDb.precio_venta, // Ejemplo: 'precio_venta' a 'price'
+            status: itemDb.estado_operativo, // Ejemplo: 'estado_operativo' a 'status'
+            central: itemDb.stock_sucursal_central, // Ejemplo a 'central'
+            margalef: itemDb.stock_sucursal_margalef, // Ejemplo a 'margalef'
+            active: itemDb.esta_activo // Ejemplo booleano a 'active'
+          };
+        });
+
+        // Guardamos los datos YA TRADUCIDOS en el estado
+        setProducts(productosMapeados);
+      }
+    } catch (error) {
+      console.error('Error al cargar productos:', error.message);
+      // Aquí podrías usar tu showToast para mostrar el error al usuario
+    } finally {
+      setLoading(false);
+    }
+  }
+  */
+
+
+  // Función de consulta de los paises registrados.
+  async function fetchPaises() {
+    try {
+      const { data, error } = await supabase
+        .from('paises_origen') // Conecta con la tabla que usaste en el Dashboard
+        .select('id, nombre')
+        .order('nombre', { ascending: true }); // Los ordenamos alfabéticamente
+
+      if (error) throw error;
+
+      setPaisesOrigen(data); // Guardamos la lista en el estado
+    } catch (error) {
+      console.error('Error al cargar países:', error.message);
+    }
+  }
+
+
+  // EL useEffect QUE DISPARA LA CONSULTA AL ENTRAR A LA PÁGINA
+
+  useEffect(() => {
+    // fetchProductos(); esta función que consulta todos los productos registrado. En espera por cohque de datos entre el modelo y la base. Ahora el nombre del producto (del modelo)
+    fetchPaises(); // función que consulta a los paises
+  }, []);
 
   // Toast de confirmación
   const [confirmToast, setConfirmToast] = useState(null);
@@ -63,7 +151,8 @@ function Catalogo_de_productos() {
     ean: '',
     price: '',
     status: 'Normal',
-    initialStock: 0
+    initialStock: 0,
+    paisOrigenId: ''
   });
 
   // Modal Dar de Baja
@@ -130,7 +219,9 @@ function Catalogo_de_productos() {
 
   const handleCreateProduct = (e) => {
     e.preventDefault();
-    if (!newProduct.description.trim() || eanValidation.state !== 'valid') return;
+    if (!newProduct.description.trim() || eanValidation.state !== 'valid' || !newProduct.paisOrigenId) {
+      return; 
+    }
 
     const created = {
       id: Date.now(),
@@ -144,7 +235,8 @@ function Catalogo_de_productos() {
       status: newProduct.status,
       central: Number(newProduct.initialStock) || 0,
       margalef: 0,
-      active: true
+      active: true,
+      pais_origen_id: newProduct.paisOrigenId
     };
 
     setProducts([created, ...products]);
@@ -160,7 +252,8 @@ function Catalogo_de_productos() {
       ean: '',
       price: '',
       status: 'Normal',
-      initialStock: 0
+      initialStock: 0,
+      paisOrigenId: '' // <-- RESETEA EL CAMPO, esto para limpiar los posibles campso lseccionados y dejamos unos preseleccionados
     });
   };
 
@@ -663,6 +756,27 @@ function Catalogo_de_productos() {
                 value={newProduct.initialStock}
                 onChange={(e) => setNewProduct({ ...newProduct, initialStock: e.target.value })}
               />
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className="form-field">
+              <label>País de Origen<span className="req">*</span></label>
+              <select
+                required
+                value={newProduct.paisOrigenId}
+                onChange={(e) => setNewProduct({ ...newProduct, paisOrigenId: e.target.value })}
+              >
+                <option value="" disabled>Seleccionar país...</option>
+                
+                {/* Iteramos sobre los datos reales que llegaron de Supabase */}
+                {paisesOrigen.map((pais) => (
+                  <option key={pais.id} value={pais.id}>
+                    {pais.nombre}
+                  </option>
+                ))}
+                
+              </select>
             </div>
           </div>
         </form>
