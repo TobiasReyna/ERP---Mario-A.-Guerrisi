@@ -19,19 +19,34 @@ const CATEGORY_DATA = [
     
 export default function Dashboard() {
   const [datos, setDatos] = useState([])
-  const [cargando, setCargando] = useState(true)
+  const [datos_stock, setDatosStock] = useState([])
+  const [cargando, setCargando] = useState(true) // Estado para controlar la carga de datos
   async function traerDatos() {
     try {
       const { data, error } = await supabase
-        .from('paises_origen') // Reemplaza por tu tabla real
+        .from('articulos')
         .select('*')
-        .order('nombre', { ascending: true }) // Ordenar por nombre de manera ascendente
-
-        
 
       if (error) throw error
-      
-      setDatos(data) // Guardás los datos en el estado
+
+      setDatos(data)
+
+    } catch (error) {
+      console.error('Error:', error.message)
+    } finally {
+      setCargando(false) // Avisás que ya terminó de cargar
+    }
+  }
+  async function traerDatosStock() {
+    try {
+      const { data, error } = await supabase
+        .from('articulos') //CAMBIAR
+        .select('*')
+
+      if (error) throw error
+
+      setDatosStock(data)
+
     } catch (error) {
       console.error('Error:', error.message)
     } finally {
@@ -42,6 +57,7 @@ export default function Dashboard() {
   // 4. Usás useEffect para que la función se ejecute una sola vez al abrir la página
   useEffect(() => {
     traerDatos()
+    traerDatosStock()
   }, [])
     
 
@@ -58,7 +74,7 @@ export default function Dashboard() {
             </div>
             <span className="stat-trend up">+4.2%</span>
           </div>
-          <div className="stat-value">{datos[0]?.nombre || 0}</div>
+          <div className="stat-value">{datos.length}</div>
           <div className="stat-label">Productos en catálogo</div>
         </div>
 
@@ -72,7 +88,7 @@ export default function Dashboard() {
             </div>
             <span className="stat-trend flat">estable</span>
           </div>
-          <div className="stat-value">227</div>
+          <div className="stat-value">{datos_stock.length}</div>
           <div className="stat-label">Unidades — stock consolidado</div>
         </div>
 
