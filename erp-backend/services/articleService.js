@@ -39,6 +39,79 @@ class ArticleService {
 
         return data;
     }
+
+    static async obtenerArticulosActivos() {
+        const { data, error } = await supabaseAdmin
+            .from('articulos')
+            .select('*')
+            .eq('estado', true);
+
+        if (error) {
+            throw new Error(`Error en base de datos: ${error.message}`);
+        }
+        return data;
+    }
+
+    static async obtenerArticuloPorId(id) {
+        const { data, error } = await supabaseAdmin
+            .from('articulos')
+            .select('*')
+            .eq('id', id)
+            .single();
+
+        if (error) {
+            throw new Error(`Error en base de datos: ${error.message}`);
+        }
+        return data;
+    }
+
+    static async modificarArticulo(id, payload) {
+        const {
+            codigo_interno,
+            descripcion,
+            codigo_ean13,
+            categoria_id,
+            marca_id,
+            pais_origen,
+            precio_actual,
+            modelo
+        } = payload;
+
+        const { data, error } = await supabaseAdmin
+            .from('articulos')
+            .update({
+                codigo_interno,
+                descripcion,
+                codigo_ean13,
+                categoria_id,
+                marca_id,
+                pais_origen,
+                precio_actual,
+                modelo: modelo || 'Sin especificar'
+            })
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) {
+            throw new Error(`Error en base de datos: ${error.message}`);
+        }
+        return data;
+    }
+
+    static async darBajaLogica(id) {
+        const { data, error } = await supabaseAdmin
+            .from('articulos')
+            .update({ estado: false })
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) {
+            throw new Error(`Error en base de datos: ${error.message}`);
+        }
+        return data;
+    }
 }
 
 module.exports = ArticleService;
