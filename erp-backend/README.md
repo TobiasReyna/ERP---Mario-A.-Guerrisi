@@ -33,7 +33,7 @@ Sigue estos pasos para levantar el proyecto de forma local (Ideal para nuevos de
    ```env
    PORT=3001
    SUPABASE_URL=tu_url_de_supabase_aqui
-   SUPABASE_SERVICE_ROL_KEY=tu_service_role_key_aqui
+   SUPABASE_SERVICE_ROLE_KEY=tu_service_role_key_aqui
    ```
    *(Nota: Pide al Administrador o Tech Lead las claves reales correspondientes al entorno de desarrollo).*
 4. **Levantar el servidor**:
