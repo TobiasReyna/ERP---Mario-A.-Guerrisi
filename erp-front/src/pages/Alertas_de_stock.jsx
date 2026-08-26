@@ -1,13 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import Modal from '../components/Modal';
 
-const INITIAL_ACTIVITIES = [
-  { id: 1, title: 'Movimiento registrado', text: 'Se registró un ajuste negativo de stock para Fender Stratocaster Player (motivo: Rotura).', time: 'Hace 32 minutos', category: 'Movimientos', type: 'ok', unread: true },
-  { id: 2, title: 'Transferencia completada', text: 'Se transfirieron 2 unidades de Roland TD-17 de Tienda Central a Galería Margalef.', time: 'Ayer · 17:30', category: 'Movimientos', type: 'info', unread: false },
-  { id: 3, title: 'Producto actualizado', text: 'Se actualizó el precio de Fender Stratocaster Player a $1.250.000.', time: '15/08/2026 · 09:20', category: 'Catálogo', type: 'ok', unread: false },
-  { id: 4, title: 'Error de validación del catálogo', text: 'Intento de carga con EAN-13 inválido en el formulario de nuevo producto.', time: '14/08/2026 · 12:05', category: 'Catálogo', type: 'crit', unread: false },
-];
-
 function Alertas_de_stock() {
   const [alertas, setAlertas] = useState([]);
   const [loadingAlertas, setLoadingAlertas] = useState(true);
@@ -15,7 +8,7 @@ function Alertas_de_stock() {
 
   const [activeTab, setActiveTab] = useState('reposicion'); // 'reposicion' | 'actividad'
   const [activityFilter, setActivityFilter] = useState('Todas');
-  const [activities, setActivities] = useState(INITIAL_ACTIVITIES);
+  const [activities, setActivities] = useState([]);
 
   useEffect(() => {
     const fetchAlertas = async () => {
@@ -30,7 +23,32 @@ function Alertas_de_stock() {
         setLoadingAlertas(false);
       }
     };
+    const fetchActivities = async () => {
+      try {
+        const res = await fetch('http://localhost:3001/api/system/activity');
+        if (res.ok) {
+          const json = await res.json();
+          const mapped = (json.data || []).map(a => {
+            const dateObj = new Date(a.fecha);
+            const timeStr = `${String(dateObj.getDate()).padStart(2, '0')}/${String(dateObj.getMonth() + 1).padStart(2, '0')}/${dateObj.getFullYear()} · ${String(dateObj.getHours()).padStart(2, '0')}:${String(dateObj.getMinutes()).padStart(2, '0')}`;
+            return {
+              id: a.id,
+              title: a.titulo,
+              text: a.descripcion,
+              time: timeStr,
+              category: a.tipo === 'MOVIMIENTOS' ? 'Movimientos' : 'Catálogo',
+              type: a.typeLabel,
+              unread: true
+            };
+          });
+          setActivities(mapped);
+        }
+      } catch (err) {
+        console.error("Error fetching activities:", err);
+      }
+    };
     fetchAlertas();
+    fetchActivities();
   }, []);
 
   // Toast confirmaciones
@@ -326,7 +344,7 @@ function Alertas_de_stock() {
           <div className="notif-page-list">
             {filteredActivities.length === 0 ? (
               <div style={{ padding: '32px', textAlign: 'center', color: 'var(--gray-500)' }}>
-                No hay actividades registradas bajo este filtro.
+                No hay actividad reciente
               </div>
             ) : (
               filteredActivities.map((act) => (

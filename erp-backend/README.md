@@ -6,10 +6,9 @@ Bienvenido al repositorio del backend del **ERP Mario A. Guerrisi**. Este servic
 
 El proyecto está construido sobre **Node.js** utilizando **Express.js** bajo el patrón de arquitectura por capas (Controladores, Servicios, Rutas).
 
-**🚨 REGLA DE ORO DEL BACKEND:**  
-Este backend actúa estrictamente como una capa de transporte e inserción/consulta limpia. **Toda la lógica pesada, concurrencia optimista, cálculos matemáticos de stock (sumas/restas) y prevención de condiciones de carrera está delegada a la Base de Datos (PostgreSQL en Supabase) mediante el uso de Triggers y Funciones PL/pgSQL.**
-- El backend *inserta* un registro de ajuste o transferencia. El *trigger* en BD es quien impacta las existencias reales mediante bloqueos a nivel de fila (`FOR UPDATE`).
-- El backend *modifica* un precio. El *trigger* detecta el cambio y registra automáticamente el historial.
+**🚨 REGLAS CLAVE DE NEGOCIO Y SEGURIDAD:**  
+- **Validaciones Estrictas Previas (Controladores):** El backend cuenta con un filtro estricto de seguridad en la capa de controladores antes de cursar cualquier transacción a la base de datos. Se impide matemáticamente que el stock de un depósito quede con números negativos (quiebres irreales) durante ajustes o transferencias, abortando la petición con un error HTTP 400.
+- **Delega de Transacciones a BD:** Toda la lógica pesada de inserciones, cálculos de concurrencia optimista y prevención de condiciones de carrera está delegada a la Base de Datos (PostgreSQL en Supabase) mediante Triggers y Funciones PL/pgSQL, utilizando bloqueos a nivel de fila (`FOR UPDATE`).
 
 ## 📦 Dependencias Principales
 
@@ -77,13 +76,14 @@ A continuación, un detalle rápido de los endpoints expuestos organizados por m
 - `GET /:articulo_id` : Devuelve el stock consolidado total y el desglose en array por depósito.
 - `GET /:articulo_id/history` : Trazabilidad unificada de movimientos (ajustes y transferencias) ordenada cronológicamente por fecha descendente.
 
-### 🗂️ Módulo de Maestros (Tablas Auxiliares) - `/api`
-Endpoints utilitarios utilizados por el Frontend para poblar menús desplegables (selects):
+### 🗂️ Módulo de Maestros y Sistema - `/api`
+Endpoints utilitarios y globales utilizados por el Frontend:
 - `GET /categories` : Categorías de productos.
 - `GET /brands` : Marcas (filtra solo las activas).
 - `GET /countries` : Países de origen.
 - `GET /deposits` : Depósitos físicos habilitados en el sistema.
 - `GET /adjustment-reasons` : Tipos y motivos de ajuste permitidos.
+- `GET /system/activity` : **[NUEVO]** Actividad del Sistema / Historial Global. Unifica y formatea de forma cronológica los movimientos de stock y las actualizaciones del catálogo en una sola respuesta, ideal para poblar campanitas de notificaciones.
 
 ## 🧪 Cómo probar la API (Testing Rápido)
 

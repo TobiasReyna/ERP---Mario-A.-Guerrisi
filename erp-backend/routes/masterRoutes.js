@@ -9,5 +9,6 @@ router.get('/brands', masterController.getMarcas);
 router.get('/countries', masterController.getPaises);
 router.get('/deposits', masterController.getDepositosActivos);
 router.get('/adjustment-reasons', masterController.getMotivosAjuste);
+router.get('/system/activity', masterController.getActividadSistema);
 
 module.exports = router;

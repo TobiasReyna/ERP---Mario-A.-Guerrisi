@@ -19,20 +19,59 @@ const ROUTE_INFO = {
   '/Perfil': { title: 'Mi perfil', subtitle: 'Información de la cuenta y el depósito asignado' },
 };
 
-const INITIAL_NOTIFICATIONS = [
-  { id: 1, type: 'crit', title: 'Stock crítico:', text: 'Fender Stratocaster Player alcanzó el stock mínimo.', time: 'Hace 5 minutos', unread: true },
-  { id: 2, type: 'warn', title: 'Reposición sugerida:', text: 'Yamaha P-145 requiere una reposición de 6 unidades.', time: 'Hace 18 minutos', unread: true },
-  { id: 3, type: 'ok', title: 'Movimiento registrado:', text: 'Se registró un ajuste de stock correctamente.', time: 'Hace 32 minutos', unread: true },
-];
-
 function App() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const [notifications, setNotifications] = useState(INITIAL_NOTIFICATIONS);
+  const [notifications, setNotifications] = useState([]);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [isUserOpen, setIsUserOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+
+  useEffect(() => {
+    Promise.all([
+      fetch('http://localhost:3001/api/stock/alerts').then(res => res.ok ? res.json() : { data: [] }),
+      fetch('http://localhost:3001/api/system/activity').then(res => res.ok ? res.json() : { data: [] })
+    ])
+    .then(([alertsRes, activityRes]) => {
+      let combined = [];
+      
+      if (alertsRes.data) {
+        combined = combined.concat(alertsRes.data.map(alert => {
+          const isCritical = alert.stock_actual <= 0;
+          return {
+            id: `alert-${alert.articulo_id}-${alert.deposito_id}`,
+            type: isCritical ? 'crit' : 'warn',
+            title: isCritical ? 'Stock crítico:' : 'Reposición sugerida:',
+            text: `${alert.articulo_nombre} en ${alert.deposito_nombre}. Quedan ${alert.stock_actual} unidades. Sugerida: ${alert.cantidad_sugerida}.`,
+            time: 'Ahora',
+            unread: true,
+            rawDate: new Date()
+          };
+        }));
+      }
+
+      if (activityRes.data) {
+        combined = combined.concat(activityRes.data.map(a => {
+          const dateObj = new Date(a.fecha);
+          const timeStr = `${String(dateObj.getDate()).padStart(2, '0')}/${String(dateObj.getMonth() + 1).padStart(2, '0')}/${dateObj.getFullYear()} · ${String(dateObj.getHours()).padStart(2, '0')}:${String(dateObj.getMinutes()).padStart(2, '0')}`;
+          return {
+            id: `act-${a.id}`,
+            type: a.typeLabel,
+            title: a.titulo + ':',
+            text: a.descripcion,
+            time: timeStr,
+            unread: true,
+            rawDate: dateObj
+          };
+        }));
+      }
+
+      combined.sort((a, b) => b.rawDate - a.rawDate);
+      setNotifications(combined);
+    })
+    .catch(err => console.error("Error fetching notifications:", err));
+  }, []);
 
   const notifRef = useRef(null);
   const userRef = useRef(null);
@@ -152,7 +191,7 @@ function App() {
               <path d="M13.73 21a2 2 0 0 1-3.46 0" />
             </svg>
             Alertas y notificaciones
-            <span className="nav-item-badge">10</span>
+            {unreadCount > 0 && <span className="nav-item-badge">{unreadCount}</span>}
           </NavLink>
         </nav>
 
