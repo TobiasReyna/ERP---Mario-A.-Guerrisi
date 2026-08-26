@@ -27,19 +27,15 @@ const CATEGORIES = [
   'Accesorios', 'Instrumentos de viento'
 ];
 
-const COUNTRIES = [
-  { id: 'a37d867b-7d1f-4cda-8582-f2d26476b138', name: 'Argentina' },
-  { id: '93836159-2616-4a77-83a3-deaeb97f4dbd', name: 'China' },
-  { id: 'b05040f8-3657-40da-b803-30c2b6ee3b1d', name: 'Estados Unidos' },
-  { id: '619e3858-f561-4108-a323-7218cf7b5f84', name: 'Indonesia' },
-  { id: 'aa5056d6-d159-4903-8e77-a8c79c03b3e5', name: 'Japón' },
-  { id: '67fea9c7-083a-450d-b8ff-5d7581e0dbd9', name: 'México' },
-];
+
 
 function Catalogo_de_productos() {
   const navigate = useNavigate();
 
   const [formCategories, setFormCategories] = useState([]);
+  const [formCountries, setFormCountries] = useState([]);
+  const [formBrands, setFormBrands] = useState([]);
+  
   useEffect(() => {
     fetch('http://localhost:3001/api/categories')
       .then(res => res.json())
@@ -49,6 +45,24 @@ function Catalogo_de_productos() {
         }
       })
       .catch(err => console.error("Error fetching categories:", err));
+
+    fetch('http://localhost:3001/api/countries')
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.data) {
+          setFormCountries(data.data);
+        }
+      })
+      .catch(err => console.error("Error fetching countries:", err));
+
+    fetch('http://localhost:3001/api/brands')
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.data) {
+          setFormBrands(data.data);
+        }
+      })
+      .catch(err => console.error("Error fetching brands:", err));
   }, []);
 
   const [products, setProducts] = useState(INITIAL_PRODUCTS);
@@ -69,13 +83,13 @@ function Catalogo_de_productos() {
     code: 'COD-0017',
     category: '',
     description: '',
-    brand: 'Fender',
+    brand: '',
     model: '',
     ean: '',
     price: '',
     status: 'Normal',
     initialStock: 0,
-    originCountry: 'a37d867b-7d1f-4cda-8582-f2d26476b138'
+    originCountry: ''
   });
 
   // Modal Dar de Baja
@@ -133,7 +147,7 @@ function Catalogo_de_productos() {
 
   const handleCreateProduct = (e) => {
     e.preventDefault();
-    if (!newProduct.category || !newProduct.description.trim() || eanValidation.state !== 'valid') return;
+    if (!newProduct.category || !newProduct.originCountry || !newProduct.brand || !newProduct.description.trim() || eanValidation.state !== 'valid') return;
 
     const created = {
       id: Date.now(),
@@ -159,13 +173,13 @@ function Catalogo_de_productos() {
       code: `COD-${String(products.length + 2).padStart(4, '0')}`,
       category: '',
       description: '',
-      brand: 'Fender',
+      brand: '',
       model: '',
       ean: '',
       price: '',
       status: 'Normal',
       initialStock: 0,
-      originCountry: 'a37d867b-7d1f-4cda-8582-f2d26476b138'
+      originCountry: ''
     });
   };
 
@@ -565,13 +579,15 @@ function Catalogo_de_productos() {
           <div className="form-row">
             <div className="form-field">
               <label>Marca<span className="req">*</span></label>
-              <input
-                type="text"
-                placeholder="Ej: Fender"
-                required
+              <select
                 value={newProduct.brand}
                 onChange={(e) => setNewProduct({ ...newProduct, brand: e.target.value })}
-              />
+              >
+                <option value="">Seleccione una marca</option>
+                {formBrands.map(b => (
+                  <option key={b.id} value={b.id}>{b.nombre}</option>
+                ))}
+              </select>
             </div>
             <div className="form-field">
               <label>Modelo</label>
@@ -642,8 +658,9 @@ function Catalogo_de_productos() {
                 value={newProduct.originCountry}
                 onChange={(e) => setNewProduct({ ...newProduct, originCountry: e.target.value })}
               >
-                {COUNTRIES.map(c => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
+                <option value="">Seleccione un país</option>
+                {formCountries.map(c => (
+                  <option key={c.id} value={c.id}>{c.nombre}</option>
                 ))}
               </select>
             </div>
