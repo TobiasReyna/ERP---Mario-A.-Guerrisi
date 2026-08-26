@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Modal from '../components/Modal';
 
@@ -27,8 +27,29 @@ const CATEGORIES = [
   'Accesorios', 'Instrumentos de viento'
 ];
 
+const COUNTRIES = [
+  { id: 'a37d867b-7d1f-4cda-8582-f2d26476b138', name: 'Argentina' },
+  { id: '93836159-2616-4a77-83a3-deaeb97f4dbd', name: 'China' },
+  { id: 'b05040f8-3657-40da-b803-30c2b6ee3b1d', name: 'Estados Unidos' },
+  { id: '619e3858-f561-4108-a323-7218cf7b5f84', name: 'Indonesia' },
+  { id: 'aa5056d6-d159-4903-8e77-a8c79c03b3e5', name: 'Japón' },
+  { id: '67fea9c7-083a-450d-b8ff-5d7581e0dbd9', name: 'México' },
+];
+
 function Catalogo_de_productos() {
   const navigate = useNavigate();
+
+  const [formCategories, setFormCategories] = useState([]);
+  useEffect(() => {
+    fetch('http://localhost:3001/api/categories')
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.data) {
+          setFormCategories(data.data);
+        }
+      })
+      .catch(err => console.error("Error fetching categories:", err));
+  }, []);
 
   const [products, setProducts] = useState(INITIAL_PRODUCTS);
   const [searchTerm, setSearchTerm] = useState('');
@@ -46,14 +67,15 @@ function Catalogo_de_productos() {
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   const [newProduct, setNewProduct] = useState({
     code: 'COD-0017',
-    category: 'Guitarras eléctricas',
+    category: '',
     description: '',
     brand: 'Fender',
     model: '',
     ean: '',
     price: '',
     status: 'Normal',
-    initialStock: 0
+    initialStock: 0,
+    originCountry: 'a37d867b-7d1f-4cda-8582-f2d26476b138'
   });
 
   // Modal Dar de Baja
@@ -111,7 +133,7 @@ function Catalogo_de_productos() {
 
   const handleCreateProduct = (e) => {
     e.preventDefault();
-    if (!newProduct.description.trim() || eanValidation.state !== 'valid') return;
+    if (!newProduct.category || !newProduct.description.trim() || eanValidation.state !== 'valid') return;
 
     const created = {
       id: Date.now(),
@@ -125,7 +147,8 @@ function Catalogo_de_productos() {
       status: newProduct.status,
       central: Number(newProduct.initialStock) || 0,
       margalef: 0,
-      active: true
+      active: true,
+      originCountry: newProduct.originCountry
     };
 
     setProducts([created, ...products]);
@@ -134,14 +157,15 @@ function Catalogo_de_productos() {
 
     setNewProduct({
       code: `COD-${String(products.length + 2).padStart(4, '0')}`,
-      category: 'Guitarras eléctricas',
+      category: '',
       description: '',
       brand: 'Fender',
       model: '',
       ean: '',
       price: '',
       status: 'Normal',
-      initialStock: 0
+      initialStock: 0,
+      originCountry: 'a37d867b-7d1f-4cda-8582-f2d26476b138'
     });
   };
 
@@ -517,8 +541,9 @@ function Catalogo_de_productos() {
                 value={newProduct.category}
                 onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })}
               >
-                {CATEGORIES.filter(c => c !== 'Todas').map(c => (
-                  <option key={c} value={c}>{c}</option>
+                <option value="">Seleccione una categoría</option>
+                {formCategories.map(c => (
+                  <option key={c.id} value={c.id}>{c.nombre}</option>
                 ))}
               </select>
             </div>
@@ -612,14 +637,14 @@ function Catalogo_de_productos() {
 
           <div className="form-row">
             <div className="form-field">
-              <label>Estado<span className="req">*</span></label>
+              <label>País de Origen<span className="req">*</span></label>
               <select
-                value={newProduct.status}
-                onChange={(e) => setNewProduct({ ...newProduct, status: e.target.value })}
+                value={newProduct.originCountry}
+                onChange={(e) => setNewProduct({ ...newProduct, originCountry: e.target.value })}
               >
-                <option value="Normal">Normal</option>
-                <option value="Reposición">Reposición</option>
-                <option value="Crítico">Crítico</option>
+                {COUNTRIES.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
               </select>
             </div>
             <div className="form-field">
