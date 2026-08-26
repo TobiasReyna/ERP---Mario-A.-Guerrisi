@@ -1,7 +1,7 @@
 const ArticleService = require('../services/articleService');
 
 // Inyectando usuario para Sprint 1
-const TEST_USER_ID = "TU_UUID_REAL_AQUI";
+const TEST_USER_ID = "7ab3d65c-eecc-4f0b-98a1-2c53efce620e";
 
 const crearArticulo = async (req, res) => {
     try {

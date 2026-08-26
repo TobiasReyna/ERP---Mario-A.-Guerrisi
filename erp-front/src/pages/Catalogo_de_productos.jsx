@@ -145,42 +145,71 @@ function Catalogo_de_productos() {
     setTimeout(() => setConfirmToast(null), 4000);
   };
 
-  const handleCreateProduct = (e) => {
+  const handleCreateProduct = async (e) => {
     e.preventDefault();
     if (!newProduct.category || !newProduct.originCountry || !newProduct.brand || !newProduct.description.trim() || eanValidation.state !== 'valid') return;
 
-    const created = {
-      id: Date.now(),
-      code: newProduct.code,
-      name: newProduct.description,
-      brand: newProduct.brand,
-      model: newProduct.model || newProduct.code,
-      ean: newProduct.ean,
-      category: newProduct.category,
-      price: Number(String(newProduct.price).replace(/[^0-9]/g, '')) || 0,
-      status: newProduct.status,
-      central: Number(newProduct.initialStock) || 0,
-      margalef: 0,
-      active: true,
-      originCountry: newProduct.originCountry
-    };
+    try {
+      const payload = {
+        codigo_interno: newProduct.code,
+        descripcion: newProduct.description,
+        codigo_ean13: newProduct.ean,
+        categoria_id: newProduct.category,
+        marca_id: newProduct.brand,
+        pais_origen: newProduct.originCountry,
+        precio_actual: Number(String(newProduct.price).replace(/[^0-9]/g, '')) || 0,
+        modelo: newProduct.model || null
+      };
 
-    setProducts([created, ...products]);
-    setIsNewModalOpen(false);
-    showToast('Producto guardado correctamente en el catálogo.');
+      const response = await fetch('http://localhost:3001/api/articles', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
 
-    setNewProduct({
-      code: `COD-${String(products.length + 2).padStart(4, '0')}`,
-      category: '',
-      description: '',
-      brand: '',
-      model: '',
-      ean: '',
-      price: '',
-      status: 'Normal',
-      initialStock: 0,
-      originCountry: ''
-    });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error al guardar el producto');
+      }
+
+      const created = {
+        id: Date.now(),
+        code: newProduct.code,
+        name: newProduct.description,
+        brand: newProduct.brand,
+        model: newProduct.model || newProduct.code,
+        ean: newProduct.ean,
+        category: newProduct.category,
+        price: payload.precio_actual,
+        status: newProduct.status,
+        central: Number(newProduct.initialStock) || 0,
+        margalef: 0,
+        active: true,
+        originCountry: newProduct.originCountry
+      };
+
+      setProducts([created, ...products]);
+      setIsNewModalOpen(false);
+      showToast('Producto guardado correctamente en el catálogo.');
+
+      setNewProduct({
+        code: `COD-${String(products.length + 2).padStart(4, '0')}`,
+        category: '',
+        description: '',
+        brand: '',
+        model: '',
+        ean: '',
+        price: '',
+        status: 'Normal',
+        initialStock: 0,
+        originCountry: ''
+      });
+    } catch (error) {
+      console.error(error);
+      alert(error.message);
+    }
   };
 
   // Dar de baja (Soft Delete)
