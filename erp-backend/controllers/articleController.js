@@ -62,8 +62,28 @@ const obtenerArticulosActivos = async (req, res) => {
         const articulos = await ArticleService.obtenerArticulosActivos();
         return res.status(200).json({ data: articulos });
     } catch (error) {
-        console.error('[API] Error GET /api/articles:', error);
+        console.error('[API] Error GET /api/articles/activos:', error);
         return res.status(500).json({ error: error.message || 'Error interno al obtener artículos.' });
+    }
+};
+
+const obtenerArticulosInactivos = async (req, res) => {
+    try {
+        const articulos = await ArticleService.obtenerArticulosInactivos();
+        return res.status(200).json({ data: articulos });
+    } catch (error) {
+        console.error('[API] Error GET /api/articles/inactivos:', error);
+        return res.status(500).json({ error: error.message || 'Error interno al obtener artículos inactivos.' });
+    }
+};
+
+const obtenerTodosArticulos = async (req, res) => {
+    try {
+        const articulos = await ArticleService.obtenerTodosArticulos();
+        return res.status(200).json({ data: articulos });
+    } catch (error) {
+        console.error('[API] Error GET /api/articles/todos:', error);
+        return res.status(500).json({ error: error.message || 'Error interno al obtener todos los artículos.' });
     }
 };
 
@@ -148,6 +168,8 @@ const darBajaLogica = async (req, res) => {
 module.exports = {
     crearArticulo,
     obtenerArticulosActivos,
+    obtenerArticulosInactivos,
+    obtenerTodosArticulos,
     obtenerArticuloPorId,
     modificarArticulo,
     darBajaLogica

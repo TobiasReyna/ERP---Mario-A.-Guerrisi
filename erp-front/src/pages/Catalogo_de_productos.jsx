@@ -76,14 +76,6 @@ function Catalogo_de_productos() {
       })
       .catch(err => console.error("Error fetching brands:", err));
 
-    fetch('http://localhost:3001/api/articles')
-      .then(res => res.json())
-      .then(data => {
-        if (data && data.data) {
-          setProducts(data.data);
-        }
-      })
-      .catch(err => console.error("Error fetching articles:", err));
   }, []);
 
   const [products, setProducts] = useState([]);
@@ -91,6 +83,22 @@ function Catalogo_de_productos() {
   const [selectedBrand, setSelectedBrand] = useState('Todas');
   const [selectedStatus, setSelectedStatus] = useState('Todas');
   const [lifecycleFilter, setLifecycleFilter] = useState('activos'); // 'activos' | 'bajas' | 'todos'
+
+  useEffect(() => {
+    let endpoint = 'http://localhost:3001/api/articles';
+    if (lifecycleFilter === 'bajas') endpoint = 'http://localhost:3001/api/articles/inactivos';
+    else if (lifecycleFilter === 'todos') endpoint = 'http://localhost:3001/api/articles/todos';
+
+    fetch(endpoint)
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.data) {
+          setProducts(data.data);
+        }
+      })
+      .catch(err => console.error("Error fetching articles:", err));
+  }, [lifecycleFilter]);
+
   const [sortBy, setSortBy] = useState('relevantes');
   const [activeCategory, setActiveCategory] = useState('Todas');
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'table'
@@ -233,12 +241,27 @@ function Catalogo_de_productos() {
   };
 
   // Dar de baja (Soft Delete)
-  const handleConfirmDeactivate = () => {
+  const handleConfirmDeactivate = async () => {
     if (!productToDeactivate) return;
-    setProducts(products.map(p => p.id === productToDeactivate.id ? { ...p, estado: false } : p));
-    setIsDeactivateModalOpen(false);
-    showToast(`El producto "${productToDeactivate.descripcion}" fue dado de baja. Podés consultarlo o reactivarlo filtrando por "Dados de baja".`);
-    setProductToDeactivate(null);
+
+    try {
+      const response = await fetch(`http://localhost:3001/api/articles/${productToDeactivate.id}/status`, {
+        method: 'PATCH'
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error al dar de baja el producto');
+      }
+
+      setProducts(products.map(p => p.id === productToDeactivate.id ? { ...p, estado: false } : p));
+      setIsDeactivateModalOpen(false);
+      showToast(`El producto "${getBrandName(productToDeactivate.marca_id)} ${productToDeactivate.modelo}" fue dado de baja. Podés consultarlo o reactivarlo filtrando por "Dados de baja".`);
+      setProductToDeactivate(null);
+    } catch (error) {
+      console.error(error);
+      alert(error.message);
+    }
   };
 
   // Reactivar producto
@@ -730,20 +753,8 @@ function Catalogo_de_productos() {
       >
         <div>
           <p style={{ fontSize: '13.5px', color: 'var(--gray-700)', lineHeight: '1.6', marginBottom: '14px' }}>
-            ¿Confirmás que querés dar de baja a <strong>{productToDeactivate?.descripcion} ({productToDeactivate?.codigo_interno})</strong>?
+            ¿Confirmás que querés dar de baja a <strong>{getBrandName(productToDeactivate?.marca_id)} {productToDeactivate?.modelo}</strong>?
           </p>
-          <div className="form-field">
-            <label>Motivo de la baja</label>
-            <select
-              value={deactivateReason}
-              onChange={(e) => setDeactivateReason(e.target.value)}
-            >
-              <option value="Discontinuado por el fabricante">Discontinuado por el fabricante</option>
-              <option value="Fin de comercialización">Fin de comercialización</option>
-              <option value="Reemplazado por nuevo modelo">Reemplazado por nuevo modelo</option>
-              <option value="Sin stock proyectado">Sin stock proyectado</option>
-            </select>
-          </div>
           <p style={{ fontSize: '12px', color: 'var(--gray-500)', marginTop: '12px' }}>
             * Esta acción no borrará los movimientos históricos y podrás reactivar el producto en cualquier momento.
           </p>

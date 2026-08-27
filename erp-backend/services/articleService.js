@@ -52,6 +52,29 @@ class ArticleService {
         return data;
     }
 
+    static async obtenerArticulosInactivos() {
+        const { data, error } = await supabaseAdmin
+            .from('articulos')
+            .select('*')
+            .eq('estado', false);
+
+        if (error) {
+            throw new Error(`Error en base de datos: ${error.message}`);
+        }
+        return data;
+    }
+
+    static async obtenerTodosArticulos() {
+        const { data, error } = await supabaseAdmin
+            .from('articulos')
+            .select('*');
+
+        if (error) {
+            throw new Error(`Error en base de datos: ${error.message}`);
+        }
+        return data;
+    }
+
     static async obtenerArticuloPorId(id) {
         const { data, error } = await supabaseAdmin
             .from('articulos')

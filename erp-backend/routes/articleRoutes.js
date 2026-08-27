@@ -8,6 +8,12 @@ router.post('/', articleController.crearArticulo);
 // GET /api/articles - Listar artículos activos
 router.get('/', articleController.obtenerArticulosActivos);
 
+// GET /api/articles/inactivos - Listar artículos inactivos
+router.get('/inactivos', articleController.obtenerArticulosInactivos);
+
+// GET /api/articles/todos - Listar todos los artículos
+router.get('/todos', articleController.obtenerTodosArticulos);
+
 // GET /api/articles/:id - Obtener detalle de un artículo
 router.get('/:id', articleController.obtenerArticuloPorId);
 
