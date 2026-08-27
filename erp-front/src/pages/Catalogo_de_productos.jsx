@@ -2,24 +2,6 @@ import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Modal from '../components/Modal';
 
-const INITIAL_PRODUCTS = [
-  { id: 1, code: 'COD-0001', name: 'Stratocaster Player', brand: 'Fender', model: 'MX23', ean: '7791234500011', category: 'Guitarras eléctricas', price: 1250000, status: 'Normal', central: 8, margalef: 3, active: true },
-  { id: 2, code: 'COD-0002', name: 'Les Paul Studio', brand: 'Gibson', model: 'LPS', ean: '7791234500028', category: 'Guitarras eléctricas', price: 2480000, status: 'Reposición', central: 4, margalef: 2, active: true },
-  { id: 3, code: 'COD-0003', name: 'AD810', brand: 'Cort', model: 'AD810', ean: '7791234500035', category: 'Guitarras acústicas', price: 310000, status: 'Normal', central: 12, margalef: 9, active: true },
-  { id: 4, code: 'COD-0004', name: '214ce', brand: 'Taylor', model: '214ce', ean: '7791234500042', category: 'Guitarras acústicas', price: 980000, status: 'Crítico', central: 3, margalef: 1, active: true },
-  { id: 5, code: 'COD-0005', name: 'Player Jazz Bass', brand: 'Fender', model: 'PJB', ean: '7791234500059', category: 'Bajos', price: 1150000, status: 'Reposición', central: 5, margalef: 3, active: true },
-  { id: 6, code: 'COD-0006', name: 'GSR200', brand: 'Ibanez', model: 'GSR200', ean: '7791234500066', category: 'Bajos', price: 420000, status: 'Crítico', central: 2, margalef: 1, active: true },
-  { id: 7, code: 'COD-0007', name: 'P-145', brand: 'Yamaha', model: 'P-145', ean: '7791234500073', category: 'Pianos', price: 650000, status: 'Crítico', central: 1, margalef: 1, active: true },
-  { id: 8, code: 'COD-0008', name: 'B2', brand: 'Korg', model: 'B2', ean: '7791234500080', category: 'Teclados', price: 480000, status: 'Normal', central: 7, margalef: 3, active: true },
-  { id: 9, code: 'COD-0009', name: 'TD-17', brand: 'Roland', model: 'TD-17', ean: '7791234500097', category: 'Baterías', price: 2150000, status: 'Crítico', central: 3, margalef: 1, active: true },
-  { id: 10, code: 'COD-0010', name: 'Export Series', brand: 'Pearl', model: 'Export', ean: '7791234500103', category: 'Baterías', price: 1680000, status: 'Crítico', central: 2, margalef: 0, active: true },
-  { id: 11, code: 'COD-0011', name: 'Cajón Peruano', brand: 'LP', model: 'Serie Americana', ean: '7791234500110', category: 'Percusión', price: 185000, status: 'Normal', central: 15, margalef: 10, active: true },
-  { id: 12, code: 'COD-0012', name: 'MG30GFX', brand: 'Marshall', model: 'MG30GFX', ean: '7791234500127', category: 'Amplificadores', price: 520000, status: 'Reposición', central: 6, margalef: 3, active: true },
-  { id: 13, code: 'COD-0013', name: 'SM58', brand: 'Shure', model: 'SM58', ean: '7791234500134', category: 'Micrófonos', price: 195000, status: 'Normal', central: 20, margalef: 12, active: true },
-  { id: 14, code: 'COD-0014', name: 'HS5', brand: 'Yamaha', model: 'HS5', ean: '7791234500141', category: 'Audio', price: 340000, status: 'Reposición', central: 4, margalef: 2, active: true },
-  { id: 15, code: 'COD-0015', name: 'Correa + Púas Kit', brand: 'Dunlop', model: 'Kit', ean: '7791234500158', category: 'Accesorios', price: 28000, status: 'Normal', central: 30, margalef: 22, active: true },
-  { id: 16, code: 'COD-0016', name: 'YTR-2330', brand: 'Yamaha', model: 'YTR-2330', ean: '7791234500165', category: 'Instrumentos de viento', price: 890000, status: 'Crítico', central: 2, margalef: 0, active: false },
-];
 
 const CATEGORIES = [
   'Todas', 'Guitarras eléctricas', 'Guitarras acústicas', 'Bajos', 'Teclados',
@@ -63,9 +45,18 @@ function Catalogo_de_productos() {
         }
       })
       .catch(err => console.error("Error fetching brands:", err));
+
+    fetch('http://localhost:3001/api/articles')
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.data) {
+          setProducts(data.data);
+        }
+      })
+      .catch(err => console.error("Error fetching articles:", err));
   }, []);
 
-  const [products, setProducts] = useState(INITIAL_PRODUCTS);
+  const [products, setProducts] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBrand, setSelectedBrand] = useState('Todas');
   const [selectedStatus, setSelectedStatus] = useState('Todas');
@@ -116,27 +107,27 @@ function Catalogo_de_productos() {
   const filteredProducts = useMemo(() => {
     return products
       .filter((item) => {
-        const matchesCategory = activeCategory === 'Todas' || item.category === activeCategory;
-        const matchesBrand = selectedBrand === 'Todas' || item.brand === selectedBrand;
-        const matchesStatus = selectedStatus === 'Todas' || item.status === selectedStatus;
+        const matchesCategory = activeCategory === 'Todas' || item.categoria_id === activeCategory;
+        const matchesBrand = selectedBrand === 'Todas' || item.marca_id === selectedBrand;
+        const matchesStatus = selectedStatus === 'Todas' || item.status === selectedStatus; // We keep item.status or maybe it's not present, we will ignore for now
         const matchesLifecycle =
           lifecycleFilter === 'todos' ||
-          (lifecycleFilter === 'activos' && item.active) ||
-          (lifecycleFilter === 'bajas' && !item.active);
+          (lifecycleFilter === 'activos' && item.estado) ||
+          (lifecycleFilter === 'bajas' && !item.estado);
 
         const matchesSearch =
-          item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          item.brand.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          item.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          item.ean.includes(searchTerm);
+          (item.descripcion && item.descripcion.toLowerCase().includes(searchTerm.toLowerCase())) ||
+          (item.marca_id && String(item.marca_id).toLowerCase().includes(searchTerm.toLowerCase())) ||
+          (item.codigo_interno && String(item.codigo_interno).toLowerCase().includes(searchTerm.toLowerCase())) ||
+          (item.codigo_ean13 && String(item.codigo_ean13).includes(searchTerm));
 
         return matchesCategory && matchesBrand && matchesStatus && matchesLifecycle && matchesSearch;
       })
       .sort((a, b) => {
-        if (sortBy === 'price-asc') return a.price - b.price;
-        if (sortBy === 'price-desc') return b.price - a.price;
-        if (sortBy === 'stock') return (b.central + b.margalef) - (a.central + a.margalef);
-        return a.id - b.id;
+        if (sortBy === 'price-asc') return a.precio_actual - b.precio_actual;
+        if (sortBy === 'price-desc') return b.precio_actual - a.precio_actual;
+        if (sortBy === 'stock') return 0;
+        return String(a.id).localeCompare(String(b.id));
       });
   }, [products, searchTerm, selectedBrand, selectedStatus, lifecycleFilter, sortBy, activeCategory]);
 
@@ -174,21 +165,8 @@ function Catalogo_de_productos() {
         throw new Error(errorData.error || 'Error al guardar el producto');
       }
 
-      const created = {
-        id: Date.now(),
-        code: newProduct.code,
-        name: newProduct.description,
-        brand: newProduct.brand,
-        model: newProduct.model || newProduct.code,
-        ean: newProduct.ean,
-        category: newProduct.category,
-        price: payload.precio_actual,
-        status: newProduct.status,
-        central: Number(newProduct.initialStock) || 0,
-        margalef: 0,
-        active: true,
-        originCountry: newProduct.originCountry
-      };
+      const result = await response.json();
+      const created = result.data;
 
       setProducts([created, ...products]);
       setIsNewModalOpen(false);
@@ -215,26 +193,23 @@ function Catalogo_de_productos() {
   // Dar de baja (Soft Delete)
   const handleConfirmDeactivate = () => {
     if (!productToDeactivate) return;
-    setProducts(products.map(p => p.id === productToDeactivate.id ? { ...p, active: false } : p));
+    setProducts(products.map(p => p.id === productToDeactivate.id ? { ...p, estado: false } : p));
     setIsDeactivateModalOpen(false);
-    showToast(`El producto "${productToDeactivate.name}" fue dado de baja. Podés consultarlo o reactivarlo filtrando por "Dados de baja".`);
+    showToast(`El producto "${productToDeactivate.descripcion}" fue dado de baja. Podés consultarlo o reactivarlo filtrando por "Dados de baja".`);
     setProductToDeactivate(null);
   };
 
   // Reactivar producto
   const handleConfirmReactivate = () => {
     if (!productToReactivate) return;
-    setProducts(products.map(p => p.id === productToReactivate.id ? { ...p, active: true } : p));
+    setProducts(products.map(p => p.id === productToReactivate.id ? { ...p, estado: true } : p));
     setIsReactivateModalOpen(false);
-    showToast(`El producto "${productToReactivate.name}" fue reactivado en el catálogo activo.`);
+    showToast(`El producto "${productToReactivate.descripcion}" fue reactivado en el catálogo activo.`);
     setProductToReactivate(null);
   };
 
   const getBadge = (prod) => {
-    if (!prod.active) return <span className="badge badge-gray"><span className="badge-dot"></span>Dado de baja</span>;
-    if (prod.status === 'Normal') return <span className="badge badge-green"><span className="badge-dot"></span>Normal</span>;
-    if (prod.status === 'Reposición') return <span className="badge badge-amber"><span className="badge-dot"></span>Reposición</span>;
-    return <span className="badge badge-red"><span className="badge-dot"></span>Crítico</span>;
+    return <span className="badge badge-green"><span className="badge-dot"></span>Normal</span>;
   };
 
   return (
@@ -380,11 +355,11 @@ function Catalogo_de_productos() {
               <div
                 className="product-card"
                 key={prod.id}
-                style={{ opacity: prod.active ? 1 : 0.72 }}
+                style={{ opacity: prod.estado ? 1 : 0.72 }}
               >
                 <div className="product-thumb">
-                  <span className="thumb-tag">{prod.category}</span>
-                  <span className="thumb-code">{prod.code}</span>
+                  <span className="thumb-tag">{prod.categoria_id}</span>
+                  <span className="thumb-code">{prod.codigo_interno}</span>
                   <svg viewBox="0 0 24 24" fill="none" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M9 18V5l12-2v13" />
                     <circle cx="6" cy="18" r="3" />
@@ -393,21 +368,21 @@ function Catalogo_de_productos() {
                 </div>
 
                 <div className="product-body">
-                  <span className="product-brand">{prod.brand}</span>
-                  <h3 className="product-name">{prod.name}</h3>
-                  <span className="product-model">Modelo {prod.model} · EAN {prod.ean}</span>
+                  <span className="product-brand">{prod.marca_id}</span>
+                  <h3 className="product-name">{prod.marca_id} {prod.modelo}</h3>
+                  <span className="product-model">Modelo {prod.modelo} · EAN {prod.codigo_ean13}</span>
 
                   <div className="product-meta-row">
-                    <span className="product-price">${prod.price.toLocaleString('es-AR')}</span>
+                    <span className="product-price">${prod.precio_actual}</span>
                     {getBadge(prod)}
                   </div>
 
                   <div className="product-stock-split">
-                    <span>Central: <b>{prod.central}</b></span>
+                    <span>Central: <b>-</b></span>
                     <span>·</span>
-                    <span>Margalef: <b>{prod.margalef}</b></span>
+                    <span>Margalef: <b>-</b></span>
                     <span>·</span>
-                    <span>Consol.: <b>{prod.central + prod.margalef}</b></span>
+                    <span>Consol.: <b>-</b></span>
                   </div>
 
                   <div className="product-card-actions">
@@ -418,7 +393,7 @@ function Catalogo_de_productos() {
                       Ver detalle
                     </button>
 
-                    {prod.active ? (
+                    {prod.estado ? (
                       <button
                         className="icon-btn btn-icon-only"
                         title="Dar de baja producto"
@@ -480,14 +455,14 @@ function Catalogo_de_productos() {
                   </tr>
                 ) : (
                   filteredProducts.map((prod) => (
-                    <tr key={prod.id} style={{ opacity: prod.active ? 1 : 0.65 }}>
-                      <td className="cell-mono">{prod.code}</td>
-                      <td className="cell-strong">{prod.name}</td>
-                      <td>{prod.brand}</td>
-                      <td>{prod.model}</td>
-                      <td className="cell-mono">{prod.ean}</td>
-                      <td>{prod.category}</td>
-                      <td className="cell-strong">${prod.price.toLocaleString('es-AR')}</td>
+                    <tr key={prod.id} style={{ opacity: prod.estado ? 1 : 0.65 }}>
+                      <td className="cell-mono">{prod.codigo_interno}</td>
+                      <td className="cell-strong">{prod.marca_id} {prod.modelo}</td>
+                      <td>{prod.marca_id}</td>
+                      <td>{prod.modelo}</td>
+                      <td className="cell-mono">{prod.codigo_ean13}</td>
+                      <td>{prod.categoria_id}</td>
+                      <td className="cell-strong">${prod.precio_actual}</td>
                       <td>{getBadge(prod)}</td>
                       <td>
                         <div className="row-actions">
@@ -502,7 +477,7 @@ function Catalogo_de_productos() {
                             </svg>
                           </button>
 
-                          {prod.active ? (
+                          {prod.estado ? (
                             <button
                               className="icon-btn"
                               title="Dar de baja producto"
@@ -728,7 +703,7 @@ function Catalogo_de_productos() {
       >
         <div>
           <p style={{ fontSize: '13.5px', color: 'var(--gray-700)', lineHeight: '1.6', marginBottom: '14px' }}>
-            ¿Confirmás que querés dar de baja a <strong>{productToDeactivate?.name} ({productToDeactivate?.code})</strong>?
+            ¿Confirmás que querés dar de baja a <strong>{productToDeactivate?.descripcion} ({productToDeactivate?.codigo_interno})</strong>?
           </p>
           <div className="form-field">
             <label>Motivo de la baja</label>
@@ -769,7 +744,7 @@ function Catalogo_de_productos() {
         }
       >
         <p style={{ fontSize: '13.5px', color: 'var(--gray-700)', lineHeight: '1.6' }}>
-          ¿Deseás reactivar <strong>{productToReactivate?.name} ({productToReactivate?.code})</strong>? El producto volverá a estar disponible para movimientos y consultas en el catálogo activo.
+          ¿Deseás reactivar <strong>{productToReactivate?.descripcion} ({productToReactivate?.codigo_interno})</strong>? El producto volverá a estar disponible para movimientos y consultas en el catálogo activo.
         </p>
       </Modal>
     </div>
