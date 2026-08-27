@@ -9,7 +9,37 @@ const CATEGORIES = [
   'Accesorios', 'Instrumentos de viento'
 ];
 
+const ProductStock = ({ articuloId }) => {
+  const [stock, setStock] = useState({ central: '-', margalef: '-', consol: '-' });
 
+  useEffect(() => {
+    fetch(`http://localhost:3001/api/stock/${articuloId}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.data) {
+          const { stock_consolidado, desglose } = data.data;
+          const central = desglose?.find(d => d.deposito_id === 'bf975c47-946f-406c-bb0e-a41dbe656df4')?.cantidad ?? '-';
+          const margalef = desglose?.find(d => d.deposito_id === '26ef85b3-71e1-419a-be45-896fad9b1cd2')?.cantidad ?? '-';
+          setStock({
+            central,
+            margalef,
+            consol: stock_consolidado ?? '-'
+          });
+        }
+      })
+      .catch(err => console.error("Error fetching stock:", err));
+  }, [articuloId]);
+
+  return (
+    <div className="product-stock-split">
+      <span>Central: <b>{stock.central}</b></span>
+      <span>·</span>
+      <span>Margalef: <b>{stock.margalef}</b></span>
+      <span>·</span>
+      <span>Consol.: <b>{stock.consol}</b></span>
+    </div>
+  );
+};
 
 function Catalogo_de_productos() {
   const navigate = useNavigate();
@@ -103,6 +133,16 @@ function Catalogo_de_productos() {
     return { state: 'valid', message: 'Código EAN-13 válido y disponible.' };
   }, [newProduct.ean, products]);
 
+  const getCategoryName = (id) => {
+    const cat = formCategories.find(c => c.id === id);
+    return cat ? cat.nombre : 'Sin categoría';
+  };
+
+  const getBrandName = (id) => {
+    const brand = formBrands.find(b => b.id === id);
+    return brand ? brand.nombre : 'Sin marca';
+  };
+
   // Filtrado reactivo
   const filteredProducts = useMemo(() => {
     return products
@@ -115,9 +155,11 @@ function Catalogo_de_productos() {
           (lifecycleFilter === 'activos' && item.estado) ||
           (lifecycleFilter === 'bajas' && !item.estado);
 
+        const brandName = getBrandName(item.marca_id).toLowerCase();
+        
         const matchesSearch =
           (item.descripcion && item.descripcion.toLowerCase().includes(searchTerm.toLowerCase())) ||
-          (item.marca_id && String(item.marca_id).toLowerCase().includes(searchTerm.toLowerCase())) ||
+          brandName.includes(searchTerm.toLowerCase()) ||
           (item.codigo_interno && String(item.codigo_interno).toLowerCase().includes(searchTerm.toLowerCase())) ||
           (item.codigo_ean13 && String(item.codigo_ean13).includes(searchTerm));
 
@@ -129,7 +171,7 @@ function Catalogo_de_productos() {
         if (sortBy === 'stock') return 0;
         return String(a.id).localeCompare(String(b.id));
       });
-  }, [products, searchTerm, selectedBrand, selectedStatus, lifecycleFilter, sortBy, activeCategory]);
+  }, [products, searchTerm, selectedBrand, selectedStatus, lifecycleFilter, sortBy, activeCategory, formBrands, formCategories]);
 
   const showToast = (message) => {
     setConfirmToast(message);
@@ -208,6 +250,7 @@ function Catalogo_de_productos() {
     setProductToReactivate(null);
   };
 
+
   const getBadge = (prod) => {
     return <span className="badge badge-green"><span className="badge-dot"></span>Normal</span>;
   };
@@ -268,20 +311,10 @@ function Catalogo_de_productos() {
         <div className="select-field">
           Marca:
           <select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)}>
-            <option>Todas</option>
-            <option>Fender</option>
-            <option>Gibson</option>
-            <option>Yamaha</option>
-            <option>Roland</option>
-            <option>Marshall</option>
-            <option>Shure</option>
-            <option>Korg</option>
-            <option>Cort</option>
-            <option>Taylor</option>
-            <option>Ibanez</option>
-            <option>Pearl</option>
-            <option>LP</option>
-            <option>Dunlop</option>
+            <option value="Todas">Todas</option>
+            {formBrands.map(b => (
+              <option key={b.id} value={b.id}>{b.nombre}</option>
+            ))}
           </select>
         </div>
 
@@ -358,7 +391,7 @@ function Catalogo_de_productos() {
                 style={{ opacity: prod.estado ? 1 : 0.72 }}
               >
                 <div className="product-thumb">
-                  <span className="thumb-tag">{prod.categoria_id}</span>
+                  <span className="thumb-tag">{getCategoryName(prod.categoria_id)}</span>
                   <span className="thumb-code">{prod.codigo_interno}</span>
                   <svg viewBox="0 0 24 24" fill="none" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M9 18V5l12-2v13" />
@@ -368,8 +401,8 @@ function Catalogo_de_productos() {
                 </div>
 
                 <div className="product-body">
-                  <span className="product-brand">{prod.marca_id}</span>
-                  <h3 className="product-name">{prod.marca_id} {prod.modelo}</h3>
+                  <span className="product-brand">{getBrandName(prod.marca_id)}</span>
+                  <h3 className="product-name">{getBrandName(prod.marca_id)} {prod.modelo}</h3>
                   <span className="product-model">Modelo {prod.modelo} · EAN {prod.codigo_ean13}</span>
 
                   <div className="product-meta-row">
@@ -377,13 +410,7 @@ function Catalogo_de_productos() {
                     {getBadge(prod)}
                   </div>
 
-                  <div className="product-stock-split">
-                    <span>Central: <b>-</b></span>
-                    <span>·</span>
-                    <span>Margalef: <b>-</b></span>
-                    <span>·</span>
-                    <span>Consol.: <b>-</b></span>
-                  </div>
+                  <ProductStock articuloId={prod.id} />
 
                   <div className="product-card-actions">
                     <button
@@ -457,11 +484,11 @@ function Catalogo_de_productos() {
                   filteredProducts.map((prod) => (
                     <tr key={prod.id} style={{ opacity: prod.estado ? 1 : 0.65 }}>
                       <td className="cell-mono">{prod.codigo_interno}</td>
-                      <td className="cell-strong">{prod.marca_id} {prod.modelo}</td>
-                      <td>{prod.marca_id}</td>
+                      <td className="cell-strong">{getBrandName(prod.marca_id)} {prod.modelo}</td>
+                      <td>{getBrandName(prod.marca_id)}</td>
                       <td>{prod.modelo}</td>
                       <td className="cell-mono">{prod.codigo_ean13}</td>
-                      <td>{prod.categoria_id}</td>
+                      <td>{getCategoryName(prod.categoria_id)}</td>
                       <td className="cell-strong">${prod.precio_actual}</td>
                       <td>{getBadge(prod)}</td>
                       <td>
