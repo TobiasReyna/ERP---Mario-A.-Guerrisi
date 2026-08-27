@@ -50,10 +50,21 @@ const getMotivosAjuste = async (req, res) => {
     }
 };
 
+const getActividadSistema = async (req, res) => {
+    try {
+        const data = await MasterService.getActividadSistema();
+        return res.status(200).json({ data });
+    } catch (error) {
+        console.error('[API] Error GET /api/system/activity:', error);
+        return res.status(500).json({ error: error.message });
+    }
+};
+
 module.exports = {
     getCategorias,
     getMarcas,
     getPaises,
     getDepositosActivos,
-    getMotivosAjuste
+    getMotivosAjuste,
+    getActividadSistema
 };

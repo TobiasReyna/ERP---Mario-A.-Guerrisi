@@ -1,37 +1,55 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Modal from '../components/Modal';
 
-const INITIAL_CRITICAL_CARDS = [
-  { id: 1, name: 'Taylor 214ce', code: 'COD-0004', sku: 'GTR-TAY-008', actual: 4, min: 6, max: 14, suggested: 10, warehouse: 'Consolidado', priority: 'crit' },
-  { id: 2, name: 'Ibanez GSR200', code: 'COD-0006', sku: 'BAJ-IBA-010', actual: 3, min: 6, max: 12, suggested: 9, warehouse: 'Consolidado', priority: 'crit' },
-  { id: 3, name: 'Yamaha P-145', code: 'COD-0007', sku: 'KEY-YAM-003', actual: 1, min: 3, max: 8, suggested: 7, warehouse: 'Tienda Central', priority: 'crit' },
-  { id: 4, name: 'Pearl Export Series', code: 'COD-0010', sku: 'BAT-PEA-012', actual: 2, min: 4, max: 9, suggested: 7, warehouse: 'Consolidado', priority: 'crit' },
-];
-
-const INITIAL_REPLENISHMENT_TABLE = [
-  { id: 1, name: 'Taylor 214ce', actual: 4, min: 6, max: 14, suggested: 10, scope: 'Consolidado', priority: 'Crítico', priorityClass: 'badge-red' },
-  { id: 2, name: 'Ibanez GSR200', actual: 3, min: 6, max: 12, suggested: 9, scope: 'Consolidado', priority: 'Crítico', priorityClass: 'badge-red' },
-  { id: 3, name: 'Yamaha P-145', actual: 1, min: 3, max: 8, suggested: 7, scope: 'Tienda Central', priority: 'Crítico', priorityClass: 'badge-red' },
-  { id: 4, name: 'Roland TD-17', actual: 4, min: 4, max: 10, suggested: 6, scope: 'Consolidado', priority: 'Crítico', priorityClass: 'badge-red' },
-  { id: 5, name: 'Pearl Export Series', actual: 2, min: 4, max: 9, suggested: 7, scope: 'Consolidado', priority: 'Crítico', priorityClass: 'badge-red' },
-  { id: 6, name: 'Yamaha YTR-2330', actual: 2, min: 5, max: 10, suggested: 8, scope: 'Consolidado', priority: 'Crítico', priorityClass: 'badge-red' },
-  { id: 7, name: 'Gibson Les Paul Studio', actual: 6, min: 4, max: 10, suggested: 4, scope: 'Consolidado', priority: 'Reposición', priorityClass: 'badge-amber' },
-  { id: 8, name: 'Fender Player Jazz Bass', actual: 8, min: 5, max: 12, suggested: 4, scope: 'Consolidado', priority: 'Reposición', priorityClass: 'badge-amber' },
-  { id: 9, name: 'Marshall MG30GFX', actual: 9, min: 5, max: 14, suggested: 5, scope: 'Consolidado', priority: 'Reposición', priorityClass: 'badge-amber' },
-  { id: 10, name: 'Yamaha HS5', actual: 6, min: 5, max: 12, suggested: 6, scope: 'Consolidado', priority: 'Reposición', priorityClass: 'badge-amber' },
-];
-
-const INITIAL_ACTIVITIES = [
-  { id: 1, title: 'Movimiento registrado', text: 'Se registró un ajuste negativo de stock para Fender Stratocaster Player (motivo: Rotura).', time: 'Hace 32 minutos', category: 'Movimientos', type: 'ok', unread: true },
-  { id: 2, title: 'Transferencia completada', text: 'Se transfirieron 2 unidades de Roland TD-17 de Tienda Central a Galería Margalef.', time: 'Ayer · 17:30', category: 'Movimientos', type: 'info', unread: false },
-  { id: 3, title: 'Producto actualizado', text: 'Se actualizó el precio de Fender Stratocaster Player a $1.250.000.', time: '15/08/2026 · 09:20', category: 'Catálogo', type: 'ok', unread: false },
-  { id: 4, title: 'Error de validación del catálogo', text: 'Intento de carga con EAN-13 inválido en el formulario de nuevo producto.', time: '14/08/2026 · 12:05', category: 'Catálogo', type: 'crit', unread: false },
-];
-
 function Alertas_de_stock() {
+  const [alertas, setAlertas] = useState([]);
+  const [loadingAlertas, setLoadingAlertas] = useState(true);
+  const [errorAlertas, setErrorAlertas] = useState(null);
+
   const [activeTab, setActiveTab] = useState('reposicion'); // 'reposicion' | 'actividad'
   const [activityFilter, setActivityFilter] = useState('Todas');
-  const [activities, setActivities] = useState(INITIAL_ACTIVITIES);
+  const [activities, setActivities] = useState([]);
+
+  useEffect(() => {
+    const fetchAlertas = async () => {
+      try {
+        const res = await fetch('http://localhost:3001/api/stock/alerts');
+        if (!res.ok) throw new Error('Error al obtener alertas');
+        const json = await res.json();
+        setAlertas(json.data || []);
+      } catch (err) {
+        setErrorAlertas(err.message);
+      } finally {
+        setLoadingAlertas(false);
+      }
+    };
+    const fetchActivities = async () => {
+      try {
+        const res = await fetch('http://localhost:3001/api/system/activity');
+        if (res.ok) {
+          const json = await res.json();
+          const mapped = (json.data || []).map(a => {
+            const dateObj = new Date(a.fecha);
+            const timeStr = `${String(dateObj.getDate()).padStart(2, '0')}/${String(dateObj.getMonth() + 1).padStart(2, '0')}/${dateObj.getFullYear()} · ${String(dateObj.getHours()).padStart(2, '0')}:${String(dateObj.getMinutes()).padStart(2, '0')}`;
+            return {
+              id: a.id,
+              title: a.titulo,
+              text: a.descripcion,
+              time: timeStr,
+              category: a.tipo === 'MOVIMIENTOS' ? 'Movimientos' : 'Catálogo',
+              type: a.typeLabel,
+              unread: true
+            };
+          });
+          setActivities(mapped);
+        }
+      } catch (err) {
+        console.error("Error fetching activities:", err);
+      }
+    };
+    fetchAlertas();
+    fetchActivities();
+  }, []);
 
   // Toast confirmaciones
   const [toastMessage, setToastMessage] = useState(null);
@@ -105,7 +123,7 @@ function Alertas_de_stock() {
           onClick={() => setActiveTab('reposicion')}
         >
           Reposición de stock
-          <span className="tab-btn-badge crit">10</span>
+          {alertas.length > 0 && <span className="tab-btn-badge crit">{alertas.length}</span>}
         </button>
         <button
           className={`tab-btn ${activeTab === 'actividad' ? 'active' : ''}`}
@@ -131,7 +149,7 @@ function Alertas_de_stock() {
                 </svg>
               </div>
               <div>
-                <div className="alert-summary-title">10 productos requieren atención</div>
+                <div className="alert-summary-title">{alertas.length} productos requieren atención</div>
                 <div className="alert-summary-sub">
                   Revisá el detalle y generá reposiciones para evitar quiebres de stock
                 </div>
@@ -139,15 +157,15 @@ function Alertas_de_stock() {
             </div>
             <div className="alert-summary-stats">
               <div className="alert-summary-stat">
-                <div className="n">6</div>
+                <div className="n">{alertas.filter(a => a.stock_actual <= (a.stock_minimo / 2)).length}</div>
                 <div className="l">Críticos</div>
               </div>
               <div className="alert-summary-stat">
-                <div className="n">4</div>
+                <div className="n">{alertas.filter(a => a.stock_actual > (a.stock_minimo / 2)).length}</div>
                 <div className="l">Reposición</div>
               </div>
               <div className="alert-summary-stat">
-                <div className="n">2</div>
+                <div className="n">{new Set(alertas.map(a => a.deposito_id)).size}</div>
                 <div className="l">Depósitos</div>
               </div>
             </div>
@@ -173,12 +191,17 @@ function Alertas_de_stock() {
           </div>
 
           <div className="alert-cards">
-            {INITIAL_CRITICAL_CARDS.map((card) => (
-              <div className="alert-card" key={card.id}>
+            {loadingAlertas && <div style={{ padding: '20px', color: 'var(--gray-500)' }}>Cargando alertas críticas...</div>}
+            {errorAlertas && <div style={{ padding: '20px', color: 'var(--red)' }}>Error: {errorAlertas}</div>}
+            {!loadingAlertas && !errorAlertas && alertas.filter(a => a.stock_actual <= (a.stock_minimo / 2)).length === 0 && (
+              <div style={{ padding: '20px', color: 'var(--gray-500)' }}>No hay productos en estado crítico.</div>
+            )}
+            {!loadingAlertas && !errorAlertas && alertas.filter(a => a.stock_actual <= (a.stock_minimo / 2)).map((card, idx) => (
+              <div className="alert-card" key={`${card.articulo_id}_${card.deposito_id}`}>
                 <div className="alert-card-head">
                   <div>
-                    <div className="alert-card-name">{card.name}</div>
-                    <div className="alert-card-sku">{card.code} · {card.sku}</div>
+                    <div className="alert-card-name">{card.articulo_nombre}</div>
+                    <div className="alert-card-sku">ID: {card.articulo_id.substring(0,8)}</div>
                   </div>
                   <span className="badge badge-red">
                     <span className="badge-dot"></span>Crítico
@@ -187,19 +210,19 @@ function Alertas_de_stock() {
 
                 <div className="alert-card-metrics">
                   <div className="alert-metric crit">
-                    <div className="n">{card.actual}</div>
+                    <div className="n">{card.stock_actual}</div>
                     <div className="l">Actual</div>
                   </div>
                   <div className="alert-metric">
-                    <div className="n">{card.min}</div>
+                    <div className="n">{card.stock_minimo}</div>
                     <div className="l">Mínimo</div>
                   </div>
                   <div className="alert-metric">
-                    <div className="n">{card.max}</div>
+                    <div className="n">{card.stock_maximo}</div>
                     <div className="l">Máximo</div>
                   </div>
                   <div className="alert-metric suggest">
-                    <div className="n">{card.suggested}</div>
+                    <div className="n">{card.cantidad_sugerida}</div>
                     <div className="l">Reponer</div>
                   </div>
                 </div>
@@ -210,11 +233,15 @@ function Alertas_de_stock() {
                       <path d="M21 8 12 3 3 8l9 5 9-5Z" />
                       <path d="M3 8v8l9 5 9-5V8" />
                     </svg>
-                    {card.warehouse}
+                    {card.deposito_nombre}
                   </span>
                   <button
                     className="btn btn-outline btn-sm"
-                    onClick={() => handleOpenRepositionModal(card)}
+                    onClick={() => handleOpenRepositionModal({
+                      name: card.articulo_nombre,
+                      code: card.articulo_id.substring(0,8),
+                      suggested: card.cantidad_sugerida
+                    })}
                   >
                     Generar reposición
                   </button>
@@ -256,24 +283,42 @@ function Alertas_de_stock() {
                   </tr>
                 </thead>
                 <tbody>
-                  {INITIAL_REPLENISHMENT_TABLE.map((row) => (
-                    <tr key={row.id}>
-                      <td className="cell-strong">{row.name}</td>
-                      <td className={`stock-cell ${row.priority === 'Crítico' ? 'crit' : 'low'}`}>
-                        {row.actual}
-                      </td>
-                      <td>{row.min}</td>
-                      <td>{row.max}</td>
-                      <td className="cell-strong">{row.suggested}</td>
-                      <td>{row.scope}</td>
-                      <td>
-                        <span className={`badge ${row.priorityClass}`}>
-                          <span className="badge-dot"></span>
-                          {row.priority}
-                        </span>
-                      </td>
+                  {loadingAlertas && (
+                    <tr>
+                      <td colSpan="7" style={{ textAlign: 'center', padding: '20px', color: 'var(--gray-500)' }}>Cargando datos...</td>
                     </tr>
-                  ))}
+                  )}
+                  {errorAlertas && (
+                    <tr>
+                      <td colSpan="7" style={{ textAlign: 'center', padding: '20px', color: 'var(--red)' }}>Error: {errorAlertas}</td>
+                    </tr>
+                  )}
+                  {!loadingAlertas && !errorAlertas && alertas.length === 0 && (
+                    <tr>
+                      <td colSpan="7" style={{ textAlign: 'center', padding: '20px', color: 'var(--gray-500)' }}>No hay productos que requieran reposición.</td>
+                    </tr>
+                  )}
+                  {!loadingAlertas && !errorAlertas && alertas.map((row) => {
+                    const isCrit = row.stock_actual <= (row.stock_minimo / 2);
+                    return (
+                      <tr key={`${row.articulo_id}_${row.deposito_id}`}>
+                        <td className="cell-strong">{row.articulo_nombre}</td>
+                        <td className={`stock-cell ${isCrit ? 'crit' : 'low'}`}>
+                          {row.stock_actual}
+                        </td>
+                        <td>{row.stock_minimo}</td>
+                        <td>{row.stock_maximo}</td>
+                        <td className="cell-strong">{row.cantidad_sugerida}</td>
+                        <td>{row.deposito_nombre}</td>
+                        <td>
+                          <span className={`badge ${isCrit ? 'badge-red' : 'badge-amber'}`}>
+                            <span className="badge-dot"></span>
+                            {isCrit ? 'Crítico' : 'Reposición'}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -299,7 +344,7 @@ function Alertas_de_stock() {
           <div className="notif-page-list">
             {filteredActivities.length === 0 ? (
               <div style={{ padding: '32px', textAlign: 'center', color: 'var(--gray-500)' }}>
-                No hay actividades registradas bajo este filtro.
+                No hay actividad reciente
               </div>
             ) : (
               filteredActivities.map((act) => (
