@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+
 import { supabase } from '../config/supabaseClient';
 
 //definmos CATEGORY_DATA como un array vacío para llenarlo con los datos de stock por categoría
@@ -15,7 +15,6 @@ var CATEGORY_DATA = [
   { name: 'Accesorios', value: 52, percentage: 100, alt: true },
 ];
 
-<<<<<<< HEAD
 export default function Dashboard() {
   const [datos, setDatos] = useState([])
   const [datos_stock, setDatosStock] = useState([])
@@ -24,6 +23,26 @@ export default function Dashboard() {
   const [stockAAtender, setStockAAtender] = useState([]);
   const [movimientosdiario, setMovimientosdiario] = useState([]);
   const [datosstockXcategoria, setStockXcategoria] = useState([]);
+
+  const [alertas, setAlertas] = useState([]);
+  const [loadingAlertas, setLoadingAlertas] = useState(true);
+  const [errorAlertas, setErrorAlertas] = useState(null);
+
+async function fetchAlertas() {
+  try {
+
+        const res = await fetch('http://localhost:3001/api/stock/alerts');
+        if (!res.ok) throw new Error('Error al obtener alertas');
+        const json = await res.json();
+        setAlertas(json.data || []);
+      } catch (err) {
+        setErrorAlertas(err.message);
+      } finally {
+        setLoadingAlertas(false);
+      }
+}
+
+
 
   async function traerDatos() {
     try {
@@ -180,35 +199,13 @@ async function stockXcategoria() {
     alertaStock() 
     movimientosHoy()
     stockXcategoria()
-        
+    fetchAlertas()
+
+    
   }, [])
 
 
 
-
-
-=======
-function Dashboard() {
-  const [alertas, setAlertas] = useState([]);
-  const [loadingAlertas, setLoadingAlertas] = useState(true);
-  const [errorAlertas, setErrorAlertas] = useState(null);
-
-  useEffect(() => {
-    const fetchAlertas = async () => {
-      try {
-        const res = await fetch('http://localhost:3001/api/stock/alerts');
-        if (!res.ok) throw new Error('Error al obtener alertas');
-        const json = await res.json();
-        setAlertas(json.data || []);
-      } catch (err) {
-        setErrorAlertas(err.message);
-      } finally {
-        setLoadingAlertas(false);
-      }
-    };
-    fetchAlertas();
-  }, []);
->>>>>>> 3e507b16aa6f12c4d93c6c5b06f0bcd993e68841
 
   return (
     <div>
