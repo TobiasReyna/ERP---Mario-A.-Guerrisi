@@ -11,6 +11,9 @@ router.post('/adjust', stockController.ajustar);
 // GET /api/stock/alerts (IMPORTANTE: Debe ir antes que /:articulo_id para que Express no confunda "alerts" con un UUID)
 router.get('/alerts', stockController.obtenerAlertas);
 
+// GET /api/stock/inventory
+router.get('/inventory', stockController.obtenerInventarioGeneral);
+
 // PUT /api/stock/policies/:articulo_id
 router.put('/policies/:articulo_id', stockController.actualizarPoliticas);
 

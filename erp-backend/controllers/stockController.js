@@ -1,14 +1,11 @@
 const StockService = require('../services/stockService');
 
-// Usuario hardcodeado para Sprint 1
-const TEST_USER_ID = "7ab3d65c-eecc-4f0b-98a1-2c53efce620e";
-
 const transferir = async (req, res) => {
   try {
-    const { articulo_id, deposito_origen_id, deposito_destino_id, cantidad } = req.body;
+    const { articulo_id, deposito_origen_id, deposito_destino_id, cantidad, usuario_id } = req.body;
 
     // 1. Validaciones básicas del payload frontend
-    if (!articulo_id || !deposito_origen_id || !deposito_destino_id || cantidad === undefined) {
+    if (!articulo_id || !deposito_origen_id || !deposito_destino_id || cantidad === undefined || !usuario_id) {
       return res.status(400).json({ error: 'Faltan campos obligatorios en el request.' });
     }
 
@@ -32,13 +29,13 @@ const transferir = async (req, res) => {
       return res.status(400).json({ error: 'Stock insuficiente en el depósito de origen' });
     }
 
-    // 4. Delegar al servicio (Inyectando el TEST_USER_ID transparente al Frontend)
+    // 4. Delegar al servicio
     const transferencia = await StockService.transferirStock({
       articulo_id,
       deposito_origen_id,
       deposito_destino_id,
       cantidad,
-      usuario_id: TEST_USER_ID,
+      usuario_id,
       ip_origen
     });
 
@@ -57,9 +54,9 @@ const transferir = async (req, res) => {
 
 const ajustar = async (req, res) => {
   try {
-    const { articulo_id, deposito_id, cantidad_anterior, cantidad_nueva, motivo_id } = req.body;
+    const { articulo_id, deposito_id, cantidad_anterior, cantidad_nueva, motivo_id, usuario_id } = req.body;
 
-    if (!articulo_id || !deposito_id || cantidad_anterior === undefined || cantidad_nueva === undefined || !motivo_id) {
+    if (!articulo_id || !deposito_id || cantidad_anterior === undefined || cantidad_nueva === undefined || !motivo_id || !usuario_id) {
       return res.status(400).json({ error: 'Faltan campos obligatorios en el request.' });
     }
 
@@ -79,7 +76,7 @@ const ajustar = async (req, res) => {
       cantidad_anterior,
       cantidad_nueva,
       motivo_id,
-      usuario_id: TEST_USER_ID,
+      usuario_id,
       ip_origen
     });
 
@@ -140,17 +137,17 @@ const obtenerHistorial = async (req, res) => {
 const actualizarPoliticas = async (req, res) => {
     try {
         const { articulo_id } = req.params;
-        const { deposito_id, stock_minimo, stock_maximo } = req.body;
+        const { deposito_id, stock_minimo, stock_maximo, usuario_id } = req.body;
 
-        if (!deposito_id || stock_minimo === undefined || stock_maximo === undefined) {
-            return res.status(400).json({ error: 'Faltan campos (deposito_id, stock_minimo, stock_maximo).' });
+        if (!deposito_id || stock_minimo === undefined || stock_maximo === undefined || !usuario_id) {
+            return res.status(400).json({ error: 'Faltan campos (deposito_id, stock_minimo, stock_maximo, usuario_id).' });
         }
 
         const politicas = await StockService.actualizarPoliticas(articulo_id, {
             deposito_id,
             stock_minimo,
             stock_maximo,
-            usuario_id: TEST_USER_ID
+            usuario_id
         });
 
         return res.status(200).json({
@@ -173,11 +170,22 @@ const obtenerAlertas = async (req, res) => {
     }
 };
 
+const obtenerInventarioGeneral = async (req, res) => {
+    try {
+        const inventario = await StockService.obtenerInventarioGeneral();
+        return res.status(200).json({ data: inventario });
+    } catch (error) {
+        console.error('[API] Error GET /api/stock/inventory:', error);
+        return res.status(500).json({ error: error.message || 'Error obteniendo inventario general.' });
+    }
+};
+
 module.exports = {
   transferir,
   ajustar,
   consultarDisponibilidad,
   obtenerHistorial,
   actualizarPoliticas,
-  obtenerAlertas
+  obtenerAlertas,
+  obtenerInventarioGeneral
 };

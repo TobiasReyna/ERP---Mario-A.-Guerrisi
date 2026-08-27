@@ -1,30 +1,22 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Modal from '../components/Modal';
 
-const INITIAL_INVENTORY = [
-  { id: 1, name: 'Fender Stratocaster Player', code: 'COD-0001', category: 'Guitarras eléctricas', central: 8, margalef: 3, status: 'Normal' },
-  { id: 2, name: 'Gibson Les Paul Studio', code: 'COD-0002', category: 'Guitarras eléctricas', central: 4, margalef: 2, status: 'Reposición' },
-  { id: 3, name: 'Cort AD810', code: 'COD-0003', category: 'Guitarras acústicas', central: 12, margalef: 9, status: 'Normal' },
-  { id: 4, name: 'Taylor 214ce', code: 'COD-0004', category: 'Guitarras acústicas', central: 3, margalef: 1, status: 'Crítico' },
-  { id: 5, name: 'Fender Player Jazz Bass', code: 'COD-0005', category: 'Bajos', central: 5, margalef: 3, status: 'Reposición' },
-  { id: 6, name: 'Ibanez GSR200', code: 'COD-0006', category: 'Bajos', central: 2, margalef: 1, status: 'Crítico' },
-  { id: 7, name: 'Yamaha P-145', code: 'COD-0007', category: 'Teclados / Pianos', central: 1, margalef: 1, status: 'Crítico' },
-  { id: 8, name: 'Korg B2', code: 'COD-0008', category: 'Teclados / Pianos', central: 7, margalef: 3, status: 'Normal' },
-  { id: 9, name: 'Roland TD-17', code: 'COD-0009', category: 'Baterías / Percusión', central: 3, margalef: 1, status: 'Crítico' },
-  { id: 10, name: 'Pearl Export Series', code: 'COD-0010', category: 'Baterías / Percusión', central: 2, margalef: 0, status: 'Crítico' },
-  { id: 11, name: 'LP Cajón Peruano', code: 'COD-0011', category: 'Baterías / Percusión', central: 15, margalef: 10, status: 'Normal' },
-  { id: 12, name: 'Marshall MG30GFX', code: 'COD-0012', category: 'Amplificadores', central: 6, margalef: 3, status: 'Reposición' },
-  { id: 13, name: 'Shure SM58', code: 'COD-0013', category: 'Micrófonos / Audio', central: 20, margalef: 12, status: 'Normal' },
-  { id: 14, name: 'Yamaha HS5', code: 'COD-0014', category: 'Micrófonos / Audio', central: 4, margalef: 2, status: 'Reposición' },
-  { id: 15, name: 'Dunlop Correa + Púas Kit', code: 'COD-0015', category: 'Accesorios', central: 30, margalef: 22, status: 'Normal' },
-  { id: 16, name: 'Yamaha YTR-2330', code: 'COD-0016', category: 'Viento', central: 2, margalef: 0, status: 'Crítico' },
-];
-
 function Inventario() {
-  const [items, setItems] = useState(INITIAL_INVENTORY);
+  const [items, setItems] = useState([]);
   const [activeTab, setActiveTab] = useState('Ambos depósitos');
   const [selectedCategory, setSelectedCategory] = useState('Todas');
   const [selectedStatus, setSelectedStatus] = useState('Todos');
+
+  useEffect(() => {
+    fetch('http://localhost:3001/api/stock/inventory')
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.data) {
+          setItems(data.data);
+        }
+      })
+      .catch(err => console.error('Error fetching inventory:', err));
+  }, []);
 
   // Banner de confirmación
   const [confirmBanner, setConfirmBanner] = useState(null);
@@ -40,7 +32,7 @@ function Inventario() {
     responsable: 'Juan Pérez'
   });
 
-  const selectedItem = items[selectedProductIndex] || items[0];
+  const selectedItem = items[selectedProductIndex] || items[0] || { central: 0, margalef: 0, name: '' };
 
   const showConfirm = (text) => {
     setConfirmBanner(text);
