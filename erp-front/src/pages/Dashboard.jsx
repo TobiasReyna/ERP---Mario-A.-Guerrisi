@@ -2,8 +2,9 @@ import { Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { supabase } from '../config/supabaseClient';
 
-const CATEGORY_DATA = [
-  { name: 'Guitarras eléctricas', value: 17, percentage: 37, alt: false },
+//definmos CATEGORY_DATA como un array vacío para llenarlo con los datos de stock por categoría
+var CATEGORY_DATA = [
+  { name: 'Guitarras eléctricas', value: 4226, percentage: 37, alt: false },
   { name: 'Guitarras acústicas', value: 25, percentage: 56, alt: true },
   { name: 'Bajos', value: 11, percentage: 26, alt: false },
   { name: 'Teclados y pianos', value: 12, percentage: 27, alt: true },
@@ -14,9 +15,14 @@ const CATEGORY_DATA = [
 ];
 
 export default function Dashboard() {
-    const [datos, setDatos] = useState([])
+  const [datos, setDatos] = useState([])
   const [datos_stock, setDatosStock] = useState([])
   const [cargando, setCargando] = useState(true) // Estado para controlar la carga de datos
+  const [stockGlobal, setStockGlobal] = useState(0);
+  const [stockAAtender, setStockAAtender] = useState([]);
+  const [movimientosdiario, setMovimientosdiario] = useState([]);
+  const [datosstockXcategoria, setStockXcategoria] = useState([]);
+
   async function traerDatos() {
     try {
       const { data, error } = await supabase
@@ -49,11 +55,136 @@ export default function Dashboard() {
       setCargando(false) // Avisás que ya terminó de cargar
     }
   }
+  async function obtenerStockTotal() {
+      try {
+        setCargando(true);
+        
+        // Consultamos la tabla donde llevas el stock por depósito
+        const { data, error } = await supabase
+          .from('existencias') // Cambia esto por el nombre real de tu tabla
+          .select('cantidad')
+
+        if (error) throw error;
+
+        // Sumamos las cantidades de todos los depósitos devueltos
+        if (data) {
+          const sumaTotal = data.reduce((acumulador, registro) => acumulador + (registro.cantidad || 0), 0);
+          setStockGlobal(sumaTotal);
+        }
+        setTotalStock(sumaTotal);
+      } catch (error) {
+        console.error('Error al calcular el stock:', error.message);
+      } finally {
+        setCargando(false);
+      }
+    }
+  async function alertaStock() {
+    try {
+      const { data, error } = await supabase
+        .from('vista_alertas_reposicion')
+        .select('*')
+
+      if (error) throw error
+      setStockAAtender(data)
+    } catch (error) {
+      console.error('Error:', error.message)
+    } finally {
+      setCargando(false) // Avisás que ya terminó de cargar
+    }
+  }
+  async function movimientosHoy() {
+    try {
+      const { data, error } = await supabase
+        .from('transferencia_stock')
+        .select('*')
+        .eq('fecha', new Date().toISOString().split('T')[0])
+
+      if (error) throw error
+      setMovimientosdiario(data)
+    } catch (error) {
+      console.error('Error:', error.message)
+    } finally {
+      setCargando(false)
+    }
+  }
+async function stockXcategoria() {
+    try {
+      setCargando(true);
+      
+      // 1. Consulta a Supabase con JOIN anidado (existencias -> articulos -> categorias)
+      const { data, error } = await supabase
+        .from('existencias')
+        .select(`
+          cantidad,
+          articulos (
+            categorias (
+              nombre
+            )
+          )
+        `);
+
+      if (error) throw error;
+
+      // 2. Agrupamos los datos y sumamos el stock
+      const totalesPorCategoria = {};
+      
+      data.forEach((registro) => {
+        // Navegamos por la respuesta anidada de Supabase
+        const nombreCategoria = registro.articulos?.categorias?.nombre || 'Sin categoría';
+        const cantidad = registro.cantidad || 0;
+
+        if (!totalesPorCategoria[nombreCategoria]) {
+          totalesPorCategoria[nombreCategoria] = 0;
+        }
+        totalesPorCategoria[nombreCategoria] += cantidad;
+      });
+
+      // 3. Calculamos el valor máximo para asignar un porcentaje real a las barras
+      const maxStock = Math.max(...Object.values(totalesPorCategoria), 1);
+
+      // 4. Formateamos los datos para que sean idénticos a CATEGORY_DATA
+      const arrayFormateado = Object.keys(totalesPorCategoria).map((nombre) => {
+        const valor = totalesPorCategoria[nombre];
+        return {
+          name: nombre,
+          value: valor,
+          percentage: Math.round((valor / maxStock) * 100), // La categoría con más stock será 100%
+        };
+      });
+
+      // 5. Ordenamos de mayor a menor cantidad y aplicamos el estilo alterno (alt)
+      arrayFormateado.sort((a, b) => b.value - a.value);
+      
+      const dataFinal = arrayFormateado.map((item, index) => ({
+        ...item,
+        alt: index % 2 !== 0 // Intercala false y true (rojo y negro)
+      }));
+
+      // 6. Guardamos el array final directamente en el estado
+      setStockXcategoria(dataFinal);
+
+    } catch (error) {
+      console.error('Error al obtener stock por categoría:', error.message);
+    } finally {
+      setCargando(false);
+    }
+  }
+
 
     useEffect(() => {
     traerDatos()
     traerDatosStock()
+    obtenerStockTotal()
+    alertaStock() 
+    movimientosHoy()
+    stockXcategoria()
+        
   }, [])
+
+
+
+
+
 
   return (
     <div>
@@ -82,7 +213,7 @@ export default function Dashboard() {
             </div>
             <span className="stat-trend flat">estable</span>
           </div>
-          <div className="stat-value">227</div>
+          <div className="stat-value">{stockGlobal}</div>
           <div className="stat-label">Unidades — stock consolidado</div>
         </div>
 
@@ -96,7 +227,7 @@ export default function Dashboard() {
             </div>
             <span className="stat-trend down">+2 hoy</span>
           </div>
-          <div className="stat-value">10</div>
+          <div className="stat-value">{stockAAtender.length}</div>
           <div className="stat-label">Productos que requieren atención</div>
         </div>
 
@@ -109,7 +240,7 @@ export default function Dashboard() {
             </div>
             <span className="stat-trend up">+18%</span>
           </div>
-          <div className="stat-value">9</div>
+          <div className="stat-value">{movimientosdiario.length}</div>
           <div className="stat-label">Movimientos del día</div>
         </div>
       </div>
@@ -126,7 +257,7 @@ export default function Dashboard() {
           </div>
           <div className="panel-body">
             <div className="bar-chart">
-              {CATEGORY_DATA.map((item) => (
+              {datosstockXcategoria.map((item) => (
                 <div className="bar-row" key={item.name}>
                   <span className="bar-row-label">{item.name}</span>
                   <div className="bar-track">
