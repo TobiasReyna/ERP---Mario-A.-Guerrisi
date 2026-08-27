@@ -130,3 +130,27 @@ CREATE TABLE public.ajustes_stock (
   CONSTRAINT ajustes_stock_motivo_id_fkey FOREIGN KEY (motivo_id) REFERENCES public.motivos_ajustes(id),
   CONSTRAINT ajustes_stock_usuario_id_fkey FOREIGN KEY (usuario_id) REFERENCES public.usuarios(id)
 );
+
+CREATE OR REPLACE VIEW public.vista_alertas_reposicion AS
+SELECT 
+    a.id AS articulo_id,
+    a.codigo_interno,
+    a.descripcion AS articulo_descripcion,
+    d.id AS deposito_id,
+    d.nombre AS deposito_nombre,
+    COALESCE(e.cantidad, 0) AS stock_actual,
+    p.stock_minimo,
+    p.stock_maximo,
+    -- Calculamos cuánto hay que comprar para llegar al máximo
+    (p.stock_maximo - COALESCE(e.cantidad, 0)) AS cantidad_sugerida_reposicion
+FROM 
+    public.politicas_reposicion_deposito p
+JOIN 
+    public.articulos a ON p.articulo_id = a.id
+JOIN 
+    public.depositos d ON p.deposito_id = d.id
+LEFT JOIN 
+    public.existencias e ON p.articulo_id = e.articulo_id AND p.deposito_id = e.deposito_id
+WHERE 
+    COALESCE(e.cantidad, 0) <= p.stock_minimo
+    AND a.estado = true; -- Solo consideramos artículos activos
