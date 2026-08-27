@@ -31,10 +31,13 @@ export default function Dashboard() {
 async function fetchAlertas() {
   try {
 
-        const res = await fetch('http://localhost:3001/api/stock/alerts');
-        if (!res.ok) throw new Error('Error al obtener alertas');
-        const json = await res.json();
-        setAlertas(json.data || []);
+        const { data, error } = await supabase
+          .from('vista_alertas_reposicion')
+          .select('*')
+          .order('fecha', { ascending: false })
+          .limit(5);
+        
+        setAlertas(data || []);
       } catch (err) {
         setErrorAlertas(err.message);
       } finally {
@@ -92,7 +95,7 @@ async function fetchAlertas() {
           const sumaTotal = data.reduce((acumulador, registro) => acumulador + (registro.cantidad || 0), 0);
           setStockGlobal(sumaTotal);
         }
-        setTotalStock(sumaTotal);
+        
       } catch (error) {
         console.error('Error al calcular el stock:', error.message);
       } finally {
