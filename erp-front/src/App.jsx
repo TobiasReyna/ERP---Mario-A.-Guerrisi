@@ -214,19 +214,6 @@ function App() {
           </div>
 
           <div className="topbar-right">
-            <div className="global-search">
-              <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="11" cy="11" r="7" />
-                <path d="m21 21-4.3-4.3" />
-              </svg>
-              <input
-                type="text"
-                placeholder="Buscar por producto, código interno o EAN-13…"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={handleSearchKeyDown}
-              />
-            </div>
 
             {/* NOTIFICACIONES */}
             <div className="topbar-item" ref={notifRef}>
