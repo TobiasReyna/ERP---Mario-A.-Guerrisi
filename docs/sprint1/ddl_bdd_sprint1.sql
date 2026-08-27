@@ -17,6 +17,7 @@ CREATE TABLE public.depositos (
 CREATE TABLE public.categorias (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   nombre text NOT NULL UNIQUE,
+  estado boolean DEFAULT true,
   CONSTRAINT categorias_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.marcas (
@@ -28,6 +29,7 @@ CREATE TABLE public.marcas (
 CREATE TABLE public.paises_origen (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   nombre text NOT NULL UNIQUE,
+  estado boolean DEFAULT true,
   CONSTRAINT paises_origen_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.motivos_ajustes (
