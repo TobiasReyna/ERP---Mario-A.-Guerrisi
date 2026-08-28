@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { NavLink, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
+import { NavLink, Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom';
 
 import Dashboard from './pages/Dashboard';
 import Catalogo_de_productos from './pages/Catalogo_de_productos';
@@ -150,7 +150,7 @@ function App() {
         <nav className="nav-group">
           <div className="nav-group-label">Navegación</div>
 
-          <NavLink
+          {/* <NavLink
             to="/"
             end
             className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
@@ -162,7 +162,7 @@ function App() {
               <rect x="3" y="16" width="7" height="5" rx="1.5" />
             </svg>
             Dashboard
-          </NavLink>
+          </NavLink> */}
 
           <NavLink
             to="/Catalogo_de_productos"
@@ -377,7 +377,8 @@ function App() {
         <main className="content">
           <div key={location.pathname} className="page-transition">
             <Routes location={location}>
-              <Route path="/" element={<Dashboard />} />
+              {/* <Route path="/" element={<Dashboard />} /> */}
+              <Route path="/" element={<Navigate to="/Inventario" replace />} />
               <Route path="/Catalogo_de_productos" element={<Catalogo_de_productos />} />
               <Route path="/Inventario" element={<Inventario />} />
               <Route path="/Movimientos" element={<Movimientos />} />
