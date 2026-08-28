@@ -3,6 +3,17 @@ const ArticleService = require('../services/articleService');
 // Inyectando usuario para Sprint 1
 const TEST_USER_ID = "7ab3d65c-eecc-4f0b-98a1-2c53efce620e";
 
+// Función helper para validar el algoritmo del módulo 10 de EAN-13
+function esEAN13Valido(ean) {
+    if (!/^\d{13}$/.test(ean)) return false;
+    let suma = 0;
+    for (let i = 0; i < 12; i++) {
+        suma += parseInt(ean[i]) * (i % 2 === 0 ? 1 : 3);
+    }
+    let digitoControl = (10 - (suma % 10)) % 10;
+    return digitoControl === parseInt(ean[12]);
+}
+
 const crearArticulo = async (req, res) => {
     try {
         const { 
@@ -22,6 +33,11 @@ const crearArticulo = async (req, res) => {
 
         if (precio_actual < 0) {
             return res.status(400).json({ error: 'El precio no puede ser negativo.' });
+        }
+
+        // 🔍 VALIDACIÓN DE ALGORITMO EAN-13 (HU07-01)
+        if (!esEAN13Valido(codigo_ean13)) {
+            return res.status(400).json({ error: 'El código EAN-13 ingresado no es válido (dígito de control incorrecto).' });
         }
 
         // 2. Delegar al servicio
@@ -122,6 +138,10 @@ const modificarArticulo = async (req, res) => {
         if (precio_actual < 0) {
             return res.status(400).json({ error: 'El precio no puede ser negativo.' });
         }
+
+        if (!esEAN13Valido(codigo_ean13)) {
+            return res.status(400).json({ error: 'El código EAN-13 ingresado no es válido (dígito de control incorrecto).' });
+            }
 
         const articuloActualizado = await ArticleService.modificarArticulo(id, {
             codigo_interno,
