@@ -128,7 +128,6 @@ function Detalle_producto({ isOpen, onClose, articuloId, onUpdate }) {
   const [error, setError] = useState(null);
   const [confirmBanner, setConfirmBanner] = useState(null);
 
-  const [isTransferOpen, setIsTransferOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isConfirmEditOpen, setIsConfirmEditOpen] = useState(false);
 
@@ -144,13 +143,6 @@ function Detalle_producto({ isOpen, onClose, articuloId, onUpdate }) {
     pais_origen: '',
     codigo_ean13: '',
     precio_actual: '',
-  });
-
-  const [transferData, setTransferData] = useState({
-    origen_id: '',
-    destino_id: '',
-    cantidad: 1,
-    motivo: 'Rebalanceo de stock',
   });
 
   const showConfirm = (text) => {
@@ -227,13 +219,6 @@ function Detalle_producto({ isOpen, onClose, articuloId, onUpdate }) {
 
       const deps = depJson.data || [];
       setDepositosDisponibles(deps);
-      if (deps.length >= 2) {
-        setTransferData((prev) => ({
-          ...prev,
-          origen_id: deps[0].id,
-          destino_id: deps[1].id,
-        }));
-      }
     } catch (err) {
       console.error('Error cargando detalle del producto:', err);
       setError(err.message);
@@ -326,39 +311,6 @@ function Detalle_producto({ isOpen, onClose, articuloId, onUpdate }) {
     } catch (err) {
       console.error('Error en edición:', err);
       alert(`Error guardando cambios: ${err.message}`);
-    }
-  };
-
-  const handleConfirmTransfer = async (e) => {
-    e.preventDefault();
-    if (transferData.origen_id === transferData.destino_id) {
-      alert('El depósito de origen y destino no pueden ser iguales.');
-      return;
-    }
-
-    try {
-      const res = await fetch('http://localhost:3001/api/stock/transfer', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          articulo_id: articuloId,
-          deposito_origen_id: transferData.origen_id,
-          deposito_destino_id: transferData.destino_id,
-          cantidad: Number(transferData.cantidad),
-          motivo: transferData.motivo,
-          usuario_id: TEMP_USER_ID,
-        }),
-      });
-
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.message || 'Error al ejecutar transferencia');
-
-      setIsTransferOpen(false);
-      showConfirm('Transferencia realizada correctamente.');
-      loadProductDetails();
-      if (onUpdate) onUpdate();
-    } catch (err) {
-      alert(`Error en la transferencia: ${err.message}`);
     }
   };
 
@@ -506,9 +458,6 @@ function Detalle_producto({ isOpen, onClose, articuloId, onUpdate }) {
                     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                   </svg>
                   Editar producto
-                </button>
-                <button className="btn btn-outline" style={{ fontSize: '12px', padding: '6px 10px' }} onClick={() => setIsTransferOpen(true)}>
-                  Transferir stock
                 </button>
               </div>
             </div>
@@ -750,46 +699,6 @@ function Detalle_producto({ isOpen, onClose, articuloId, onUpdate }) {
             <li>Si hubo cambio de precio, se registrará el valor anterior en el historial de auditoría.</li>
           </ul>
         </div>
-      </Modal>
-
-      {/* SUB-MODAL TRANSFERENCIA */}
-      <Modal
-        isOpen={isTransferOpen}
-        onClose={() => setIsTransferOpen(false)}
-        title="Transferir Stock"
-        footer={
-          <>
-            <button className="btn btn-outline" onClick={() => setIsTransferOpen(false)}>Cancelar</button>
-            <button className="btn btn-primary" onClick={handleConfirmTransfer}>Confirmar</button>
-          </>
-        }
-      >
-        <form onSubmit={handleConfirmTransfer} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-            <div className="form-field" style={{ flex: '1 1 180px' }}>
-              <label>Origen</label>
-              <select value={transferData.origen_id} onChange={(e) => setTransferData({ ...transferData, origen_id: e.target.value })}>
-                {depositosDisponibles.map((d) => <option key={d.id} value={d.id}>{d.nombre}</option>)}
-              </select>
-            </div>
-            <div className="form-field" style={{ flex: '1 1 180px' }}>
-              <label>Destino</label>
-              <select value={transferData.destino_id} onChange={(e) => setTransferData({ ...transferData, destino_id: e.target.value })}>
-                {depositosDisponibles.map((d) => <option key={d.id} value={d.id}>{d.nombre}</option>)}
-              </select>
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-            <div className="form-field" style={{ flex: '1 1 120px' }}>
-              <label>Cantidad</label>
-              <input type="number" min="1" required value={transferData.cantidad} onChange={(e) => setTransferData({ ...transferData, cantidad: Number(e.target.value) })} />
-            </div>
-            <div className="form-field" style={{ flex: '2 1 200px' }}>
-              <label>Motivo</label>
-              <input type="text" value={transferData.motivo} onChange={(e) => setTransferData({ ...transferData, motivo: e.target.value })} />
-            </div>
-          </div>
-        </form>
       </Modal>
     </>
   );
