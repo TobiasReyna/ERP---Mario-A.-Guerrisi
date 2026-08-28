@@ -11,7 +11,7 @@ async function testCarreraDetectada() {
 
   // ⚠️ IMPORTANTE: Reemplaza estos valores por UUIDs reales de tu base de datos
   const payload = {
-    articulo_id: "663edd60-613f-4839-ac83-4594b25f8134", //guitarra amarilla gibson les paul
+    articulo_id: "3a7dd8b4-35ba-4a53-8c39-fd62f6a2f202", //guitarra fliying V
     deposito_id: "bf975c47-946f-406c-bb0e-a41dbe656df4", //tienda central
     motivo_id: "337e0491-fab0-45d9-8a90-0656388af5cd", //perdida
     // Inyectamos un valor absurdamente alto o incorrecto para forzar el fallo

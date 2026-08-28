@@ -5,7 +5,7 @@ async function testCajaBlancaCB01() {
 
   // ⚠️ IMPORTANTE: Completa con UUIDs reales. El artículo NO debe tener stock previo en este depósito.
   const payload = {
-    articulo_id: "766916c2-6a95-49a2-bb5b-808611ee9f0f", //artLucio
+    articulo_id: "3a7dd8b4-35ba-4a53-8c39-fd62f6a2f202", //guitarra flying V
     deposito_id: "bf975c47-946f-406c-bb0e-a41dbe656df4", //tienda central
     motivo_id: "337e0491-fab0-45d9-8a90-0656388af5cd", //perdida
     cantidad_anterior: 0, 
