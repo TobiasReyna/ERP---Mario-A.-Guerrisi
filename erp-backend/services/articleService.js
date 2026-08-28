@@ -3,7 +3,6 @@ const { supabaseAdmin } = require('../config/supabase');
 class ArticleService {
     static async crearArticulo(payload) {
         const {
-            codigo_interno,
             descripcion,
             codigo_ean13,
             categoria_id,
@@ -20,7 +19,6 @@ class ArticleService {
             .from('articulos')
             .insert([
                 {
-                    codigo_interno,
                     descripcion,
                     codigo_ean13,
                     categoria_id,
@@ -45,6 +43,29 @@ class ArticleService {
             .from('articulos')
             .select('*')
             .eq('estado', true);
+
+        if (error) {
+            throw new Error(`Error en base de datos: ${error.message}`);
+        }
+        return data;
+    }
+
+    static async obtenerArticulosInactivos() {
+        const { data, error } = await supabaseAdmin
+            .from('articulos')
+            .select('*')
+            .eq('estado', false);
+
+        if (error) {
+            throw new Error(`Error en base de datos: ${error.message}`);
+        }
+        return data;
+    }
+
+    static async obtenerTodosArticulos() {
+        const { data, error } = await supabaseAdmin
+            .from('articulos')
+            .select('*');
 
         if (error) {
             throw new Error(`Error en base de datos: ${error.message}`);
@@ -103,6 +124,20 @@ class ArticleService {
         const { data, error } = await supabaseAdmin
             .from('articulos')
             .update({ estado: false })
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) {
+            throw new Error(`Error en base de datos: ${error.message}`);
+        }
+        return data;
+    }
+
+    static async darAltaLogica(id) {
+        const { data, error } = await supabaseAdmin
+            .from('articulos')
+            .update({ estado: true })
             .eq('id', id)
             .select()
             .single();

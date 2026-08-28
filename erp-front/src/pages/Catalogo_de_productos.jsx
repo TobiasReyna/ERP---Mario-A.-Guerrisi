@@ -1,25 +1,7 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Modal from '../components/Modal';
 
-const INITIAL_PRODUCTS = [
-  { id: 1, code: 'COD-0001', name: 'Stratocaster Player', brand: 'Fender', model: 'MX23', ean: '7791234500011', category: 'Guitarras eléctricas', price: 1250000, status: 'Normal', central: 8, margalef: 3, active: true },
-  { id: 2, code: 'COD-0002', name: 'Les Paul Studio', brand: 'Gibson', model: 'LPS', ean: '7791234500028', category: 'Guitarras eléctricas', price: 2480000, status: 'Reposición', central: 4, margalef: 2, active: true },
-  { id: 3, code: 'COD-0003', name: 'AD810', brand: 'Cort', model: 'AD810', ean: '7791234500035', category: 'Guitarras acústicas', price: 310000, status: 'Normal', central: 12, margalef: 9, active: true },
-  { id: 4, code: 'COD-0004', name: '214ce', brand: 'Taylor', model: '214ce', ean: '7791234500042', category: 'Guitarras acústicas', price: 980000, status: 'Crítico', central: 3, margalef: 1, active: true },
-  { id: 5, code: 'COD-0005', name: 'Player Jazz Bass', brand: 'Fender', model: 'PJB', ean: '7791234500059', category: 'Bajos', price: 1150000, status: 'Reposición', central: 5, margalef: 3, active: true },
-  { id: 6, code: 'COD-0006', name: 'GSR200', brand: 'Ibanez', model: 'GSR200', ean: '7791234500066', category: 'Bajos', price: 420000, status: 'Crítico', central: 2, margalef: 1, active: true },
-  { id: 7, code: 'COD-0007', name: 'P-145', brand: 'Yamaha', model: 'P-145', ean: '7791234500073', category: 'Pianos', price: 650000, status: 'Crítico', central: 1, margalef: 1, active: true },
-  { id: 8, code: 'COD-0008', name: 'B2', brand: 'Korg', model: 'B2', ean: '7791234500080', category: 'Teclados', price: 480000, status: 'Normal', central: 7, margalef: 3, active: true },
-  { id: 9, code: 'COD-0009', name: 'TD-17', brand: 'Roland', model: 'TD-17', ean: '7791234500097', category: 'Baterías', price: 2150000, status: 'Crítico', central: 3, margalef: 1, active: true },
-  { id: 10, code: 'COD-0010', name: 'Export Series', brand: 'Pearl', model: 'Export', ean: '7791234500103', category: 'Baterías', price: 1680000, status: 'Crítico', central: 2, margalef: 0, active: true },
-  { id: 11, code: 'COD-0011', name: 'Cajón Peruano', brand: 'LP', model: 'Serie Americana', ean: '7791234500110', category: 'Percusión', price: 185000, status: 'Normal', central: 15, margalef: 10, active: true },
-  { id: 12, code: 'COD-0012', name: 'MG30GFX', brand: 'Marshall', model: 'MG30GFX', ean: '7791234500127', category: 'Amplificadores', price: 520000, status: 'Reposición', central: 6, margalef: 3, active: true },
-  { id: 13, code: 'COD-0013', name: 'SM58', brand: 'Shure', model: 'SM58', ean: '7791234500134', category: 'Micrófonos', price: 195000, status: 'Normal', central: 20, margalef: 12, active: true },
-  { id: 14, code: 'COD-0014', name: 'HS5', brand: 'Yamaha', model: 'HS5', ean: '7791234500141', category: 'Audio', price: 340000, status: 'Reposición', central: 4, margalef: 2, active: true },
-  { id: 15, code: 'COD-0015', name: 'Correa + Púas Kit', brand: 'Dunlop', model: 'Kit', ean: '7791234500158', category: 'Accesorios', price: 28000, status: 'Normal', central: 30, margalef: 22, active: true },
-  { id: 16, code: 'COD-0016', name: 'YTR-2330', brand: 'Yamaha', model: 'YTR-2330', ean: '7791234500165', category: 'Instrumentos de viento', price: 890000, status: 'Crítico', central: 2, margalef: 0, active: false },
-];
 
 const CATEGORIES = [
   'Todas', 'Guitarras eléctricas', 'Guitarras acústicas', 'Bajos', 'Teclados',
@@ -27,14 +9,96 @@ const CATEGORIES = [
   'Accesorios', 'Instrumentos de viento'
 ];
 
+const ProductStock = ({ articuloId }) => {
+  const [stock, setStock] = useState({ central: '-', margalef: '-', consol: '-' });
+
+  useEffect(() => {
+    fetch(`http://localhost:3001/api/stock/${articuloId}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.data) {
+          const { stock_consolidado, desglose } = data.data;
+          const central = desglose?.find(d => d.deposito_id === 'bf975c47-946f-406c-bb0e-a41dbe656df4')?.cantidad ?? '-';
+          const margalef = desglose?.find(d => d.deposito_id === '26ef85b3-71e1-419a-be45-896fad9b1cd2')?.cantidad ?? '-';
+          setStock({
+            central,
+            margalef,
+            consol: stock_consolidado ?? '-'
+          });
+        }
+      })
+      .catch(err => console.error("Error fetching stock:", err));
+  }, [articuloId]);
+
+  return (
+    <div className="product-stock-split">
+      <span>Central: <b>{stock.central}</b></span>
+      <span>·</span>
+      <span>Margalef: <b>{stock.margalef}</b></span>
+      <span>·</span>
+      <span>Consol.: <b>{stock.consol}</b></span>
+    </div>
+  );
+};
+
 function Catalogo_de_productos() {
   const navigate = useNavigate();
 
-  const [products, setProducts] = useState(INITIAL_PRODUCTS);
+  const [formCategories, setFormCategories] = useState([]);
+  const [formCountries, setFormCountries] = useState([]);
+  const [formBrands, setFormBrands] = useState([]);
+  
+  useEffect(() => {
+    fetch('http://localhost:3001/api/categories')
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.data) {
+          setFormCategories(data.data);
+        }
+      })
+      .catch(err => console.error("Error fetching categories:", err));
+
+    fetch('http://localhost:3001/api/countries')
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.data) {
+          setFormCountries(data.data);
+        }
+      })
+      .catch(err => console.error("Error fetching countries:", err));
+
+    fetch('http://localhost:3001/api/brands')
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.data) {
+          setFormBrands(data.data);
+        }
+      })
+      .catch(err => console.error("Error fetching brands:", err));
+
+  }, []);
+
+  const [products, setProducts] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBrand, setSelectedBrand] = useState('Todas');
   const [selectedStatus, setSelectedStatus] = useState('Todas');
   const [lifecycleFilter, setLifecycleFilter] = useState('activos'); // 'activos' | 'bajas' | 'todos'
+
+  useEffect(() => {
+    let endpoint = 'http://localhost:3001/api/articles';
+    if (lifecycleFilter === 'bajas') endpoint = 'http://localhost:3001/api/articles/inactivos';
+    else if (lifecycleFilter === 'todos') endpoint = 'http://localhost:3001/api/articles/todos';
+
+    fetch(endpoint)
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.data) {
+          setProducts(data.data);
+        }
+      })
+      .catch(err => console.error("Error fetching articles:", err));
+  }, [lifecycleFilter]);
+
   const [sortBy, setSortBy] = useState('relevantes');
   const [activeCategory, setActiveCategory] = useState('Todas');
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'table'
@@ -45,15 +109,15 @@ function Catalogo_de_productos() {
   // Modal Nuevo Producto
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   const [newProduct, setNewProduct] = useState({
-    code: 'COD-0017',
-    category: 'Guitarras eléctricas',
+    category: '',
     description: '',
-    brand: 'Fender',
+    brand: '',
     model: '',
     ean: '',
     price: '',
     status: 'Normal',
-    initialStock: 0
+    initialStock: 0,
+    originCountry: ''
   });
 
   // Modal Dar de Baja
@@ -76,98 +140,154 @@ function Catalogo_de_productos() {
     return { state: 'valid', message: 'Código EAN-13 válido y disponible.' };
   }, [newProduct.ean, products]);
 
+  const getCategoryName = (id) => {
+    const cat = formCategories.find(c => c.id === id);
+    return cat ? cat.nombre : 'Sin categoría';
+  };
+
+  const getBrandName = (id) => {
+    const brand = formBrands.find(b => b.id === id);
+    return brand ? brand.nombre : 'Sin marca';
+  };
+
   // Filtrado reactivo
   const filteredProducts = useMemo(() => {
     return products
       .filter((item) => {
-        const matchesCategory = activeCategory === 'Todas' || item.category === activeCategory;
-        const matchesBrand = selectedBrand === 'Todas' || item.brand === selectedBrand;
-        const matchesStatus = selectedStatus === 'Todas' || item.status === selectedStatus;
+        const matchesCategory = activeCategory === 'Todas' || item.categoria_id === activeCategory;
+        const matchesBrand = selectedBrand === 'Todas' || item.marca_id === selectedBrand;
+        const matchesStatus = selectedStatus === 'Todas' || item.status === selectedStatus; // We keep item.status or maybe it's not present, we will ignore for now
         const matchesLifecycle =
           lifecycleFilter === 'todos' ||
-          (lifecycleFilter === 'activos' && item.active) ||
-          (lifecycleFilter === 'bajas' && !item.active);
+          (lifecycleFilter === 'activos' && item.estado) ||
+          (lifecycleFilter === 'bajas' && !item.estado);
 
+        const brandName = getBrandName(item.marca_id).toLowerCase();
+        
         const matchesSearch =
-          item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          item.brand.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          item.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          item.ean.includes(searchTerm);
+          (item.descripcion && item.descripcion.toLowerCase().includes(searchTerm.toLowerCase())) ||
+          brandName.includes(searchTerm.toLowerCase()) ||
+          (item.codigo_interno && String(item.codigo_interno).toLowerCase().includes(searchTerm.toLowerCase())) ||
+          (item.codigo_ean13 && String(item.codigo_ean13).includes(searchTerm));
 
         return matchesCategory && matchesBrand && matchesStatus && matchesLifecycle && matchesSearch;
       })
       .sort((a, b) => {
-        if (sortBy === 'price-asc') return a.price - b.price;
-        if (sortBy === 'price-desc') return b.price - a.price;
-        if (sortBy === 'stock') return (b.central + b.margalef) - (a.central + a.margalef);
-        return a.id - b.id;
+        if (sortBy === 'price-asc') return a.precio_actual - b.precio_actual;
+        if (sortBy === 'price-desc') return b.precio_actual - a.precio_actual;
+        if (sortBy === 'stock') return 0;
+        return String(a.id).localeCompare(String(b.id));
       });
-  }, [products, searchTerm, selectedBrand, selectedStatus, lifecycleFilter, sortBy, activeCategory]);
+  }, [products, searchTerm, selectedBrand, selectedStatus, lifecycleFilter, sortBy, activeCategory, formBrands, formCategories]);
 
   const showToast = (message) => {
     setConfirmToast(message);
     setTimeout(() => setConfirmToast(null), 4000);
   };
 
-  const handleCreateProduct = (e) => {
+  const handleCreateProduct = async (e) => {
     e.preventDefault();
-    if (!newProduct.description.trim() || eanValidation.state !== 'valid') return;
+    if (!newProduct.category || !newProduct.originCountry || !newProduct.brand || !newProduct.description.trim() || eanValidation.state !== 'valid') return;
 
-    const created = {
-      id: Date.now(),
-      code: newProduct.code,
-      name: newProduct.description,
-      brand: newProduct.brand,
-      model: newProduct.model || newProduct.code,
-      ean: newProduct.ean,
-      category: newProduct.category,
-      price: Number(String(newProduct.price).replace(/[^0-9]/g, '')) || 0,
-      status: newProduct.status,
-      central: Number(newProduct.initialStock) || 0,
-      margalef: 0,
-      active: true
-    };
+    try {
+      const payload = {
+        descripcion: newProduct.description,
+        codigo_ean13: newProduct.ean,
+        categoria_id: newProduct.category,
+        marca_id: newProduct.brand,
+        pais_origen: newProduct.originCountry,
+        precio_actual: Number(String(newProduct.price).replace(/[^0-9]/g, '')) || 0,
+        modelo: newProduct.model || null
+      };
 
-    setProducts([created, ...products]);
-    setIsNewModalOpen(false);
-    showToast('Producto guardado correctamente en el catálogo.');
+      const response = await fetch('http://localhost:3001/api/articles', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
 
-    setNewProduct({
-      code: `COD-${String(products.length + 2).padStart(4, '0')}`,
-      category: 'Guitarras eléctricas',
-      description: '',
-      brand: 'Fender',
-      model: '',
-      ean: '',
-      price: '',
-      status: 'Normal',
-      initialStock: 0
-    });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error al guardar el producto');
+      }
+
+      const result = await response.json();
+      const created = result.data;
+
+      setProducts([created, ...products]);
+      setIsNewModalOpen(false);
+      showToast('Producto guardado correctamente en el catálogo.');
+
+      setNewProduct({
+        category: '',
+        description: '',
+        brand: '',
+        model: '',
+        ean: '',
+        price: '',
+        status: 'Normal',
+        initialStock: 0,
+        originCountry: ''
+      });
+    } catch (error) {
+      console.error(error);
+      alert(error.message);
+    }
   };
 
   // Dar de baja (Soft Delete)
-  const handleConfirmDeactivate = () => {
+  const handleConfirmDeactivate = async () => {
     if (!productToDeactivate) return;
-    setProducts(products.map(p => p.id === productToDeactivate.id ? { ...p, active: false } : p));
-    setIsDeactivateModalOpen(false);
-    showToast(`El producto "${productToDeactivate.name}" fue dado de baja. Podés consultarlo o reactivarlo filtrando por "Dados de baja".`);
-    setProductToDeactivate(null);
+
+    try {
+      const response = await fetch(`http://localhost:3001/api/articles/${productToDeactivate.id}/status`, {
+        method: 'PATCH'
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error al dar de baja el producto');
+      }
+
+      setProducts(products.map(p => p.id === productToDeactivate.id ? { ...p, estado: false } : p));
+      setIsDeactivateModalOpen(false);
+      showToast(`El producto "${getBrandName(productToDeactivate.marca_id)} ${productToDeactivate.modelo}" fue dado de baja. Podés consultarlo o reactivarlo filtrando por "Dados de baja".`);
+      setProductToDeactivate(null);
+    } catch (error) {
+      console.error(error);
+      alert(error.message);
+    }
   };
 
   // Reactivar producto
-  const handleConfirmReactivate = () => {
+  const handleConfirmReactivate = async () => {
     if (!productToReactivate) return;
-    setProducts(products.map(p => p.id === productToReactivate.id ? { ...p, active: true } : p));
-    setIsReactivateModalOpen(false);
-    showToast(`El producto "${productToReactivate.name}" fue reactivado en el catálogo activo.`);
-    setProductToReactivate(null);
+
+    try {
+      const response = await fetch(`http://localhost:3001/api/articles/${productToReactivate.id}/reactivate`, {
+        method: 'PATCH'
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error al reactivar el producto');
+      }
+
+      setProducts(products.map(p => p.id === productToReactivate.id ? { ...p, estado: true } : p));
+      setIsReactivateModalOpen(false);
+      showToast(`El producto "${getBrandName(productToReactivate.marca_id)} ${productToReactivate.modelo}" fue reactivado en el catálogo activo.`);
+      setProductToReactivate(null);
+    } catch (error) {
+      console.error(error);
+      alert(error.message);
+    }
   };
 
+
   const getBadge = (prod) => {
-    if (!prod.active) return <span className="badge badge-gray"><span className="badge-dot"></span>Dado de baja</span>;
-    if (prod.status === 'Normal') return <span className="badge badge-green"><span className="badge-dot"></span>Normal</span>;
-    if (prod.status === 'Reposición') return <span className="badge badge-amber"><span className="badge-dot"></span>Reposición</span>;
-    return <span className="badge badge-red"><span className="badge-dot"></span>Crítico</span>;
+    return <span className="badge badge-green"><span className="badge-dot"></span>Normal</span>;
   };
 
   return (
@@ -226,20 +346,10 @@ function Catalogo_de_productos() {
         <div className="select-field">
           Marca:
           <select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)}>
-            <option>Todas</option>
-            <option>Fender</option>
-            <option>Gibson</option>
-            <option>Yamaha</option>
-            <option>Roland</option>
-            <option>Marshall</option>
-            <option>Shure</option>
-            <option>Korg</option>
-            <option>Cort</option>
-            <option>Taylor</option>
-            <option>Ibanez</option>
-            <option>Pearl</option>
-            <option>LP</option>
-            <option>Dunlop</option>
+            <option value="Todas">Todas</option>
+            {formBrands.map(b => (
+              <option key={b.id} value={b.id}>{b.nombre}</option>
+            ))}
           </select>
         </div>
 
@@ -313,11 +423,11 @@ function Catalogo_de_productos() {
               <div
                 className="product-card"
                 key={prod.id}
-                style={{ opacity: prod.active ? 1 : 0.72 }}
+                style={{ opacity: prod.estado ? 1 : 0.72 }}
               >
                 <div className="product-thumb">
-                  <span className="thumb-tag">{prod.category}</span>
-                  <span className="thumb-code">{prod.code}</span>
+                  <span className="thumb-tag">{getCategoryName(prod.categoria_id)}</span>
+                  <span className="thumb-code">{prod.codigo_interno}</span>
                   <svg viewBox="0 0 24 24" fill="none" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M9 18V5l12-2v13" />
                     <circle cx="6" cy="18" r="3" />
@@ -326,22 +436,16 @@ function Catalogo_de_productos() {
                 </div>
 
                 <div className="product-body">
-                  <span className="product-brand">{prod.brand}</span>
-                  <h3 className="product-name">{prod.name}</h3>
-                  <span className="product-model">Modelo {prod.model} · EAN {prod.ean}</span>
+                  <span className="product-brand">{getBrandName(prod.marca_id)}</span>
+                  <h3 className="product-name">{getBrandName(prod.marca_id)} {prod.modelo}</h3>
+                  <span className="product-model">Modelo {prod.modelo} · EAN {prod.codigo_ean13}</span>
 
                   <div className="product-meta-row">
-                    <span className="product-price">${prod.price.toLocaleString('es-AR')}</span>
+                    <span className="product-price">${prod.precio_actual}</span>
                     {getBadge(prod)}
                   </div>
 
-                  <div className="product-stock-split">
-                    <span>Central: <b>{prod.central}</b></span>
-                    <span>·</span>
-                    <span>Margalef: <b>{prod.margalef}</b></span>
-                    <span>·</span>
-                    <span>Consol.: <b>{prod.central + prod.margalef}</b></span>
-                  </div>
+                  <ProductStock articuloId={prod.id} />
 
                   <div className="product-card-actions">
                     <button
@@ -351,7 +455,7 @@ function Catalogo_de_productos() {
                       Ver detalle
                     </button>
 
-                    {prod.active ? (
+                    {prod.estado ? (
                       <button
                         className="icon-btn btn-icon-only"
                         title="Dar de baja producto"
@@ -413,14 +517,14 @@ function Catalogo_de_productos() {
                   </tr>
                 ) : (
                   filteredProducts.map((prod) => (
-                    <tr key={prod.id} style={{ opacity: prod.active ? 1 : 0.65 }}>
-                      <td className="cell-mono">{prod.code}</td>
-                      <td className="cell-strong">{prod.name}</td>
-                      <td>{prod.brand}</td>
-                      <td>{prod.model}</td>
-                      <td className="cell-mono">{prod.ean}</td>
-                      <td>{prod.category}</td>
-                      <td className="cell-strong">${prod.price.toLocaleString('es-AR')}</td>
+                    <tr key={prod.id} style={{ opacity: prod.estado ? 1 : 0.65 }}>
+                      <td className="cell-mono">{prod.codigo_interno}</td>
+                      <td className="cell-strong">{getBrandName(prod.marca_id)} {prod.modelo}</td>
+                      <td>{getBrandName(prod.marca_id)}</td>
+                      <td>{prod.modelo}</td>
+                      <td className="cell-mono">{prod.codigo_ean13}</td>
+                      <td>{getCategoryName(prod.categoria_id)}</td>
+                      <td className="cell-strong">${prod.precio_actual}</td>
                       <td>{getBadge(prod)}</td>
                       <td>
                         <div className="row-actions">
@@ -435,7 +539,7 @@ function Catalogo_de_productos() {
                             </svg>
                           </button>
 
-                          {prod.active ? (
+                          {prod.estado ? (
                             <button
                               className="icon-btn"
                               title="Dar de baja producto"
@@ -502,23 +606,15 @@ function Catalogo_de_productos() {
           </div>
 
           <div className="form-row">
-            <div className="form-field">
-              <label>Código interno<span className="req">*</span></label>
-              <input
-                type="text"
-                required
-                value={newProduct.code}
-                onChange={(e) => setNewProduct({ ...newProduct, code: e.target.value })}
-              />
-            </div>
-            <div className="form-field">
+            <div className="form-field full">
               <label>Categoría<span className="req">*</span></label>
               <select
                 value={newProduct.category}
                 onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })}
               >
-                {CATEGORIES.filter(c => c !== 'Todas').map(c => (
-                  <option key={c} value={c}>{c}</option>
+                <option value="">Seleccione una categoría</option>
+                {formCategories.map(c => (
+                  <option key={c.id} value={c.id}>{c.nombre}</option>
                 ))}
               </select>
             </div>
@@ -540,13 +636,15 @@ function Catalogo_de_productos() {
           <div className="form-row">
             <div className="form-field">
               <label>Marca<span className="req">*</span></label>
-              <input
-                type="text"
-                placeholder="Ej: Fender"
-                required
+              <select
                 value={newProduct.brand}
                 onChange={(e) => setNewProduct({ ...newProduct, brand: e.target.value })}
-              />
+              >
+                <option value="">Seleccione una marca</option>
+                {formBrands.map(b => (
+                  <option key={b.id} value={b.id}>{b.nombre}</option>
+                ))}
+              </select>
             </div>
             <div className="form-field">
               <label>Modelo</label>
@@ -612,14 +710,15 @@ function Catalogo_de_productos() {
 
           <div className="form-row">
             <div className="form-field">
-              <label>Estado<span className="req">*</span></label>
+              <label>País de Origen<span className="req">*</span></label>
               <select
-                value={newProduct.status}
-                onChange={(e) => setNewProduct({ ...newProduct, status: e.target.value })}
+                value={newProduct.originCountry}
+                onChange={(e) => setNewProduct({ ...newProduct, originCountry: e.target.value })}
               >
-                <option value="Normal">Normal</option>
-                <option value="Reposición">Reposición</option>
-                <option value="Crítico">Crítico</option>
+                <option value="">Seleccione un país</option>
+                {formCountries.map(c => (
+                  <option key={c.id} value={c.id}>{c.nombre}</option>
+                ))}
               </select>
             </div>
             <div className="form-field">
@@ -657,20 +756,8 @@ function Catalogo_de_productos() {
       >
         <div>
           <p style={{ fontSize: '13.5px', color: 'var(--gray-700)', lineHeight: '1.6', marginBottom: '14px' }}>
-            ¿Confirmás que querés dar de baja a <strong>{productToDeactivate?.name} ({productToDeactivate?.code})</strong>?
+            ¿Confirmás que querés dar de baja a <strong>{getBrandName(productToDeactivate?.marca_id)} {productToDeactivate?.modelo}</strong>?
           </p>
-          <div className="form-field">
-            <label>Motivo de la baja</label>
-            <select
-              value={deactivateReason}
-              onChange={(e) => setDeactivateReason(e.target.value)}
-            >
-              <option value="Discontinuado por el fabricante">Discontinuado por el fabricante</option>
-              <option value="Fin de comercialización">Fin de comercialización</option>
-              <option value="Reemplazado por nuevo modelo">Reemplazado por nuevo modelo</option>
-              <option value="Sin stock proyectado">Sin stock proyectado</option>
-            </select>
-          </div>
           <p style={{ fontSize: '12px', color: 'var(--gray-500)', marginTop: '12px' }}>
             * Esta acción no borrará los movimientos históricos y podrás reactivar el producto en cualquier momento.
           </p>
@@ -698,7 +785,7 @@ function Catalogo_de_productos() {
         }
       >
         <p style={{ fontSize: '13.5px', color: 'var(--gray-700)', lineHeight: '1.6' }}>
-          ¿Deseás reactivar <strong>{productToReactivate?.name} ({productToReactivate?.code})</strong>? El producto volverá a estar disponible para movimientos y consultas en el catálogo activo.
+          ¿Deseás reactivar <strong>{getBrandName(productToReactivate?.marca_id)} {productToReactivate?.modelo}</strong>? El producto volverá a estar disponible para movimientos y consultas en el catálogo activo.
         </p>
       </Modal>
     </div>
