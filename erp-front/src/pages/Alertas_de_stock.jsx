@@ -10,8 +10,14 @@ function Alertas_de_stock() {
   const [activeTab, setActiveTab] = useState('reposicion'); // 'reposicion' | 'actividad'
   const [activityFilter, setActivityFilter] = useState('Todas');
   const [activities, setActivities] = useState([]);
+  
+  const [ultimaLectura, setUltimaLectura] = useState('0');
 
   useEffect(() => {
+    // 1. Sincronizá el estado inicial leyendo la clave al montar
+    const storedLastRead = localStorage.getItem('alertasLeidas') || '0';
+    setUltimaLectura(storedLastRead);
+
     const fetchAlertas = async () => {
       try {
         const res = await fetch('http://localhost:3001/api/stock/alerts');
@@ -41,7 +47,7 @@ function Alertas_de_stock() {
               time: timeStr,
               category: a.tipo === 'MOVIMIENTOS' ? 'Movimientos' : 'Catálogo',
               type: a.typeLabel,
-              unread: true,
+              rawDate: dateObj,
             };
           });
           setActivities(mapped);
@@ -64,7 +70,9 @@ function Alertas_de_stock() {
   const [orderQty, setOrderQty] = useState(1);
   const [isExporting, setIsExporting] = useState(false);
 
-  const unreadActivityCount = useMemo(() => activities.filter((a) => a.unread).length, [activities]);
+  const unreadActivityCount = useMemo(() => {
+    return activities.filter((a) => a.rawDate.getTime() > parseInt(ultimaLectura, 10)).length;
+  }, [activities, ultimaLectura]);
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -131,14 +139,15 @@ function Alertas_de_stock() {
   // Filtrado pestaña actividad
   const filteredActivities = useMemo(() => {
     return activities.filter((act) => {
+      const isUnread = act.rawDate.getTime() > parseInt(ultimaLectura, 10);
       if (activityFilter === 'Todas') return true;
-      if (activityFilter === 'No leídas') return act.unread;
+      if (activityFilter === 'No leídas') return isUnread;
       if (activityFilter === 'Stock') return act.title.toLowerCase().includes('stock') || act.text.toLowerCase().includes('stock');
       if (activityFilter === 'Movimientos') return act.category === 'Movimientos';
       if (activityFilter === 'Catálogo') return act.category === 'Catálogo';
       return true;
     });
-  }, [activities, activityFilter]);
+  }, [activities, activityFilter, ultimaLectura]);
 
   return (
     <div>
@@ -393,37 +402,30 @@ function Alertas_de_stock() {
                 No hay actividad reciente
               </div>
             ) : (
-              filteredActivities.map((act) => (
-                <div
-                  key={act.id}
-                  className={`notif-page-item ${act.unread ? 'unread' : ''}`}
-                  onClick={() => {
-                    const readIds = JSON.parse(localStorage.getItem('readAlertsIds') || '[]');
-                    if (!readIds.includes(act.id)) {
-                      readIds.push(act.id);
-                      localStorage.setItem('readAlertsIds', JSON.stringify(readIds));
-                    }
-                    setActivities(activities.map((a) => (a.id === act.id ? { ...a, unread: false } : a)));
-                  }}
-                  style={{ cursor: 'pointer' }}
-                >
-                  <div className={`notif-page-icon ${act.type}`}>
-                    {act.type === 'ok' && (
-                      <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M20 6 9 17l-5-5" />
-                      </svg>
-                    )}
-                    {act.type === 'info' && (
-                      <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M7 7h13l-3-3M17 17H4l3 3" />
-                      </svg>
-                    )}
-                    {act.type === 'crit' && (
-                      <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M18 6 6 18M6 6l12 12" />
-                      </svg>
-                    )}
-                  </div>
+              filteredActivities.map((act) => {
+                const isUnread = act.rawDate.getTime() > parseInt(ultimaLectura, 10);
+                return (
+                  <div
+                    key={act.id}
+                    className={`notif-page-item ${isUnread ? 'unread' : ''}`}
+                  >
+                    <div className={`notif-page-icon ${!isUnread ? 'ok' : act.type}`}>
+                      {(!isUnread || act.type === 'ok') && (
+                        <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M20 6 9 17l-5-5" />
+                        </svg>
+                      )}
+                      {isUnread && act.type === 'info' && (
+                        <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M7 7h13l-3-3M17 17H4l3 3" />
+                        </svg>
+                      )}
+                      {isUnread && act.type === 'crit' && (
+                        <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M18 6 6 18M6 6l12 12" />
+                        </svg>
+                      )}
+                    </div>
                   <div className="notif-page-body">
                     <div className="notif-page-title">{act.title}</div>
                     <div className="notif-page-text">{act.text}</div>
@@ -431,7 +433,8 @@ function Alertas_de_stock() {
                   </div>
                   <span className="notif-page-cat">{act.category}</span>
                 </div>
-              ))
+              );
+            })
             )}
           </div>
         </div>

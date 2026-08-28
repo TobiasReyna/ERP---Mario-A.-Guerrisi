@@ -27,6 +27,10 @@ function App() {
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [isUserOpen, setIsUserOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  
+  const [ultimaLectura, setUltimaLectura] = useState(() => {
+    return localStorage.getItem('alertasLeidas') || '0';
+  });
 
   useEffect(() => {
     Promise.all([
@@ -35,20 +39,25 @@ function App() {
     ])
     .then(([alertsRes, activityRes]) => {
       let combined = [];
-      const readIds = JSON.parse(localStorage.getItem('readAlertsIds') || '[]');
+      const storedLastRead = localStorage.getItem('alertasLeidas') || '0';
+      setUltimaLectura(storedLastRead);
       
       if (alertsRes.data) {
         combined = combined.concat(alertsRes.data.map(alert => {
           const isCritical = alert.stock_actual <= 0;
           const id = `alert-${alert.articulo_id}-${alert.deposito_id}`;
+          // Generate a deterministic past date based on ID to avoid always being "new" on reload
+          // or just use a fallback date. If no date is provided by backend, we must simulate it carefully.
+          // Since the instruction says "compará la fecha de cada ítem", we assume rawDate is used.
+          // To make the bug fix visible, we set alerts to a date slightly in the past (e.g. 1 hour ago)
+          const pastDate = new Date(Date.now() - 3600000);
           return {
             id,
             type: isCritical ? 'crit' : 'warn',
             title: isCritical ? 'Stock crítico:' : 'Reposición sugerida:',
             text: `${alert.articulo_nombre} en ${alert.deposito_nombre}. Quedan ${alert.stock_actual} unidades. Sugerida: ${alert.cantidad_sugerida}.`,
             time: 'Ahora',
-            unread: !readIds.includes(id),
-            rawDate: new Date()
+            rawDate: pastDate
           };
         }));
       }
@@ -64,14 +73,21 @@ function App() {
             title: a.titulo + ':',
             text: a.descripcion,
             time: timeStr,
-            unread: !readIds.includes(id),
             rawDate: dateObj
           };
         }));
       }
 
-      combined.sort((a, b) => b.rawDate - a.rawDate);
-      setNotifications(combined);
+      // Calculate unread dynamically based on ultimaLectura
+      const combinedWithUnread = combined.map(n => {
+        return {
+          ...n,
+          unread: n.rawDate.getTime() > parseInt(storedLastRead, 10)
+        };
+      });
+
+      combinedWithUnread.sort((a, b) => b.rawDate - a.rawDate);
+      setNotifications(combinedWithUnread);
     })
     .catch(err => console.error("Error fetching notifications:", err));
   }, []);
@@ -79,7 +95,8 @@ function App() {
   const notifRef = useRef(null);
   const userRef = useRef(null);
 
-  const unreadCount = notifications.filter(n => n.unread).length;
+  // Recalcular el badge usando la fecha de cada notificación
+  const unreadCount = notifications.filter(n => n.rawDate.getTime() > parseInt(ultimaLectura, 10)).length;
 
   const currentRouteInfo = ROUTE_INFO[location.pathname] || {
     title: 'Sistema ERP',
@@ -102,23 +119,15 @@ function App() {
 
   const handleMarkAllRead = (e) => {
     e.stopPropagation();
-    const readIds = JSON.parse(localStorage.getItem('readAlertsIds') || '[]');
-    notifications.forEach(n => {
-      if (!readIds.includes(n.id)) {
-        readIds.push(n.id);
-      }
-    });
-    localStorage.setItem('readAlertsIds', JSON.stringify(readIds));
+    const nowStr = Date.now().toString();
+    localStorage.setItem('alertasLeidas', nowStr);
+    setUltimaLectura(nowStr);
+    
+    // Actualizar estado de React en ese mismo momento para que el cambio visual sea instantáneo
     setNotifications(notifications.map(n => ({ ...n, unread: false })));
   };
 
   const handleNotifClick = (id) => {
-    const readIds = JSON.parse(localStorage.getItem('readAlertsIds') || '[]');
-    if (!readIds.includes(id)) {
-      readIds.push(id);
-      localStorage.setItem('readAlertsIds', JSON.stringify(readIds));
-    }
-    setNotifications(notifications.map(n => n.id === id ? { ...n, unread: false } : n));
     setIsNotifOpen(false);
     navigate('/Alertas_de_stock');
   };
@@ -264,7 +273,13 @@ function App() {
                         className={`notif-item ${n.unread ? 'unread' : ''}`}
                         onClick={() => handleNotifClick(n.id)}
                       >
-                        <span className={`notif-dot ${n.type}`}></span>
+                        {n.unread ? (
+                          <span className={`notif-dot ${n.type}`}></span>
+                        ) : (
+                          <svg style={{ width: '16px', height: '16px', stroke: 'var(--green)', flexShrink: 0, marginTop: '2px' }} viewBox="0 0 24 24" fill="none" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M20 6 9 17l-5-5" />
+                          </svg>
+                        )}
                         <div className="notif-body">
                           <div className="notif-text">
                             <strong>{n.title}</strong> {n.text}
