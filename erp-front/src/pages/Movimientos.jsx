@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import Modal from '../components/Modal';
+import { supabase } from '../config/supabaseClient';
 
 function Movimientos() {
   const [movements, setMovements] = useState([]);
@@ -10,6 +11,8 @@ function Movimientos() {
   const [selectedWarehouse, setSelectedWarehouse] = useState('Todos');
   const [selectedUser, setSelectedUser] = useState('Todos');
   const [searchQuery, setSearchQuery] = useState('');
+  const [filteredMovements, setFilteredMovements] = useState([]);
+  const [isLoadingFilters, setIsLoadingFilters] = useState(false);
 
   // Toast confirmación
   const [confirmToast, setConfirmToast] = useState(null);
@@ -21,18 +24,28 @@ function Movimientos() {
   const [dbArticles, setDbArticles] = useState([]);
   const [dbDeposits, setDbDeposits] = useState([]);
   const [dbReasons, setDbReasons] = useState([]);
+ 
+  const [dbFetchProd, setDbFetchProd] = useState([]);
+  const [dbFetchDepo, setDbFetchDepo] = useState([]);
+  const [dbFetchUsu, setDbFetchUsu] = useState([]);
+  const [dbFetchMot, setDbFetchMot] = useState([]);
 
-const [selectedArticleId, setSelectedArticleId] = useState('');
+  
+  const [selectedArticleId, setSelectedArticleId] = useState('');
   const [selectedDepositId, setSelectedDepositId] = useState('');
   const [selectedReasonId, setSelectedReasonId] = useState('');
   const [baseStock, setBaseStock] = useState(0);
+  const [selectedDestinationDepositId, setSelectedDestinationDepositId] = useState('');
 
   const [movementType, setMovementType] = useState('entrada');
   const [qty, setQty] = useState(5);
-  const [user, setUser] = useState('Juan Pérez');
+  const [user, setUser] = useState('');
   const [hasReasonError, setHasReasonError] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
+
+  //asi todo croto hago un insert distinto
+ 
 
   const fetchHistory = async (articles) => {
     try {
@@ -112,14 +125,164 @@ const [selectedArticleId, setSelectedArticleId] = useState('');
       console.error('Error fetching history:', err);
     }
   };
+  const fetchProducts = async () => {
+    try {
+      const {data, error} = await supabase.from('articulos').select('*');
+      if (error) {
+        throw error;
+      }
+      setDbFetchProd(data)
+    } catch (err) {
+      console.error('Error fetching products:', err);
+    }
+  };
+  const fetchDepositos = async () => {
+    try {
+      const {data, error} = await supabase.from('depositos').select('*');
+      if (error) {
+        throw error;
+      }
+      setDbFetchDepo(data)
+    } catch (err) {
+      console.error('Error fetching products:', err);
+    }
+  };
+  const fetchUsuarios = async () => {
+    try {
+      const {data, error} = await supabase.from('usuarios').select('*');
+      if (error) {
+        throw error;
+      }
+      setDbFetchUsu(data)
+    } catch (err) {
+      console.error('Error fetching products:', err);
+    }
+  };
+  const fetchMotivos = async () => {
+    try {
+      const {data, error} = await supabase.from('motivos_ajustes').select('*');
+      if (error) {
+        throw error;
+      }
+      setDbFetchMot(data)
+    } catch (err) {
+      console.error('Error fetching products:', err);
+    }
+  };
+  const fetchStock = async () => {
+  // Si falta alguna de las dos selecciones en el modal, no consultamos la DB
+  if (!selectedArticleId || !selectedDepositId) return;
+
+  try {
+    const { data, error } = await supabase
+      .from('existencias')
+      .select('cantidad')
+      .eq('articulo_id', selectedArticleId) // Filtra por el UUID del artículo
+      .eq('deposito_id', selectedDepositId); // Filtra por el UUID del depósito
+
+    if (error) throw error;
+
+    // Si la fila existe en la tabla, tomamos su cantidad. Si no existe, asumimos 0.
+    if (data && data.length > 0) {
+      setBaseStock(data[0].cantidad);
+    } else {
+      setBaseStock(0);
+    }
+  } catch (err) {
+    console.error('Error fetching stock de existencias:', err);
+    setBaseStock(0);
+  }
+};
+
+
+  useEffect(() => {
+  async function fetchFilteredData() {
+    setIsLoadingFilters(true);
+    
+    try {
+      // 1. JOIN anidado: articulos -> categorias / marcas
+      let query = supabase
+       .from('transferencias_stock') 
+       .select(`*,
+         articulos ( 
+           descripcion, 
+           categorias ( nombre ),
+           marcas ( nombre )
+         ),
+         motivos_ajustes ( nombre ),
+         usuarios ( nombre ),
+         origen:depositos!deposito_origen_id ( nombre )
+        `);
+
+      if (selectedType !== 'Todos') {
+        const typeMapping = {
+          'Entrada': 'ENTRADA',
+          'Salida': 'SALIDA',
+          'Ajuste positivo': 'AJUSTE POS.',
+          'Ajuste negativo': 'AJUSTE NEG.',
+          'Transferencia': 'TRANSFERENCIA'
+        };
+        query = query.eq('tipo_movimiento', typeMapping[selectedType]); 
+      }
+
+      if (selectedWarehouse !== 'Todos') {
+        query = query.ilike('deposito', `%${selectedWarehouse}%`);
+      }
+
+      if (selectedUser !== 'Todos') {
+        query = query.eq('usuario', selectedUser);
+      }
+
+      if (searchQuery.trim() !== '') {
+        query = query.or(`producto.ilike.%${searchQuery}%,motivo.ilike.%${searchQuery}%`);
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+
+      const formattedData = (data || []).map((row, i) => {
+        let fechaLimpia = row.fecha_hora_registro 
+          ? row.fecha_hora_registro.split('.')[0].replace('T', ' ') 
+          : '';
+
+        // 2. Extraemos el nombre de la categoría (o marca) navegando por el objeto anidado
+        let nombreCategoria = row.articulos?.categorias?.nombre || '-';
+        let nombreMarca = row.articulos?.marcas?.nombre || '';
+
+        return {
+          id: row.id || `hist-${i}`,
+          date: fechaLimpia, 
+          product: row.articulos?.descripcion || 'Producto desconocido', 
+          type: nombreCategoria, // Puedes cambiarlo a nombreMarca si prefieres mostrar la marca
+          typeClass: '', 
+          warehouse: row.origen?.nombre || 'Depósito desconocido', 
+          qty: row.cantidad, 
+          reason: row.motivos_ajustes?.nombre || 'Transferencia',
+          user: row.usuarios?.nombre || 'Usuario desconocido',
+          stockChange: '-' 
+        };
+      });
+
+      setFilteredMovements(formattedData);
+
+    } catch (error) {
+      console.error('Error al filtrar en Supabase:', error.message);
+    } finally {
+      setIsLoadingFilters(false);
+    }
+  }
+
+  fetchFilteredData();
+}, [selectedType, selectedWarehouse, selectedUser, searchQuery]);
 
   useEffect(() => {
     const fetchMasterData = async () => {
       try {
         const [resArt, resDep, resRea] = await Promise.all([
-          fetch('http://localhost:3001/api/articles'),
-          fetch('http://localhost:3001/api/deposits'),
-          fetch('http://localhost:3001/api/adjustment-reasons')
+          fetch('http://localhost:3001/api/existencias'),
+          fetch('http://localhost:3001/api/depositos'),
+          fetch('http://localhost:3001/api/motivos_ajustes')
         ]);
         const art = await resArt.json();
         const dep = await resDep.json();
@@ -136,28 +299,21 @@ const [selectedArticleId, setSelectedArticleId] = useState('');
           await fetchHistory(art.data);
         }
       } catch (err) {
-        console.error('Error cargando catálogos:', err);
+        console.error('Error cargando catálogos del servidor local:', err);
       }
     };
+
+    // Llamadas iniciales a Supabase
+    fetchProducts();
+    fetchDepositos();
+    fetchUsuarios();
+    fetchMotivos();
     fetchMasterData();
   }, []);
 
   useEffect(() => {
     if (selectedArticleId && selectedDepositId) {
-      fetch(`http://localhost:3001/api/stock/${selectedArticleId}`)
-        .then(res => res.json())
-        .then(json => {
-          if (json.data && json.data.desglose) {
-            const depStock = json.data.desglose.find(d => d.deposito_id === selectedDepositId);
-            setBaseStock(depStock ? depStock.cantidad : 0);
-          } else {
-            setBaseStock(0);
-          }
-        })
-        .catch(err => {
-          console.error('Error fetching stock:', err);
-          setBaseStock(0);
-        });
+      fetchStock(); 
     }
   }, [selectedArticleId, selectedDepositId]);
 
@@ -178,25 +334,7 @@ const [selectedArticleId, setSelectedArticleId] = useState('');
   };
 
   // Filtrado
-  const filteredMovements = useMemo(() => {
-    return movements.filter((m) => {
-      const matchType =
-        selectedType === 'Todos' ||
-        (selectedType === 'Entrada' && m.type === 'ENTRADA') ||
-        (selectedType === 'Salida' && m.type === 'SALIDA') ||
-        (selectedType === 'Ajuste positivo' && m.type === 'AJUSTE POS.') ||
-        (selectedType === 'Ajuste negativo' && m.type === 'AJUSTE NEG.') ||
-        (selectedType === 'Transferencia' && m.type === 'TRANSFERENCIA');
 
-      const matchWh = selectedWarehouse === 'Todos' || m.warehouse.includes(selectedWarehouse);
-      const matchUser = selectedUser === 'Todos' || m.user === selectedUser;
-      const matchSearch =
-        m.product.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        m.reason.toLowerCase().includes(searchQuery.toLowerCase());
-
-      return matchType && matchWh && matchUser && matchSearch;
-    });
-  }, [movements, selectedType, selectedWarehouse, selectedUser, searchQuery]);
 
   const handleOpenModal = () => {
     if (dbArticles.length > 0) setSelectedArticleId(dbArticles[0].id);
@@ -204,18 +342,21 @@ const [selectedArticleId, setSelectedArticleId] = useState('');
     setSelectedReasonId('');
     setMovementType('entrada');
     setQty(5);
-    setUser('Juan Pérez');
+    setUser('');
     setHasReasonError(false);
     setSubmitError(null);
     setIsModalOpen(true);
   };
 
-  const handleConfirmMovement = async (e) => {
+    const handleConfirmMovement = async (e) => {
     e.preventDefault();
 
-    // Validación HU-02: Motivo obligatorio para ajustes
     if (isAdjustment && !selectedReasonId) {
       setHasReasonError(true);
+      return;
+    }
+    if (movementType === 'transferencia' && !selectedDestinationDepositId) {
+      setSubmitError('Debes seleccionar un depósito destino para la transferencia.');
       return;
     }
 
@@ -224,51 +365,116 @@ const [selectedArticleId, setSelectedArticleId] = useState('');
     setIsSubmitting(true);
 
     try {
-      let endpoint = 'http://localhost:3001/api/stock/adjust';
-      let payload = {
-        articulo_id: selectedArticleId, 
-        deposito_id: selectedDepositId,          
-        cantidad_anterior: baseStock,
-        cantidad_nueva: calculatedResultStock,
-        motivo_id: selectedReasonId || null                
-      };
+      // ========================================================
+      // 1. REGISTRO DEL HISTORIAL
+      // ========================================================
+      const registroHistorial = {
+      articulo_id: selectedArticleId,
+      deposito_origen_id: selectedDepositId,
+      // Si es transferencia usa el destino seleccionado, si no, repite el origen
+      deposito_destino_id: movementType === 'transferencia' ? selectedDestinationDepositId : selectedDepositId,
+      cantidad: Number(qty),
+      motivo_id: selectedReasonId || null,
+      usuario_id: user || null,
+      tipo_movimiento: movementType,
+      ip_origen: '127.0.0.1' // <-- Agregado para cumplir con la restricción NOT NULL
+    };
 
-      if (!isAdjustment) {
-        endpoint = 'http://localhost:3001/api/stock/transfer';
-        const targetDeposit = dbDeposits.find(d => d.id !== selectedDepositId);
-        const targetId = targetDeposit ? targetDeposit.id : selectedDepositId;
-        payload = {
-           articulo_id: selectedArticleId,
-           deposito_origen_id: selectedDepositId,
-           deposito_destino_id: targetId,
-           cantidad: Number(qty)
-        };
+    const { error: historyError } = await supabase
+      .from('transferencias_stock')
+      .insert([registroHistorial]);
+
+      if (historyError) throw new Error(`Error en historial: ${historyError.message}`);
+
+      // ========================================================
+      // 2. ACTUALIZACIÓN DE EXISTENCIAS (Lógica Condicional)
+      // ========================================================
+      if (movementType === 'transferencia') {
+      // --- A. Restar al origen ---
+      const { error: errorOrigen } = await supabase
+        .from('existencias')
+        .update({ cantidad: baseStock - Number(qty) })
+        .eq('articulo_id', selectedArticleId)
+        .eq('deposito_id', selectedDepositId);
+
+      if (errorOrigen) throw new Error(`Error al descontar del origen: ${errorOrigen.message}`);
+
+      // --- B. Sumar al destino ---
+      const { data: destData, error: destError } = await supabase
+        .from('existencias')
+        .select('cantidad') // Aquí buscamos la cantidad actual
+        .eq('articulo_id', selectedArticleId)
+        .eq('deposito_id', selectedDestinationDepositId)
+        .maybeSingle();
+
+      if (destError) throw new Error(`Error verificando destino: ${destError.message}`);
+
+      if (destData) {
+        const { error: updateDestError } = await supabase
+          .from('existencias')
+          .update({ cantidad: destData.cantidad + Number(qty) })
+          .eq('articulo_id', selectedArticleId)
+          .eq('deposito_id', selectedDestinationDepositId);
+
+        if (updateDestError) throw new Error(`Error al sumar en destino: ${updateDestError.message}`);
+      } else {
+        const { error: insertDestError } = await supabase
+          .from('existencias')
+          .insert([{
+            articulo_id: selectedArticleId,
+            deposito_id: selectedDestinationDepositId,
+            cantidad: Number(qty)
+            // No enviamos id_art_x_dep, Supabase lo generará automáticamente si es un UUID con default
+          }]);
+
+        if (insertDestError) throw new Error(`Error al crear stock en destino: ${insertDestError.message}`);
       }
 
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Ocurrió un error al registrar el movimiento en el servidor.');
+    } else {
+      // --- LÓGICA NORMAL (Entrada, Salida, Ajustes) ---
+      const { data: existingRecord, error: checkError } = await supabase
+        .from('existencias')
+        .select('id_art_x_dep') // <-- ¡CORREGIDO! Antes decía 'id'
+        .eq('articulo_id', selectedArticleId)
+        .eq('deposito_id', selectedDepositId)
+        .maybeSingle();
+
+      if (checkError) throw new Error(`Error al verificar stock: ${checkError.message}`);
+
+      if (existingRecord) {
+        const { error: updateError } = await supabase
+          .from('existencias')
+          .update({ cantidad: calculatedResultStock })
+          .eq('articulo_id', selectedArticleId)
+          .eq('deposito_id', selectedDepositId);
+
+        if (updateError) throw new Error(`Error al actualizar stock: ${updateError.message}`);
+      } else {
+        const { error: insertError } = await supabase
+          .from('existencias')
+          .insert([{
+            articulo_id: selectedArticleId,
+            deposito_id: selectedDepositId,
+            cantidad: calculatedResultStock
+          }]);
+
+        if (insertError) throw new Error(`Error al crear registro de stock: ${insertError.message}`);
       }
+    }
 
-      // -- Actualizamos el historial real --
-      await fetchHistory(dbArticles);
+      // ========================================================
+      // 3. FINALIZACIÓN Y LIMPIEZA
+      // ========================================================
+      await fetchStock();
 
-      // Limpiamos el formulario y cerramos
-      if (dbArticles.length > 0) setSelectedArticleId(dbArticles[0].id);
-      if (dbDeposits.length > 0) setSelectedDepositId(dbDeposits[0].id);
       setSelectedReasonId('');
+      if (typeof setSelectedDestinationDepositId === 'function') {
+        setSelectedDestinationDepositId('');
+      }
       setMovementType('entrada');
       setQty(5);
-      setUser('Juan Pérez');
-
       setIsModalOpen(false);
-      showToast('Movimiento registrado correctamente en la base de datos.');
+      showToast('Movimiento registrado y stock actualizado con éxito.');
 
     } catch (err) {
       setSubmitError(err.message);
@@ -358,7 +564,7 @@ const [selectedArticleId, setSelectedArticleId] = useState('');
               <tr>
                 <th>Fecha</th>
                 <th>Producto</th>
-                <th>Tipo</th>
+                <th>Modelo</th>
                 <th>Depósito</th>
                 <th>Cantidad</th>
                 <th>Motivo</th>
@@ -378,7 +584,7 @@ const [selectedArticleId, setSelectedArticleId] = useState('');
                   <tr key={mov.id}>
                     <td>{mov.date}</td>
                     <td className="cell-strong">{mov.product}</td>
-                    <td><span className={`type-pill ${mov.typeClass}`}>{mov.type}</span></td>
+                    <td>{mov.type}</td>
                     <td>{mov.warehouse}</td>
                     <td className="cell-strong">{mov.qty}</td>
                     <td>{mov.reason}</td>
@@ -421,11 +627,10 @@ const [selectedArticleId, setSelectedArticleId] = useState('');
                 value={selectedArticleId}
                 onChange={(e) => setSelectedArticleId(e.target.value)}
               >
-                {dbArticles.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.descripcion} — {p.codigo_interno}
-                  </option>
-                ))}
+                <option value="" disabled>Selecciona un producto</option>
+                {
+                  dbFetchProd.map(p => (<option key={p.id} value={p.id}>{p.descripcion}</option>))
+                }
               </select>
             </div>
           </div>
@@ -437,10 +642,10 @@ const [selectedArticleId, setSelectedArticleId] = useState('');
                 value={selectedDepositId}
                 onChange={(e) => setSelectedDepositId(e.target.value)}
               >
-                {dbDeposits.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.nombre}
-                  </option>
+                <option value="" disabled>Selecciona un depósito</option>
+                {dbFetchDepo.map(d => (
+                  <option key={d.id} value={d.id}>{d.nombre}</option>
+                  
                 ))}
               </select>
             </div>
@@ -462,7 +667,24 @@ const [selectedArticleId, setSelectedArticleId] = useState('');
               </select>
             </div>
           </div>
-
+                {movementType === 'transferencia' && (
+                <div className="form-row">
+                  <div className="form-field full">
+                    <label>Depósito Destino<span className="req">*</span></label>
+                    <select
+                      value={selectedDestinationDepositId}
+                      onChange={(e) => setSelectedDestinationDepositId(e.target.value)}
+                    >
+                      <option value="" disabled>Selecciona el depósito destino</option>
+                      {dbFetchDepo
+                        .filter(d => d.id !== selectedDepositId) // Evita que se transfiera al mismo depósito
+                        .map(d => (
+                          <option key={d.id} value={d.id}>{d.nombre}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
           <div className="form-row">
             <div className="form-field">
               <label>Cantidad<span className="req">*</span></label>
@@ -479,9 +701,12 @@ const [selectedArticleId, setSelectedArticleId] = useState('');
             <div className="form-field">
               <label>Usuario responsable</label>
               <select value={user} onChange={(e) => setUser(e.target.value)}>
-                <option>Juan Pérez</option>
-                <option>María Gómez</option>
-                <option>Carlos Ruiz</option>
+                <option value="" disabled>Selecciona un usuario</option>
+
+                {dbFetchUsu.map(u => (
+                  <option key={u.id} value={u.id}>{u.nombre}</option>
+                  
+                ))}
               </select>
             </div>
           </div>
@@ -499,7 +724,7 @@ const [selectedArticleId, setSelectedArticleId] = useState('');
                 }}
               >
                 <option value="">Seleccionar motivo…</option>
-                {dbReasons.map(r => (
+                {dbFetchMot.map(r => (
                   <option key={r.id} value={r.id}>{r.nombre}</option>
                 ))}
               </select>
@@ -524,6 +749,7 @@ const [selectedArticleId, setSelectedArticleId] = useState('');
             <label>Vista previa de stock</label>
             <div className="stock-preview">
               <div className="sp-item">
+                {/* Mostramos baseStock que es el valor numérico que acabamos de traer */}
                 <div className="n">{baseStock}</div>
                 <div className="l">Stock anterior</div>
               </div>

@@ -203,9 +203,9 @@ async function stockXcategoria() {
     movimientosHoy()
     stockXcategoria()
     fetchAlertas()
-
+})
     
-  }, [])
+, [];
 
 
 
