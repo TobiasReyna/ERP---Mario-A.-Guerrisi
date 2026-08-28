@@ -3,7 +3,6 @@ const { supabaseAdmin } = require('../config/supabase');
 class ArticleService {
     static async crearArticulo(payload) {
         const {
-            codigo_interno,
             descripcion,
             codigo_ean13,
             categoria_id,
@@ -20,7 +19,6 @@ class ArticleService {
             .from('articulos')
             .insert([
                 {
-                    codigo_interno,
                     descripcion,
                     codigo_ean13,
                     categoria_id,

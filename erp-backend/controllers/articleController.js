@@ -6,7 +6,6 @@ const TEST_USER_ID = "7ab3d65c-eecc-4f0b-98a1-2c53efce620e";
 const crearArticulo = async (req, res) => {
     try {
         const { 
-            codigo_interno, 
             descripcion, 
             codigo_ean13, 
             categoria_id, 
@@ -17,7 +16,7 @@ const crearArticulo = async (req, res) => {
         } = req.body;
 
         // 1. Validaciones básicas del payload frontend
-        if (!codigo_interno || !descripcion || !codigo_ean13 || !categoria_id || !marca_id || !pais_origen || precio_actual === undefined) {
+        if (!descripcion || !codigo_ean13 || !categoria_id || !marca_id || !pais_origen || precio_actual === undefined) {
             return res.status(400).json({ error: 'Faltan campos obligatorios en el request.' });
         }
 
@@ -27,7 +26,6 @@ const crearArticulo = async (req, res) => {
 
         // 2. Delegar al servicio
         const nuevoArticulo = await ArticleService.crearArticulo({
-            codigo_interno,
             descripcion,
             codigo_ean13,
             categoria_id,

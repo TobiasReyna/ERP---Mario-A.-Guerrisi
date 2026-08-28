@@ -109,7 +109,6 @@ function Catalogo_de_productos() {
   // Modal Nuevo Producto
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   const [newProduct, setNewProduct] = useState({
-    code: 'COD-0017',
     category: '',
     description: '',
     brand: '',
@@ -192,7 +191,6 @@ function Catalogo_de_productos() {
 
     try {
       const payload = {
-        codigo_interno: newProduct.code,
         descripcion: newProduct.description,
         codigo_ean13: newProduct.ean,
         categoria_id: newProduct.category,
@@ -223,7 +221,6 @@ function Catalogo_de_productos() {
       showToast('Producto guardado correctamente en el catálogo.');
 
       setNewProduct({
-        code: `COD-${String(products.length + 2).padStart(4, '0')}`,
         category: '',
         description: '',
         brand: '',
@@ -609,16 +606,7 @@ function Catalogo_de_productos() {
           </div>
 
           <div className="form-row">
-            <div className="form-field">
-              <label>Código interno<span className="req">*</span></label>
-              <input
-                type="text"
-                required
-                value={newProduct.code}
-                onChange={(e) => setNewProduct({ ...newProduct, code: e.target.value })}
-              />
-            </div>
-            <div className="form-field">
+            <div className="form-field full">
               <label>Categoría<span className="req">*</span></label>
               <select
                 value={newProduct.category}
