@@ -70,31 +70,43 @@ function Alertas_de_stock() {
     setTimeout(() => setToastMessage(null), 4000);
   };
 
-  const handleExportExcel = async () => {
-    if (alertas.length === 0) {
+  const handleExportExcel = () => {
+    if (!alertas || alertas.length === 0) {
       showToast('No hay productos que requieran reposición para exportar.');
       return;
     }
 
     try {
       setIsExporting(true);
-      const excelRows = alertas.map((row) => {
-        const isCrit = row.stock_actual <= row.stock_minimo / 2;
+
+      const formattedItems = alertas.map((row) => {
+        const stockActual = Number(row.stock_actual ?? 0);
+        const stockMin = Number(row.stock_minimo ?? 0);
+        const isCrit = stockActual <= stockMin / 2;
+
+        // Priorizar el código interno real del artículo
+        const codigoInterno =
+          row.codigo_interno ||
+          row.codigo ||
+          row.code ||
+          row.articulo_codigo ||
+          (row.articulo_id ? String(row.articulo_id).substring(0, 8) : 'S/C');
+
         return {
-          'Código': row.articulo_id ? String(row.articulo_id).substring(0, 8) : 'N/A',
-          'Producto': row.articulo_nombre,
-          'Stock Actual': row.stock_actual,
-          'Stock Mínimo': row.stock_minimo,
-          'Stock Máximo': row.stock_maximo,
-          'Reposición Sugerida': row.cantidad_sugerida,
-          'Depósito / Alcance': row.deposito_nombre,
-          'Prioridad': isCrit ? 'Crítico' : 'Reposición',
+          codigo: codigoInterno,
+          nombre: row.articulo_nombre || row.descripcion || 'Sin descripción',
+          stockActual: stockActual,
+          stockMin: stockMin,
+          stockMax: Number(row.stock_maximo ?? 0),
+          sugerido: Number(row.cantidad_sugerida ?? 0),
+          deposito: row.deposito_nombre || 'Depósito Central',
+          prioridad: isCrit ? 'Crítico' : 'Reposición',
         };
       });
 
       const today = new Date().toISOString().slice(0, 10);
-      await exportToExcel(excelRows, `Reposicion_Stock_${today}.xlsx`, 'Reposición Sugerida');
-      showToast('Listado de reposición exportado correctamente en formato Excel.');
+      exportToExcel(formattedItems, `Reposicion_Stock_${today}.xlsx`);
+      showToast('Listado exportado correctamente en formato tabla con estilos.');
     } catch (err) {
       console.error('Error exportando a Excel:', err);
       showToast('Ocurrió un error al generar el archivo Excel.');
@@ -129,7 +141,6 @@ function Alertas_de_stock() {
 
   return (
     <div>
-
       {/* BANNER DE CONFIRMACIÓN */}
       {toastMessage && (
         <div className="confirm-banner">
@@ -160,7 +171,7 @@ function Alertas_de_stock() {
         </button>
       </div>
 
-      {/* ===================== TAB 1: REPOSICIÓN DE STOCK (HU-06) ===================== */}
+      {/* ===================== TAB 1: REPOSICIÓN DE STOCK ===================== */}
       {activeTab === 'reposicion' && (
         <div>
           {/* TARJETA RESUMEN */}
@@ -220,58 +231,61 @@ function Alertas_de_stock() {
             {!loadingAlertas && !errorAlertas && alertas.filter((a) => a.stock_actual <= a.stock_minimo / 2).length === 0 && (
               <div style={{ padding: '20px', color: 'var(--gray-500)' }}>No hay productos en estado crítico.</div>
             )}
-            {!loadingAlertas && !errorAlertas && alertas.filter((a) => a.stock_actual <= a.stock_minimo / 2).map((card) => (
-              <div className="alert-card" key={`${card.articulo_id}_${card.deposito_id}`}>
-                <div className="alert-card-head">
-                  <div>
-                    <div className="alert-card-name">{card.articulo_nombre}</div>
-                    <div className="alert-card-sku">ID: {card.articulo_id.substring(0, 8)}</div>
+            {!loadingAlertas && !errorAlertas && alertas.filter((a) => a.stock_actual <= a.stock_minimo / 2).map((card) => {
+              const codigoCard = card.codigo_interno || card.codigo || card.code || card.articulo_codigo || (card.articulo_id ? String(card.articulo_id).substring(0, 8) : 'S/C');
+              return (
+                <div className="alert-card" key={`${card.articulo_id}_${card.deposito_id}`}>
+                  <div className="alert-card-head">
+                    <div>
+                      <div className="alert-card-name">{card.articulo_nombre}</div>
+                      <div className="alert-card-sku">Cód: {codigoCard}</div>
+                    </div>
+                    <span className="badge badge-red">
+                      <span className="badge-dot"></span>Crítico
+                    </span>
                   </div>
-                  <span className="badge badge-red">
-                    <span className="badge-dot"></span>Crítico
-                  </span>
-                </div>
 
-                <div className="alert-card-metrics">
-                  <div className="alert-metric crit">
-                    <div className="n">{card.stock_actual}</div>
-                    <div className="l">Actual</div>
+                  <div className="alert-card-metrics">
+                    <div className="alert-metric crit">
+                      <div className="n">{card.stock_actual}</div>
+                      <div className="l">Actual</div>
+                    </div>
+                    <div className="alert-metric">
+                      <div className="n">{card.stock_minimo}</div>
+                      <div className="l">Mínimo</div>
+                    </div>
+                    <div className="alert-metric">
+                      <div className="n">{card.stock_maximo}</div>
+                      <div className="l">Máximo</div>
+                    </div>
+                    <div className="alert-metric suggest">
+                      <div className="n">{card.cantidad_sugerida}</div>
+                      <div className="l">Reponer</div>
+                    </div>
                   </div>
-                  <div className="alert-metric">
-                    <div className="n">{card.stock_minimo}</div>
-                    <div className="l">Mínimo</div>
-                  </div>
-                  <div className="alert-metric">
-                    <div className="n">{card.stock_maximo}</div>
-                    <div className="l">Máximo</div>
-                  </div>
-                  <div className="alert-metric suggest">
-                    <div className="n">{card.cantidad_sugerida}</div>
-                    <div className="l">Reponer</div>
-                  </div>
-                </div>
 
-                <div className="alert-card-foot">
-                  <span className="alert-card-wh">
-                    <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M21 8 12 3 3 8l9 5 9-5Z" />
-                      <path d="M3 8v8l9 5 9-5V8" />
-                    </svg>
-                    {card.deposito_nombre}
-                  </span>
-                  <button
-                    className="btn btn-outline btn-sm"
-                    onClick={() => handleOpenRepositionModal({
-                      name: card.articulo_nombre,
-                      code: card.articulo_id.substring(0, 8),
-                      suggested: card.cantidad_sugerida,
-                    })}
-                  >
-                    Generar reposición
-                  </button>
+                  <div className="alert-card-foot">
+                    <span className="alert-card-wh">
+                      <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21 8 12 3 3 8l9 5 9-5Z" />
+                        <path d="M3 8v8l9 5 9-5V8" />
+                      </svg>
+                      {card.deposito_nombre}
+                    </span>
+                    <button
+                      className="btn btn-outline btn-sm"
+                      onClick={() => handleOpenRepositionModal({
+                        name: card.articulo_nombre,
+                        code: codigoCard,
+                        suggested: card.cantidad_sugerida,
+                      })}
+                    >
+                      Generar reposición
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* LISTADO COMPLETO Y EXPORTAR A EXCEL */}
@@ -301,6 +315,7 @@ function Alertas_de_stock() {
               <table>
                 <thead>
                   <tr>
+                    <th>Código</th>
                     <th>Producto</th>
                     <th>Stock actual</th>
                     <th>Mínimo</th>
@@ -313,23 +328,25 @@ function Alertas_de_stock() {
                 <tbody>
                   {loadingAlertas && (
                     <tr>
-                      <td colSpan="7" style={{ textAlign: 'center', padding: '20px', color: 'var(--gray-500)' }}>Cargando datos...</td>
+                      <td colSpan="8" style={{ textAlign: 'center', padding: '20px', color: 'var(--gray-500)' }}>Cargando datos...</td>
                     </tr>
                   )}
                   {errorAlertas && (
                     <tr>
-                      <td colSpan="7" style={{ textAlign: 'center', padding: '20px', color: 'var(--red)' }}>Error: {errorAlertas}</td>
+                      <td colSpan="8" style={{ textAlign: 'center', padding: '20px', color: 'var(--red)' }}>Error: {errorAlertas}</td>
                     </tr>
                   )}
                   {!loadingAlertas && !errorAlertas && alertas.length === 0 && (
                     <tr>
-                      <td colSpan="7" style={{ textAlign: 'center', padding: '20px', color: 'var(--gray-500)' }}>No hay productos que requieran reposición.</td>
+                      <td colSpan="8" style={{ textAlign: 'center', padding: '20px', color: 'var(--gray-500)' }}>No hay productos que requieran reposición.</td>
                     </tr>
                   )}
                   {!loadingAlertas && !errorAlertas && alertas.map((row) => {
                     const isCrit = row.stock_actual <= row.stock_minimo / 2;
+                    const cod = row.codigo_interno || row.codigo || row.code || row.articulo_codigo || (row.articulo_id ? String(row.articulo_id).substring(0, 8) : 'S/C');
                     return (
                       <tr key={`${row.articulo_id}_${row.deposito_id}`}>
+                        <td style={{ fontFamily: 'monospace', color: 'var(--gray-600)' }}>{cod}</td>
                         <td className="cell-strong">{row.articulo_nombre}</td>
                         <td className={`stock-cell ${isCrit ? 'crit' : 'low'}`}>
                           {row.stock_actual}
