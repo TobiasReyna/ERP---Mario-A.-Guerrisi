@@ -51,7 +51,7 @@ function App() {
             id,
             type: isCritical ? 'crit' : 'warn',
             title: isCritical ? 'Stock crítico:' : 'Reposición sugerida:',
-            text: `${alert.articulo_nombre} en ${alert.deposito_nombre}. Quedan ${alert.stock_actual} unidades. Sugerida: ${alert.cantidad_sugerida}.`,
+            text: `${alert.articulo_descripcion} en ${alert.deposito_nombre}. Quedan ${alert.stock_actual} unidades. Sugerida: ${alert.reposicion_sugerida}.`,
             time: 'Ahora',
             rawDate: pastDate
           };

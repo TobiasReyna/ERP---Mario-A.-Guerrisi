@@ -163,15 +163,62 @@ class StockService {
     }
 
     static async obtenerAlertas() {
-        const { data, error } = await supabaseAdmin
-            .from('vista_alertas_reposicion')
-            .select('*');
+        const [{ data: articulos }, { data: existencias }, { data: politicas }, { data: depositos }] = await Promise.all([
+            supabaseAdmin.from('articulos').select('id, codigo_interno, descripcion').eq('estado', true),
+            supabaseAdmin.from('existencias').select('articulo_id, deposito_id, cantidad'),
+            supabaseAdmin.from('politicas_reposicion_deposito').select('articulo_id, deposito_id, stock_minimo, stock_maximo'),
+            supabaseAdmin.from('depositos').select('id, nombre')
+        ]);
 
-        if (error) {
-            throw new Error(`Error consultando vista_alertas_reposicion: ${error.message}`);
+        if (!articulos || !depositos) {
+            throw new Error('Error al obtener datos básicos para alertas.');
         }
 
-        return data;
+        const depositosMap = new Map(depositos.map(d => [d.id, d.nombre]));
+        const politicasMap = new Map();
+        if (politicas) {
+            politicas.forEach(p => politicasMap.set(`${p.articulo_id}_${p.deposito_id}`, p));
+        }
+
+        const existenciasMap = new Map();
+        if (existencias) {
+            existencias.forEach(e => existenciasMap.set(`${e.articulo_id}_${e.deposito_id}`, e.cantidad));
+        }
+
+        const alertas = [];
+
+        articulos.forEach(art => {
+            depositos.forEach(dep => {
+                const key = `${art.id}_${dep.id}`;
+                const stock_actual = existenciasMap.get(key) || 0;
+                let pol = politicasMap.get(key);
+                
+                let stock_minimo = 5;
+                let stock_maximo = 20;
+
+                if (pol) {
+                    stock_minimo = pol.stock_minimo;
+                    stock_maximo = pol.stock_maximo;
+                }
+
+                if (stock_actual <= stock_minimo) {
+                    const reposicion_sugerida = stock_maximo - stock_actual;
+                    alertas.push({
+                        articulo_id: art.id,
+                        codigo_interno: art.codigo_interno,
+                        articulo_descripcion: art.descripcion,
+                        deposito_id: dep.id,
+                        deposito_nombre: dep.nombre,
+                        stock_actual,
+                        stock_minimo,
+                        stock_maximo,
+                        reposicion_sugerida
+                    });
+                }
+            });
+        });
+
+        return alertas;
     }
 
     static async obtenerInventarioGeneral() {

@@ -119,11 +119,11 @@ function Alertas_de_stock() {
 
         return {
           codigo: codigoInterno,
-          nombre: row.articulo_nombre || row.descripcion || 'Sin descripción',
+          nombre: row.articulo_descripcion || row.descripcion || 'Sin descripción',
           stockActual: stockActual,
           stockMin: stockMin,
           stockMax: Number(row.stock_maximo ?? 0),
-          sugerido: Number(row.cantidad_sugerida ?? 0),
+          sugerido: Number(row.reposicion_sugerida ?? 0),
           deposito: row.deposito_nombre || 'Depósito Central',
           prioridad: isCrit ? 'Crítico' : 'Reposición',
         };
@@ -263,7 +263,7 @@ function Alertas_de_stock() {
                 <div className="alert-card" key={`${card.articulo_id}_${card.deposito_id}`}>
                   <div className="alert-card-head">
                     <div>
-                      <div className="alert-card-name">{card.articulo_nombre}</div>
+                      <div className="alert-card-name">{card.articulo_descripcion}</div>
                       <div className="alert-card-sku">Cód: {codigoCard}</div>
                     </div>
                     <span className="badge badge-red">
@@ -285,7 +285,7 @@ function Alertas_de_stock() {
                       <div className="l">Máximo</div>
                     </div>
                     <div className="alert-metric suggest">
-                      <div className="n">{card.cantidad_sugerida}</div>
+                      <div className="n">{card.reposicion_sugerida}</div>
                       <div className="l">Reponer</div>
                     </div>
                   </div>
@@ -301,9 +301,9 @@ function Alertas_de_stock() {
                     <button
                       className="btn btn-outline btn-sm"
                       onClick={() => handleOpenRepositionModal({
-                        name: card.articulo_nombre,
+                        name: card.articulo_descripcion,
                         code: codigoCard,
-                        suggested: card.cantidad_sugerida,
+                        suggested: card.reposicion_sugerida,
                       })}
                     >
                       Generar reposición
@@ -373,13 +373,13 @@ function Alertas_de_stock() {
                     return (
                       <tr key={`${row.articulo_id}_${row.deposito_id}`}>
                         <td style={{ fontFamily: 'monospace', color: 'var(--gray-600)' }}>{cod}</td>
-                        <td className="cell-strong">{row.articulo_nombre}</td>
+                        <td className="cell-strong">{row.articulo_descripcion}</td>
                         <td className={`stock-cell ${isCrit ? 'crit' : 'low'}`}>
                           {row.stock_actual}
                         </td>
                         <td>{row.stock_minimo}</td>
                         <td>{row.stock_maximo}</td>
-                        <td className="cell-strong">{row.cantidad_sugerida_reposicion}</td>
+                        <td className="cell-strong">{row.reposicion_sugerida}</td>
                         <td>{row.deposito_nombre}</td>
                         <td>
                           <span className={`badge ${isCrit ? 'badge-red' : 'badge-amber'}`}>
