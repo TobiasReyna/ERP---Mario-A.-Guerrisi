@@ -3,19 +3,31 @@ import Modal from '../components/Modal';
 
 function Inventario() {
   const [items, setItems] = useState([]);
+  const [categorias, setCategorias] = useState([]);
   const [activeTab, setActiveTab] = useState('Ambos depósitos');
-  const [selectedCategory, setSelectedCategory] = useState('Todas');
+  const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('Todos');
 
   useEffect(() => {
+    // Fetch inventory
     fetch('http://localhost:3001/api/stock/inventory')
-      .then(res => res.json())
-      .then(data => {
+      .then((res) => res.json())
+      .then((data) => {
         if (data && data.data) {
           setItems(data.data);
         }
       })
-      .catch(err => console.error('Error fetching inventory:', err));
+      .catch((err) => console.error('Error fetching inventory:', err));
+
+    // Fetch categories
+    fetch('http://localhost:3001/api/categories')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && data.data) {
+          setCategorias(data.data);
+        }
+      })
+      .catch((err) => console.error('Error fetching categories:', err));
   }, []);
 
   // Banner de confirmación
@@ -29,7 +41,7 @@ function Inventario() {
     destino: 'margalef',
     cantidad: 3,
     motivo: 'Rebalanceo de stock',
-    responsable: 'Juan Pérez'
+    responsable: 'Juan Pérez',
   });
 
   const selectedItem = items[selectedProductIndex] || items[0] || { central: 0, margalef: 0, name: '' };
@@ -42,7 +54,7 @@ function Inventario() {
   // Filtrado reactivo
   const filteredItems = useMemo(() => {
     return items.filter((item) => {
-      const matchCategory = selectedCategory === 'Todas' || item.category === selectedCategory;
+      const matchCategory = !selectedCategory || selectedCategory === 'Todas' || String(item.categoria_id) === String(selectedCategory);
       const matchStatus = selectedStatus === 'Todos' || item.status === selectedStatus;
 
       let matchWarehouse = true;
@@ -128,41 +140,15 @@ function Inventario() {
         ))}
       </div>
 
-      {/* LEYENDA VISUAL */}
-      <div className="inventory-legend">
-        <div className="legend-item">
-          <span className="legend-swatch" style={{ background: 'var(--white)', border: '1px solid var(--gray-300)' }}></span>
-          Stock por depósito
-        </div>
-        <div className="legend-item">
-          <span className="legend-swatch" style={{ background: 'var(--gray-50)', border: '2px solid var(--gray-300)' }}></span>
-          Stock consolidado (suma)
-        </div>
-        <div className="legend-item">
-          <span className="legend-swatch" style={{ background: 'var(--crit)' }}></span>
-          Crítico (≤ mínimo)
-        </div>
-        <div className="legend-item">
-          <span className="legend-swatch" style={{ background: 'var(--amber)' }}></span>
-          Requiere reposición
-        </div>
-      </div>
-
       {/* FILTROS */}
       <div className="filter-bar">
         <div className="select-field">
           Categoría:
           <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)}>
-            <option>Todas</option>
-            <option>Guitarras eléctricas</option>
-            <option>Guitarras acústicas</option>
-            <option>Bajos</option>
-            <option>Teclados / Pianos</option>
-            <option>Baterías / Percusión</option>
-            <option>Amplificadores</option>
-            <option>Micrófonos / Audio</option>
-            <option>Accesorios</option>
-            <option>Viento</option>
+            <option value="">Todas</option>
+            {categorias.map(cat => (
+              <option key={cat.id} value={cat.id}>{cat.nombre}</option>
+            ))}
           </select>
         </div>
 
@@ -291,7 +277,7 @@ function Inventario() {
                   setTransferData({
                     ...transferData,
                     origen: orig,
-                    destino: orig === 'central' ? 'margalef' : 'central'
+                    destino: orig === 'central' ? 'margalef' : 'central',
                   });
                 }}
               >

@@ -2,6 +2,10 @@ import { useState, useEffect, useMemo } from 'react';
 import Modal from '../components/Modal';
 import { supabase } from '../config/supabaseClient';
 
+// TEMPORAL: hasta que exista login/auth real, se usa un usuario fijo.
+// Reemplazar por el UUID real de un usuario existente en la tabla `usuarios` de Supabase.
+const TEMP_USER_ID = '7ab3d65c-eecc-4f0b-98a1-2c53efce620e';
+
 function Movimientos() {
   const [movements, setMovements] = useState([]);
 

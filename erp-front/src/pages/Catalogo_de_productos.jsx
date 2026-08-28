@@ -1,112 +1,212 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import Modal from '../components/Modal';
+import Detalle_producto from './Detalle_producto';
 
+// Caché en memoria para evitar repetición de peticiones
+const imageMemoryCache = new Map();
 
-const CATEGORIES = [
-  'Todas', 'Guitarras eléctricas', 'Guitarras acústicas', 'Bajos', 'Teclados',
-  'Pianos', 'Baterías', 'Percusión', 'Amplificadores', 'Micrófonos', 'Audio',
-  'Accesorios', 'Instrumentos de viento'
-];
+// Componente de Búsqueda Automática de Imágenes (MediaWiki Action API)
+function AutoProductImage({ brand, model, description, category, query, alt, style }) {
+  const [imageUrl, setImageUrl] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
 
+  useEffect(() => {
+    const junkWords = ['sin especificar', 'estándar', 'estandar', 's/ean', 's/c', 'n/a', 'null', 'undefined', 'todas', 'articulo'];
+
+    const cleanWord = (text) => {
+      if (!text) return '';
+      const t = String(text).trim();
+      return junkWords.includes(t.toLowerCase()) ? '' : t;
+    };
+
+    const b = cleanWord(brand);
+    const m = cleanWord(model);
+    const d = cleanWord(description);
+    const c = cleanWord(category);
+
+    let searchTerms = [];
+    if (query) {
+      searchTerms.push(query.replace(/sin especificar|estándar|estandar|s\/c/gi, '').trim());
+    } else {
+      if (b && m) searchTerms.push(`${b} ${m}`);
+      if (b) searchTerms.push(`${b} instrument`);
+      if (d) searchTerms.push(d);
+      if (c) searchTerms.push(c);
+      searchTerms.push('musical instrument');
+    }
+
+    const primaryTerm = searchTerms[0] || 'musical instrument';
+
+    if (imageMemoryCache.has(primaryTerm)) {
+      setImageUrl(imageMemoryCache.get(primaryTerm));
+      setLoading(false);
+      return;
+    }
+
+    const cachedStorage = sessionStorage.getItem(`img_cache_${primaryTerm}`);
+    if (cachedStorage) {
+      imageMemoryCache.set(primaryTerm, cachedStorage);
+      setImageUrl(cachedStorage);
+      setLoading(false);
+      return;
+    }
+
+    let isMounted = true;
+    setLoading(true);
+    setHasError(false);
+
+    const fetchImage = async () => {
+      try {
+        let foundImage = null;
+
+        for (const term of searchTerms) {
+          if (!term || term.length < 2) continue;
+
+          const endpoint = `https://en.wikipedia.org/w/api.php?action=query&origin=*&format=json&generator=search&gsrsearch=${encodeURIComponent(
+            term
+          )}&gsrlimit=1&prop=pageimages&pithumbsize=600`;
+
+          const res = await fetch(endpoint);
+          if (!res.ok) continue;
+
+          const data = await res.json();
+          if (data?.query?.pages) {
+            const pages = data.query.pages;
+            const firstPageKey = Object.keys(pages)[0];
+            const src = pages[firstPageKey]?.thumbnail?.source;
+            if (src) {
+              foundImage = src;
+              break;
+            }
+          }
+        }
+
+        if (isMounted) {
+          if (foundImage) {
+            imageMemoryCache.set(primaryTerm, foundImage);
+            sessionStorage.setItem(`img_cache_${primaryTerm}`, foundImage);
+            setImageUrl(foundImage);
+          } else {
+            setHasError(true);
+          }
+        }
+      } catch {
+        if (isMounted) setHasError(true);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    fetchImage();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [brand, model, description, category, query]);
+
+  if (hasError || !imageUrl) {
+    return (
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        strokeWidth="1.3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        style={{ width: '54px', height: '54px', stroke: 'var(--gray-700)', ...style }}
+      >
+        <path d="M9 18V5l12-2v13" />
+        <circle cx="6" cy="18" r="3" />
+        <circle cx="18" cy="16" r="3" />
+      </svg>
+    );
+  }
+
+  return (
+    <img
+      src={imageUrl}
+      alt={alt || 'Instrumento'}
+      onError={() => setHasError(true)}
+      style={{
+        width: '100%',
+        height: '100%',
+        objectFit: 'cover',
+        opacity: loading ? 0 : 1,
+        transition: 'opacity 0.25s ease',
+        ...style,
+      }}
+    />
+  );
+}
+
+// Componente de Stock Dinámico por Depósito
 const ProductStock = ({ articuloId }) => {
-  const [stock, setStock] = useState({ central: '-', margalef: '-', consol: '-' });
+  const [stockData, setStockData] = useState({ consolidado: '-', desglose: [] });
 
   useEffect(() => {
     fetch(`http://localhost:3001/api/stock/${articuloId}`)
-      .then(res => res.json())
-      .then(data => {
+      .then((res) => res.json())
+      .then((data) => {
         if (data && data.data) {
-          const { stock_consolidado, desglose } = data.data;
-          const central = desglose?.find(d => d.deposito_id === 'bf975c47-946f-406c-bb0e-a41dbe656df4')?.cantidad ?? '-';
-          const margalef = desglose?.find(d => d.deposito_id === '26ef85b3-71e1-419a-be45-896fad9b1cd2')?.cantidad ?? '-';
-          setStock({
-            central,
-            margalef,
-            consol: stock_consolidado ?? '-'
+          const rawDesglose = data.data.desglose || data.data.depositos || [];
+          const totalConsol =
+            data.data.stock_consolidado ??
+            data.data.stock_total ??
+            data.data.total ??
+            rawDesglose.reduce((acc, d) => acc + (Number(d.stock_actual || d.cantidad) || 0), 0);
+
+          setStockData({
+            consolidado: totalConsol,
+            desglose: rawDesglose,
           });
         }
       })
-      .catch(err => console.error("Error fetching stock:", err));
+      .catch((err) => console.error('Error fetching stock:', err));
   }, [articuloId]);
 
   return (
     <div className="product-stock-split">
-      <span>Central: <b>{stock.central}</b></span>
-      <span>·</span>
-      <span>Margalef: <b>{stock.margalef}</b></span>
-      <span>·</span>
-      <span>Consol.: <b>{stock.consol}</b></span>
+      {stockData.desglose.length === 0 ? (
+        <span>Consol.: <b>{stockData.consolidado}</b></span>
+      ) : (
+        <>
+          {stockData.desglose.map((d, index) => (
+            <span key={d.deposito_id || d.id || index}>
+              {d.deposito_nombre || d.nombre || 'Depósito'}: <b>{d.stock_actual ?? d.cantidad ?? 0}</b>
+              {index < stockData.desglose.length - 1 ? ' · ' : ''}
+            </span>
+          ))}
+          <span> · </span>
+          <span>Consol.: <b>{stockData.consolidado}</b></span>
+        </>
+      )}
     </div>
   );
 };
 
 function Catalogo_de_productos() {
-  const navigate = useNavigate();
-
+  // Datos maestros dinámicos
   const [formCategories, setFormCategories] = useState([]);
   const [formCountries, setFormCountries] = useState([]);
   const [formBrands, setFormBrands] = useState([]);
-  
-  useEffect(() => {
-    fetch('http://localhost:3001/api/categories')
-      .then(res => res.json())
-      .then(data => {
-        if (data && data.data) {
-          setFormCategories(data.data);
-        }
-      })
-      .catch(err => console.error("Error fetching categories:", err));
 
-    fetch('http://localhost:3001/api/countries')
-      .then(res => res.json())
-      .then(data => {
-        if (data && data.data) {
-          setFormCountries(data.data);
-        }
-      })
-      .catch(err => console.error("Error fetching countries:", err));
-
-    fetch('http://localhost:3001/api/brands')
-      .then(res => res.json())
-      .then(data => {
-        if (data && data.data) {
-          setFormBrands(data.data);
-        }
-      })
-      .catch(err => console.error("Error fetching brands:", err));
-
-  }, []);
-
+  // Estados del listado
   const [products, setProducts] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBrand, setSelectedBrand] = useState('Todas');
-  const [selectedStatus, setSelectedStatus] = useState('Todas');
-  const [lifecycleFilter, setLifecycleFilter] = useState('activos'); // 'activos' | 'bajas' | 'todos'
-
-  useEffect(() => {
-    let endpoint = 'http://localhost:3001/api/articles';
-    if (lifecycleFilter === 'bajas') endpoint = 'http://localhost:3001/api/articles/inactivos';
-    else if (lifecycleFilter === 'todos') endpoint = 'http://localhost:3001/api/articles/todos';
-
-    fetch(endpoint)
-      .then(res => res.json())
-      .then(data => {
-        if (data && data.data) {
-          setProducts(data.data);
-        }
-      })
-      .catch(err => console.error("Error fetching articles:", err));
-  }, [lifecycleFilter]);
-
+  const [lifecycleFilter, setLifecycleFilter] = useState('activos');
   const [sortBy, setSortBy] = useState('relevantes');
   const [activeCategory, setActiveCategory] = useState('Todas');
-  const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'table'
+  const [viewMode, setViewMode] = useState('grid');
 
-  // Toast de confirmación
+  // Modal Detalle
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [selectedArticleId, setSelectedArticleId] = useState(null);
+
+  // Toast
   const [confirmToast, setConfirmToast] = useState(null);
 
-  // Modal Nuevo Producto
+  // Modales Altas / Bajas
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   const [newProduct, setNewProduct] = useState({
     category: '',
@@ -115,110 +215,155 @@ function Catalogo_de_productos() {
     model: '',
     ean: '',
     price: '',
-    status: 'Normal',
-    initialStock: 0,
-    originCountry: ''
+    originCountry: '',
   });
 
-  // Modal Dar de Baja
   const [isDeactivateModalOpen, setIsDeactivateModalOpen] = useState(false);
   const [productToDeactivate, setProductToDeactivate] = useState(null);
-  const [deactivateReason, setDeactivateReason] = useState('Discontinuado por el fabricante');
 
-  // Modal Reactivar
   const [isReactivateModalOpen, setIsReactivateModalOpen] = useState(false);
   const [productToReactivate, setProductToReactivate] = useState(null);
+
+  // Carga de categorías, marcas y países desde la BD
+  useEffect(() => {
+    fetch('http://localhost:3001/api/categories')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && data.data) setFormCategories(data.data);
+      })
+      .catch((err) => console.error('Error fetching categories:', err));
+
+    fetch('http://localhost:3001/api/countries')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && data.data) setFormCountries(data.data);
+      })
+      .catch((err) => console.error('Error fetching countries:', err));
+
+    fetch('http://localhost:3001/api/brands')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && data.data) setFormBrands(data.data);
+      })
+      .catch((err) => console.error('Error fetching brands:', err));
+  }, []);
+
+  // Carga de artículos
+  const fetchArticles = () => {
+    let endpoint = 'http://localhost:3001/api/articles';
+    if (lifecycleFilter === 'bajas') endpoint = 'http://localhost:3001/api/articles/inactivos';
+    else if (lifecycleFilter === 'todos') endpoint = 'http://localhost:3001/api/articles/todos';
+
+    fetch(endpoint)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && data.data) setProducts(data.data);
+      })
+      .catch((err) => console.error('Error fetching articles:', err));
+  };
+
+  useEffect(() => {
+    fetchArticles();
+  }, [lifecycleFilter]);
 
   // Validación de EAN-13
   const eanValidation = useMemo(() => {
     const val = newProduct.ean.trim();
     if (val.length === 0) return { state: 'empty' };
     const isNumeric = /^[0-9]+$/.test(val);
-    if (val.length !== 13 || !isNumeric) return { state: 'invalid', message: 'El código EAN-13 no es válido (debe tener 13 dígitos numéricos).' };
-    const isDuplicate = products.some(p => p.ean === val);
-    if (isDuplicate) return { state: 'duplicate', message: 'Este EAN-13 ya se encuentra registrado en el catálogo.' };
+    if (val.length !== 13 || !isNumeric) {
+      return { state: 'invalid', message: 'El código EAN-13 debe tener exactamente 13 dígitos numéricos.' };
+    }
+    const isDuplicate = products.some((p) => p.codigo_ean13 === val || p.ean === val);
+    if (isDuplicate) {
+      return { state: 'duplicate', message: 'Este EAN-13 ya se encuentra registrado en el catálogo.' };
+    }
     return { state: 'valid', message: 'Código EAN-13 válido y disponible.' };
   }, [newProduct.ean, products]);
 
   const getCategoryName = (id) => {
-    const cat = formCategories.find(c => c.id === id);
+    const cat = formCategories.find((c) => c.id === id);
     return cat ? cat.nombre : 'Sin categoría';
   };
 
   const getBrandName = (id) => {
-    const brand = formBrands.find(b => b.id === id);
+    const brand = formBrands.find((b) => b.id === id);
     return brand ? brand.nombre : 'Sin marca';
   };
 
-  // Filtrado reactivo
+  // Filtrado y ordenamiento reactivo
   const filteredProducts = useMemo(() => {
     return products
       .filter((item) => {
         const matchesCategory = activeCategory === 'Todas' || item.categoria_id === activeCategory;
         const matchesBrand = selectedBrand === 'Todas' || item.marca_id === selectedBrand;
-        const matchesStatus = selectedStatus === 'Todas' || item.status === selectedStatus; // We keep item.status or maybe it's not present, we will ignore for now
         const matchesLifecycle =
           lifecycleFilter === 'todos' ||
           (lifecycleFilter === 'activos' && item.estado) ||
           (lifecycleFilter === 'bajas' && !item.estado);
 
         const brandName = getBrandName(item.marca_id).toLowerCase();
-        
+        const categoryName = getCategoryName(item.categoria_id).toLowerCase();
+
         const matchesSearch =
           (item.descripcion && item.descripcion.toLowerCase().includes(searchTerm.toLowerCase())) ||
           brandName.includes(searchTerm.toLowerCase()) ||
+          categoryName.includes(searchTerm.toLowerCase()) ||
+          (item.modelo && item.modelo.toLowerCase().includes(searchTerm.toLowerCase())) ||
           (item.codigo_interno && String(item.codigo_interno).toLowerCase().includes(searchTerm.toLowerCase())) ||
           (item.codigo_ean13 && String(item.codigo_ean13).includes(searchTerm));
 
-        return matchesCategory && matchesBrand && matchesStatus && matchesLifecycle && matchesSearch;
+        return matchesCategory && matchesBrand && matchesLifecycle && matchesSearch;
       })
       .sort((a, b) => {
         if (sortBy === 'price-asc') return a.precio_actual - b.precio_actual;
         if (sortBy === 'price-desc') return b.precio_actual - a.precio_actual;
-        if (sortBy === 'stock') return 0;
         return String(a.id).localeCompare(String(b.id));
       });
-  }, [products, searchTerm, selectedBrand, selectedStatus, lifecycleFilter, sortBy, activeCategory, formBrands, formCategories]);
+  }, [products, searchTerm, selectedBrand, lifecycleFilter, sortBy, activeCategory, formBrands, formCategories]);
 
   const showToast = (message) => {
     setConfirmToast(message);
     setTimeout(() => setConfirmToast(null), 4000);
   };
 
+  const handleOpenDetailModal = (articuloId) => {
+    setSelectedArticleId(articuloId);
+    setIsDetailModalOpen(true);
+  };
+
+  // Crear producto
   const handleCreateProduct = async (e) => {
     e.preventDefault();
-    if (!newProduct.category || !newProduct.originCountry || !newProduct.brand || !newProduct.description.trim() || eanValidation.state !== 'valid') return;
+    if (!newProduct.category || !newProduct.originCountry || !newProduct.brand || !newProduct.description.trim() || eanValidation.state !== 'valid') {
+      return;
+    }
 
     try {
       const payload = {
-        descripcion: newProduct.description,
-        codigo_ean13: newProduct.ean,
+        descripcion: newProduct.description.trim(),
+        codigo_ean13: newProduct.ean.trim(),
         categoria_id: newProduct.category,
         marca_id: newProduct.brand,
         pais_origen: newProduct.originCountry,
         precio_actual: Number(String(newProduct.price).replace(/[^0-9]/g, '')) || 0,
-        modelo: newProduct.model || null
+        modelo: newProduct.model ? newProduct.model.trim() : 'Estándar',
       };
 
       const response = await fetch('http://localhost:3001/api/articles', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Error al guardar el producto');
+        throw new Error(errorData.error || errorData.message || 'Error al guardar el producto');
       }
 
-      const result = await response.json();
-      const created = result.data;
-
-      setProducts([created, ...products]);
       setIsNewModalOpen(false);
       showToast('Producto guardado correctamente en el catálogo.');
+      fetchArticles();
 
       setNewProduct({
         category: '',
@@ -227,12 +372,9 @@ function Catalogo_de_productos() {
         model: '',
         ean: '',
         price: '',
-        status: 'Normal',
-        initialStock: 0,
-        originCountry: ''
+        originCountry: '',
       });
     } catch (error) {
-      console.error(error);
       alert(error.message);
     }
   };
@@ -243,7 +385,7 @@ function Catalogo_de_productos() {
 
     try {
       const response = await fetch(`http://localhost:3001/api/articles/${productToDeactivate.id}/status`, {
-        method: 'PATCH'
+        method: 'PATCH',
       });
 
       if (!response.ok) {
@@ -251,12 +393,11 @@ function Catalogo_de_productos() {
         throw new Error(errorData.error || 'Error al dar de baja el producto');
       }
 
-      setProducts(products.map(p => p.id === productToDeactivate.id ? { ...p, estado: false } : p));
+      setProducts(products.map((p) => (p.id === productToDeactivate.id ? { ...p, estado: false } : p)));
       setIsDeactivateModalOpen(false);
-      showToast(`El producto "${getBrandName(productToDeactivate.marca_id)} ${productToDeactivate.modelo}" fue dado de baja. Podés consultarlo o reactivarlo filtrando por "Dados de baja".`);
+      showToast(`El producto "${getBrandName(productToDeactivate.marca_id)} ${productToDeactivate.modelo || ''}" fue dado de baja.`);
       setProductToDeactivate(null);
     } catch (error) {
-      console.error(error);
       alert(error.message);
     }
   };
@@ -267,7 +408,7 @@ function Catalogo_de_productos() {
 
     try {
       const response = await fetch(`http://localhost:3001/api/articles/${productToReactivate.id}/reactivate`, {
-        method: 'PATCH'
+        method: 'PATCH',
       });
 
       if (!response.ok) {
@@ -275,19 +416,13 @@ function Catalogo_de_productos() {
         throw new Error(errorData.error || 'Error al reactivar el producto');
       }
 
-      setProducts(products.map(p => p.id === productToReactivate.id ? { ...p, estado: true } : p));
+      setProducts(products.map((p) => (p.id === productToReactivate.id ? { ...p, estado: true } : p)));
       setIsReactivateModalOpen(false);
-      showToast(`El producto "${getBrandName(productToReactivate.marca_id)} ${productToReactivate.modelo}" fue reactivado en el catálogo activo.`);
+      showToast(`El producto "${getBrandName(productToReactivate.marca_id)} ${productToReactivate.modelo || ''}" fue reactivado en el catálogo activo.`);
       setProductToReactivate(null);
     } catch (error) {
-      console.error(error);
       alert(error.message);
     }
-  };
-
-
-  const getBadge = (prod) => {
-    return <span className="badge badge-green"><span className="badge-dot"></span>Normal</span>;
   };
 
   return (
@@ -327,13 +462,13 @@ function Catalogo_de_productos() {
           </svg>
           <input
             type="text"
-            placeholder="Buscar por nombre, marca, código interno o EAN-13…"
+            placeholder="Buscar por nombre, marca, categoría, modelo o EAN-13…"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
 
-        {/* FILTRO DE ESTADO OPERATIVO (ACTIVOS / BAJAS) */}
+        {/* FILTRO DE ESTADO */}
         <div className="select-field">
           Catálogo:
           <select value={lifecycleFilter} onChange={(e) => setLifecycleFilter(e.target.value)}>
@@ -343,41 +478,32 @@ function Catalogo_de_productos() {
           </select>
         </div>
 
+        {/* FILTRO DE MARCAS DINÁMICO */}
         <div className="select-field">
           Marca:
           <select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)}>
-            <option value="Todas">Todas</option>
-            {formBrands.map(b => (
-              <option key={b.id} value={b.id}>{b.nombre}</option>
+            <option value="Todas">Todas las marcas</option>
+            {formBrands.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.nombre}
+              </option>
             ))}
           </select>
         </div>
 
-        <div className="select-field">
-          Disponibilidad:
-          <select value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value)}>
-            <option>Todas</option>
-            <option>Normal</option>
-            <option>Reposición</option>
-            <option>Crítico</option>
-          </select>
-        </div>
-
+        {/* ORDENAMIENTO */}
         <div className="select-field">
           Ordenar:
           <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
-            <option value="relevantes">Más relevantes</option>
+            <option value="relevantes">Más recientes</option>
             <option value="price-asc">Precio: menor a mayor</option>
             <option value="price-desc">Precio: mayor a menor</option>
-            <option value="stock">Stock consolidado</option>
           </select>
         </div>
 
+        {/* TOGGLE VISTA */}
         <div className="view-toggle">
-          <button
-            className={viewMode === 'grid' ? 'active' : ''}
-            onClick={() => setViewMode('grid')}
-          >
+          <button className={viewMode === 'grid' ? 'active' : ''} onClick={() => setViewMode('grid')}>
             <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="3" y="3" width="7" height="7" rx="1" />
               <rect x="14" y="3" width="7" height="7" rx="1" />
@@ -386,10 +512,7 @@ function Catalogo_de_productos() {
             </svg>
             Tarjetas
           </button>
-          <button
-            className={viewMode === 'table' ? 'active' : ''}
-            onClick={() => setViewMode('table')}
-          >
+          <button className={viewMode === 'table' ? 'active' : ''} onClick={() => setViewMode('table')}>
             <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M3 6h18M3 12h18M3 18h18" />
             </svg>
@@ -398,15 +521,22 @@ function Catalogo_de_productos() {
         </div>
       </div>
 
-      {/* CATEGORY RAIL */}
+      {/* CATEGORY RAIL DINÁMICO (DESDE BD) */}
       <div className="category-rail">
-        {CATEGORIES.map((cat) => (
+        <button
+          key="Todas"
+          className={`category-chip ${activeCategory === 'Todas' ? 'active' : ''}`}
+          onClick={() => setActiveCategory('Todas')}
+        >
+          Todas
+        </button>
+        {formCategories.map((cat) => (
           <button
-            key={cat}
-            className={`category-chip ${activeCategory === cat ? 'active' : ''}`}
-            onClick={() => setActiveCategory(cat)}
+            key={cat.id}
+            className={`category-chip ${activeCategory === cat.id ? 'active' : ''}`}
+            onClick={() => setActiveCategory(cat.id)}
           >
-            {cat}
+            {cat.nombre}
           </button>
         ))}
       </div>
@@ -419,73 +549,76 @@ function Catalogo_de_productos() {
               No se encontraron productos para los filtros seleccionados.
             </div>
           ) : (
-            filteredProducts.map((prod) => (
-              <div
-                className="product-card"
-                key={prod.id}
-                style={{ opacity: prod.estado ? 1 : 0.72 }}
-              >
-                <div className="product-thumb">
-                  <span className="thumb-tag">{getCategoryName(prod.categoria_id)}</span>
-                  <span className="thumb-code">{prod.codigo_interno}</span>
-                  <svg viewBox="0 0 24 24" fill="none" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M9 18V5l12-2v13" />
-                    <circle cx="6" cy="18" r="3" />
-                    <circle cx="18" cy="16" r="3" />
-                  </svg>
-                </div>
+            filteredProducts.map((prod) => {
+              const brandText = getBrandName(prod.marca_id);
+              const categoryText = getCategoryName(prod.categoria_id);
 
-                <div className="product-body">
-                  <span className="product-brand">{getBrandName(prod.marca_id)}</span>
-                  <h3 className="product-name">{getBrandName(prod.marca_id)} {prod.modelo}</h3>
-                  <span className="product-model">Modelo {prod.modelo} · EAN {prod.codigo_ean13}</span>
-
-                  <div className="product-meta-row">
-                    <span className="product-price">${prod.precio_actual}</span>
-                    {getBadge(prod)}
+              return (
+                <div className="product-card" key={prod.id} style={{ opacity: prod.estado ? 1 : 0.72 }}>
+                  <div className="product-thumb">
+                    <span className="thumb-tag">{categoryText}</span>
+                    <span className="thumb-code">{prod.codigo_interno}</span>
+                    <AutoProductImage
+                      brand={brandText}
+                      model={prod.modelo}
+                      description={prod.descripcion}
+                      category={categoryText}
+                      alt={prod.descripcion}
+                    />
                   </div>
 
-                  <ProductStock articuloId={prod.id} />
+                  <div className="product-body">
+                    <span className="product-brand">{brandText}</span>
+                    <h3 className="product-name">{brandText} {prod.modelo || prod.descripcion}</h3>
+                    <span className="product-model">Modelo {prod.modelo || 'Estándar'} · EAN {prod.codigo_ean13}</span>
 
-                  <div className="product-card-actions">
-                    <button
-                      className="btn btn-outline"
-                      onClick={() => navigate('/Detalle_producto')}
-                    >
-                      Ver detalle
-                    </button>
+                    <div className="product-meta-row">
+                      <span className="product-price">${Number(prod.precio_actual).toLocaleString('es-AR')}</span>
+                      <span className={`badge ${prod.estado ? 'badge-green' : 'badge-amber'}`}>
+                        <span className="badge-dot"></span>
+                        {prod.estado ? 'Activo' : 'Baja'}
+                      </span>
+                    </div>
 
-                    {prod.estado ? (
-                      <button
-                        className="icon-btn btn-icon-only"
-                        title="Dar de baja producto"
-                        onClick={() => {
-                          setProductToDeactivate(prod);
-                          setIsDeactivateModalOpen(true);
-                        }}
-                      >
-                        <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <circle cx="12" cy="12" r="10" />
-                          <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
-                        </svg>
+                    <ProductStock articuloId={prod.id} />
+
+                    <div className="product-card-actions">
+                      <button className="btn btn-outline" onClick={() => handleOpenDetailModal(prod.id)}>
+                        Ver detalle
                       </button>
-                    ) : (
-                      <button
-                        className="btn btn-outline btn-sm"
-                        style={{ color: 'var(--green)', borderColor: 'var(--green)' }}
-                        title="Reactivar producto en catálogo activo"
-                        onClick={() => {
-                          setProductToReactivate(prod);
-                          setIsReactivateModalOpen(true);
-                        }}
-                      >
-                        Reactivar
-                      </button>
-                    )}
+
+                      {prod.estado ? (
+                        <button
+                          className="icon-btn btn-icon-only"
+                          title="Dar de baja producto"
+                          onClick={() => {
+                            setProductToDeactivate(prod);
+                            setIsDeactivateModalOpen(true);
+                          }}
+                        >
+                          <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="10" />
+                            <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+                          </svg>
+                        </button>
+                      ) : (
+                        <button
+                          className="btn btn-outline btn-sm"
+                          style={{ color: 'var(--green)', borderColor: 'var(--green)' }}
+                          title="Reactivar producto en catálogo activo"
+                          onClick={() => {
+                            setProductToReactivate(prod);
+                            setIsReactivateModalOpen(true);
+                          }}
+                        >
+                          Reactivar
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       )}
@@ -498,7 +631,7 @@ function Catalogo_de_productos() {
               <thead>
                 <tr>
                   <th>Código interno</th>
-                  <th>Nombre / descripción</th>
+                  <th>Descripción / Nombre</th>
                   <th>Marca</th>
                   <th>Modelo</th>
                   <th>EAN-13</th>
@@ -519,19 +652,24 @@ function Catalogo_de_productos() {
                   filteredProducts.map((prod) => (
                     <tr key={prod.id} style={{ opacity: prod.estado ? 1 : 0.65 }}>
                       <td className="cell-mono">{prod.codigo_interno}</td>
-                      <td className="cell-strong">{getBrandName(prod.marca_id)} {prod.modelo}</td>
+                      <td className="cell-strong">{prod.descripcion}</td>
                       <td>{getBrandName(prod.marca_id)}</td>
-                      <td>{prod.modelo}</td>
+                      <td>{prod.modelo || '-'}</td>
                       <td className="cell-mono">{prod.codigo_ean13}</td>
                       <td>{getCategoryName(prod.categoria_id)}</td>
-                      <td className="cell-strong">${prod.precio_actual}</td>
-                      <td>{getBadge(prod)}</td>
+                      <td className="cell-strong">${Number(prod.precio_actual).toLocaleString('es-AR')}</td>
+                      <td>
+                        <span className={`badge ${prod.estado ? 'badge-green' : 'badge-amber'}`}>
+                          <span className="badge-dot"></span>
+                          {prod.estado ? 'Activo' : 'Baja'}
+                        </span>
+                      </td>
                       <td>
                         <div className="row-actions">
                           <button
                             className="icon-btn"
                             title="Ver detalle"
-                            onClick={() => navigate('/Detalle_producto')}
+                            onClick={() => handleOpenDetailModal(prod.id)}
                           >
                             <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                               <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z" />
@@ -576,7 +714,17 @@ function Catalogo_de_productos() {
         </div>
       )}
 
-      {/* MODAL NUEVO PRODUCTO (HU-07) */}
+      {/* MODAL DETALLE DE PRODUCTO */}
+      <Detalle_producto
+        isOpen={isDetailModalOpen}
+        onClose={() => setIsDetailModalOpen(false)}
+        articuloId={selectedArticleId}
+        onUpdate={() => {
+          fetchArticles();
+        }}
+      />
+
+      {/* MODAL NUEVO PRODUCTO */}
       <Modal
         isOpen={isNewModalOpen}
         onClose={() => setIsNewModalOpen(false)}
@@ -609,12 +757,15 @@ function Catalogo_de_productos() {
             <div className="form-field full">
               <label>Categoría<span className="req">*</span></label>
               <select
+                required
                 value={newProduct.category}
                 onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })}
               >
                 <option value="">Seleccione una categoría</option>
-                {formCategories.map(c => (
-                  <option key={c.id} value={c.id}>{c.nombre}</option>
+                {formCategories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.nombre}
+                  </option>
                 ))}
               </select>
             </div>
@@ -622,10 +773,10 @@ function Catalogo_de_productos() {
 
           <div className="form-row">
             <div className="form-field full">
-              <label>Descripción / Nombre<span className="req">*</span></label>
+              <label>Descripción / Nombre comercial<span className="req">*</span></label>
               <input
                 type="text"
-                placeholder="Ej: Guitarra eléctrica Stratocaster, cuerpo tilo…"
+                placeholder="Ej: Guitarra eléctrica Stratocaster Player Series…"
                 required
                 value={newProduct.description}
                 onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })}
@@ -637,12 +788,15 @@ function Catalogo_de_productos() {
             <div className="form-field">
               <label>Marca<span className="req">*</span></label>
               <select
+                required
                 value={newProduct.brand}
                 onChange={(e) => setNewProduct({ ...newProduct, brand: e.target.value })}
               >
                 <option value="">Seleccione una marca</option>
-                {formBrands.map(b => (
-                  <option key={b.id} value={b.id}>{b.nombre}</option>
+                {formBrands.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.nombre}
+                  </option>
                 ))}
               </select>
             </div>
@@ -650,7 +804,7 @@ function Catalogo_de_productos() {
               <label>Modelo</label>
               <input
                 type="text"
-                placeholder="Ej: MX23"
+                placeholder="Ej: Standard / Player"
                 value={newProduct.model}
                 onChange={(e) => setNewProduct({ ...newProduct, model: e.target.value })}
               />
@@ -659,7 +813,7 @@ function Catalogo_de_productos() {
 
           <div className="form-row">
             <div className="form-field">
-              <label>EAN-13<span className="req">*</span></label>
+              <label>EAN-13 (13 dígitos)<span className="req">*</span></label>
               <input
                 type="text"
                 maxLength={13}
@@ -669,30 +823,13 @@ function Catalogo_de_productos() {
                 onChange={(e) => setNewProduct({ ...newProduct, ean: e.target.value })}
               />
               {eanValidation.state === 'invalid' && (
-                <span className="field-error">
-                  <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10" />
-                    <path d="M12 8v4M12 16h.01" />
-                  </svg>
-                  {eanValidation.message}
-                </span>
+                <span className="field-error">{eanValidation.message}</span>
               )}
               {eanValidation.state === 'duplicate' && (
-                <span className="field-error">
-                  <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10" />
-                    <path d="M12 8v4M12 16h.01" />
-                  </svg>
-                  {eanValidation.message}
-                </span>
+                <span className="field-error">{eanValidation.message}</span>
               )}
               {eanValidation.state === 'valid' && (
-                <span className="field-success">
-                  <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M20 6 9 17l-5-5" />
-                  </svg>
-                  {eanValidation.message}
-                </span>
+                <span className="field-success">{eanValidation.message}</span>
               )}
             </div>
 
@@ -700,6 +837,7 @@ function Catalogo_de_productos() {
               <label>Precio ($ ARS)<span className="req">*</span></label>
               <input
                 type="number"
+                min="0"
                 placeholder="Ej: 650000"
                 required
                 value={newProduct.price}
@@ -709,32 +847,26 @@ function Catalogo_de_productos() {
           </div>
 
           <div className="form-row">
-            <div className="form-field">
+            <div className="form-field full">
               <label>País de Origen<span className="req">*</span></label>
               <select
+                required
                 value={newProduct.originCountry}
                 onChange={(e) => setNewProduct({ ...newProduct, originCountry: e.target.value })}
               >
                 <option value="">Seleccione un país</option>
-                {formCountries.map(c => (
-                  <option key={c.id} value={c.id}>{c.nombre}</option>
+                {formCountries.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.nombre}
+                  </option>
                 ))}
               </select>
-            </div>
-            <div className="form-field">
-              <label>Stock inicial (Tienda Central)</label>
-              <input
-                type="number"
-                min={0}
-                value={newProduct.initialStock}
-                onChange={(e) => setNewProduct({ ...newProduct, initialStock: e.target.value })}
-              />
             </div>
           </div>
         </form>
       </Modal>
 
-      {/* MODAL DAR DE BAJA PRODUCTO (SOFT DELETE) */}
+      {/* MODAL DAR DE BAJA PRODUCTO */}
       <Modal
         isOpen={isDeactivateModalOpen}
         onClose={() => setIsDeactivateModalOpen(false)}
@@ -756,7 +888,7 @@ function Catalogo_de_productos() {
       >
         <div>
           <p style={{ fontSize: '13.5px', color: 'var(--gray-700)', lineHeight: '1.6', marginBottom: '14px' }}>
-            ¿Confirmás que querés dar de baja a <strong>{getBrandName(productToDeactivate?.marca_id)} {productToDeactivate?.modelo}</strong>?
+            ¿Confirmás que querés dar de baja a <strong>{getBrandName(productToDeactivate?.marca_id)} {productToDeactivate?.modelo || ''}</strong>?
           </p>
           <p style={{ fontSize: '12px', color: 'var(--gray-500)', marginTop: '12px' }}>
             * Esta acción no borrará los movimientos históricos y podrás reactivar el producto en cualquier momento.
@@ -785,7 +917,7 @@ function Catalogo_de_productos() {
         }
       >
         <p style={{ fontSize: '13.5px', color: 'var(--gray-700)', lineHeight: '1.6' }}>
-          ¿Deseás reactivar <strong>{getBrandName(productToReactivate?.marca_id)} {productToReactivate?.modelo}</strong>? El producto volverá a estar disponible para movimientos y consultas en el catálogo activo.
+          ¿Deseás reactivar <strong>{getBrandName(productToReactivate?.marca_id)} {productToReactivate?.modelo || ''}</strong>? El producto volverá a estar disponible para movimientos y consultas en el catálogo activo.
         </p>
       </Modal>
     </div>

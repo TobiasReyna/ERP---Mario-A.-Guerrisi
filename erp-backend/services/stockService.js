@@ -163,45 +163,60 @@ class StockService {
     }
 
     static async obtenerAlertas() {
-        // Traemos existencias con nombres de artículo y depósito
-        const { data: existencias, error: errExt } = await supabaseAdmin
-            .from('existencias')
-            .select('articulo_id, deposito_id, cantidad, articulos(descripcion), depositos(nombre)');
-            
-        if (errExt) throw new Error(`Error consultando existencias: ${errExt.message}`);
+        const [{ data: articulos }, { data: existencias }, { data: politicas }, { data: depositos }] = await Promise.all([
+            supabaseAdmin.from('articulos').select('id, codigo_interno, descripcion').eq('estado', true),
+            supabaseAdmin.from('existencias').select('articulo_id, deposito_id, cantidad'),
+            supabaseAdmin.from('politicas_reposicion_deposito').select('articulo_id, deposito_id, stock_minimo, stock_maximo'),
+            supabaseAdmin.from('depositos').select('id, nombre')
+        ]);
 
-        // Traemos las políticas configuradas
-        const { data: politicas, error: errPol } = await supabaseAdmin
-            .from('politicas_reposicion_deposito')
-            .select('*');
+        if (!articulos || !depositos) {
+            throw new Error('Error al obtener datos básicos para alertas.');
+        }
 
-        if (errPol) throw new Error(`Error consultando políticas: ${errPol.message}`);
+        const depositosMap = new Map(depositos.map(d => [d.id, d.nombre]));
+        const politicasMap = new Map();
+        if (politicas) {
+            politicas.forEach(p => politicasMap.set(`${p.articulo_id}_${p.deposito_id}`, p));
+        }
 
-        // Armamos un mapa en memoria para cruzar datos rápido
-        const polMap = {};
-        for (const p of politicas) {
-            polMap[`${p.articulo_id}_${p.deposito_id}`] = p;
+        const existenciasMap = new Map();
+        if (existencias) {
+            existencias.forEach(e => existenciasMap.set(`${e.articulo_id}_${e.deposito_id}`, e.cantidad));
         }
 
         const alertas = [];
-        for (const ext of existencias) {
-            const key = `${ext.articulo_id}_${ext.deposito_id}`;
-            const pol = polMap[key];
 
-            // Si hay una política configurada y el stock actual perforó el mínimo
-            if (pol && ext.cantidad <= pol.stock_minimo) {
-                alertas.push({
-                    articulo_id: ext.articulo_id,
-                    articulo_nombre: ext.articulos?.descripcion || 'Desconocido',
-                    deposito_id: ext.deposito_id,
-                    deposito_nombre: ext.depositos?.nombre || 'Desconocido',
-                    stock_actual: ext.cantidad,
-                    stock_minimo: pol.stock_minimo,
-                    stock_maximo: pol.stock_maximo,
-                    cantidad_sugerida: pol.stock_maximo - ext.cantidad
-                });
-            }
-        }
+        articulos.forEach(art => {
+            depositos.forEach(dep => {
+                const key = `${art.id}_${dep.id}`;
+                const stock_actual = existenciasMap.get(key) || 0;
+                let pol = politicasMap.get(key);
+                
+                let stock_minimo = 5;
+                let stock_maximo = 20;
+
+                if (pol) {
+                    stock_minimo = pol.stock_minimo;
+                    stock_maximo = pol.stock_maximo;
+                }
+
+                if (stock_actual <= stock_minimo) {
+                    const reposicion_sugerida = stock_maximo - stock_actual;
+                    alertas.push({
+                        articulo_id: art.id,
+                        codigo_interno: art.codigo_interno,
+                        articulo_descripcion: art.descripcion,
+                        deposito_id: dep.id,
+                        deposito_nombre: dep.nombre,
+                        stock_actual,
+                        stock_minimo,
+                        stock_maximo,
+                        reposicion_sugerida
+                    });
+                }
+            });
+        });
 
         return alertas;
     }
@@ -213,7 +228,8 @@ class StockService {
                 id,
                 descripcion,
                 codigo_interno,
-                categorias(nombre),
+                categoria_id,
+                categorias(id, nombre),
                 existencias (
                     cantidad,
                     depositos (nombre)
@@ -252,6 +268,7 @@ class StockService {
                 name: art.descripcion,
                 code: art.codigo_interno,
                 category: art.categorias?.nombre || 'Sin categoría',
+                categoria_id: art.categoria_id,
                 central,
                 margalef,
                 status
