@@ -1,8 +1,118 @@
 import { useState, useEffect, useCallback } from 'react';
 import Modal from '../components/Modal';
 
+// Caché en memoria para evitar llamadas redundantes
+const imageMemoryCache = new Map();
+
+function AutoProductImage({ query, alt, style }) {
+  const [imageUrl, setImageUrl] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    if (!query || query.trim() === '') {
+      setLoading(false);
+      return;
+    }
+
+    const cleanQuery = query
+      .replace(/[^\w\s-]/gi, '')
+      .split(' ')
+      .slice(0, 3)
+      .join(' ')
+      .trim();
+
+    if (imageMemoryCache.has(cleanQuery)) {
+      setImageUrl(imageMemoryCache.get(cleanQuery));
+      setLoading(false);
+      return;
+    }
+
+    const cachedStorage = sessionStorage.getItem(`img_cache_${cleanQuery}`);
+    if (cachedStorage) {
+      imageMemoryCache.set(cleanQuery, cachedStorage);
+      setImageUrl(cachedStorage);
+      setLoading(false);
+      return;
+    }
+
+    let isMounted = true;
+    setLoading(true);
+    setHasError(false);
+
+    const fetchImage = async () => {
+      try {
+        let res = await fetch(
+          `https://es.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(cleanQuery)}`
+        );
+        let data = res.ok ? await res.json() : null;
+
+        if (!data || !data.thumbnail?.source) {
+          res = await fetch(
+            `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(cleanQuery)}`
+          );
+          data = res.ok ? await res.json() : null;
+        }
+
+        if (isMounted) {
+          if (data && data.thumbnail?.source) {
+            const highResUrl = data.thumbnail.source.replace(/\/\d+px-/, '/600px-');
+            imageMemoryCache.set(cleanQuery, highResUrl);
+            sessionStorage.setItem(`img_cache_${cleanQuery}`, highResUrl);
+            setImageUrl(highResUrl);
+          } else {
+            setHasError(true);
+          }
+        }
+      } catch {
+        if (isMounted) setHasError(true);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    fetchImage();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [query]);
+
+  if (hasError || !imageUrl) {
+    return (
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        strokeWidth="1.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        style={{ width: '80px', height: '80px', stroke: 'var(--gray-500)', ...style }}
+      >
+        <path d="M9 18V5l12-2v13" />
+        <circle cx="6" cy="18" r="3" />
+        <circle cx="18" cy="16" r="3" />
+      </svg>
+    );
+  }
+
+  return (
+    <img
+      src={imageUrl}
+      alt={alt || query}
+      onError={() => setHasError(true)}
+      style={{
+        width: '100%',
+        height: '100%',
+        objectFit: 'cover',
+        opacity: loading ? 0 : 1,
+        transition: 'opacity 0.3s ease',
+        ...style,
+      }}
+    />
+  );
+}
+
 function Detalle_producto({ isOpen, onClose, articuloId, onUpdate }) {
-  // Estados de datos maestros y existencias
   const [articulo, setArticulo] = useState(null);
   const [stockInfo, setStockInfo] = useState({ consolidado: 0, depositos: [] });
   const [historialMovimientos, setHistorialMovimientos] = useState([]);
@@ -12,23 +122,19 @@ function Detalle_producto({ isOpen, onClose, articuloId, onUpdate }) {
   const [categoriesList, setCategoriesList] = useState([]);
   const [countriesList, setCountriesList] = useState([]);
 
-  // Estados de control
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [confirmBanner, setConfirmBanner] = useState(null);
 
-  // Sub-modales
   const [isTransferOpen, setIsTransferOpen] = useState(false);
   const [isAdjustOpen, setIsAdjustOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isConfirmEditOpen, setIsConfirmEditOpen] = useState(false);
 
-  // Políticas de stock
   const [stockMin, setStockMin] = useState(5);
   const [stockMax, setStockMax] = useState(15);
   const [selectedDepositoPolitica, setSelectedDepositoPolitica] = useState('TODOS');
 
-  // Formulario de Edición de Producto
   const [editFormData, setEditFormData] = useState({
     descripcion: '',
     marca_id: '',
@@ -39,7 +145,6 @@ function Detalle_producto({ isOpen, onClose, articuloId, onUpdate }) {
     precio_actual: '',
   });
 
-  // Formulario Transferencia
   const [transferData, setTransferData] = useState({
     origen_id: '',
     destino_id: '',
@@ -47,7 +152,6 @@ function Detalle_producto({ isOpen, onClose, articuloId, onUpdate }) {
     motivo: 'Rebalanceo de stock',
   });
 
-  // Formulario Ajuste
   const [adjustData, setAdjustData] = useState({
     deposito_id: '',
     motivo_id: '',
@@ -61,7 +165,6 @@ function Detalle_producto({ isOpen, onClose, articuloId, onUpdate }) {
     setTimeout(() => setConfirmBanner(null), 4000);
   };
 
-  // Carga de datos desde la API
   const loadProductDetails = useCallback(async () => {
     if (!articuloId || !isOpen) return;
 
@@ -102,7 +205,6 @@ function Detalle_producto({ isOpen, onClose, articuloId, onUpdate }) {
       const artData = artJson.data || artJson;
       setArticulo(artData);
 
-      // Pre-cargar formulario asegurando que ningún campo quede vacío
       setEditFormData({
         descripcion: artData.descripcion || '',
         marca_id: artData.marca_id || (bList.length > 0 ? bList[0].id : ''),
@@ -211,7 +313,7 @@ function Detalle_producto({ isOpen, onClose, articuloId, onUpdate }) {
   const handleConfirmExecuteEdit = async () => {
     try {
       const codigoInternoActual = articulo?.codigo_interno || (articulo?.id ? String(articulo.id).substring(0, 8) : 'S/C');
-      
+
       const payload = {
         descripcion: editFormData.descripcion.trim(),
         marca_id: editFormData.marca_id,
@@ -225,8 +327,6 @@ function Detalle_producto({ isOpen, onClose, articuloId, onUpdate }) {
         codigo_interno: codigoInternoActual,
         usuario_id: '00000000-0000-0000-0000-000000000001',
       };
-
-      console.log('Payload enviado a PUT /api/articles/:id ->', payload);
 
       const res = await fetch(`http://localhost:3001/api/articles/${articuloId}`, {
         method: 'PUT',
@@ -379,7 +479,6 @@ function Detalle_producto({ isOpen, onClose, articuloId, onUpdate }) {
 
         {!loading && !error && articulo && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%', boxSizing: 'border-box' }}>
-            {/* TOAST CONFIRMACIÓN */}
             {confirmBanner && (
               <div className="confirm-banner" style={{ margin: 0 }}>
                 <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -388,6 +487,24 @@ function Detalle_producto({ isOpen, onClose, articuloId, onUpdate }) {
                 <span>{confirmBanner}</span>
               </div>
             )}
+
+            {/* BANNER VISUAL CON FOTO AUTOMÁTICA */}
+            <div style={{
+              width: '100%',
+              height: '180px',
+              background: 'var(--gray-100)',
+              borderRadius: '8px',
+              overflow: 'hidden',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              border: '1px solid var(--gray-200)',
+            }}>
+              <AutoProductImage
+                query={`${resolvedBrand} ${articulo.modelo || articulo.descripcion}`.trim()}
+                alt={productCommercialTitle}
+              />
+            </div>
 
             {/* ENCABEZADO Y PRECIO */}
             <div style={{ borderBottom: '1px solid var(--gray-200)', paddingBottom: '14px' }}>
@@ -456,7 +573,7 @@ function Detalle_producto({ isOpen, onClose, articuloId, onUpdate }) {
                 <div className="compare-bars">
                   {stockInfo.depositos.map((dep, idx) => {
                     const stockVal = Number(dep.stock_actual ?? dep.cantidad) || 0;
-                    const depNombre = dep.deposito_nombre || dep.nombre || (dep.deposito_id === 'bf975c47-946f-406c-bb0e-a41dbe656df4' ? 'Tienda Central' : 'Galería Margalef');
+                    const depNombre = dep.deposito_nombre || dep.nombre || 'Depósito';
                     const percent = stockInfo.consolidado > 0 ? Math.round((stockVal / stockInfo.consolidado) * 100) : 0;
                     return (
                       <div className="compare-bar-row" key={dep.deposito_id || idx} style={{ marginBottom: '6px' }}>
@@ -477,19 +594,19 @@ function Detalle_producto({ isOpen, onClose, articuloId, onUpdate }) {
               <h4 style={{ margin: '0 0 12px 0', fontSize: '13px', color: 'var(--gray-800)', fontWeight: '600' }}>
                 Políticas de Stock Mínimo / Máximo
               </h4>
-              
+
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 2fr', gap: '12px', alignItems: 'start' }}>
                 <div className="form-field" style={{ margin: 0 }}>
                   <label style={{ fontSize: '11px', fontWeight: '600', color: 'var(--gray-600)', marginBottom: '5px', display: 'block' }}>
                     Mínimo *
                   </label>
-                  <input 
-                    type="number" 
-                    min="0" 
-                    required 
-                    value={stockMin} 
-                    onChange={(e) => setStockMin(Number(e.target.value))} 
-                    style={{ width: '100%', height: '38px', padding: '0 10px', boxSizing: 'border-box', fontSize: '13px' }} 
+                  <input
+                    type="number"
+                    min="0"
+                    required
+                    value={stockMin}
+                    onChange={(e) => setStockMin(Number(e.target.value))}
+                    style={{ width: '100%', height: '38px', padding: '0 10px', boxSizing: 'border-box', fontSize: '13px' }}
                   />
                 </div>
 
@@ -497,13 +614,13 @@ function Detalle_producto({ isOpen, onClose, articuloId, onUpdate }) {
                   <label style={{ fontSize: '11px', fontWeight: '600', color: 'var(--gray-600)', marginBottom: '5px', display: 'block' }}>
                     Máximo *
                   </label>
-                  <input 
-                    type="number" 
-                    min="1" 
-                    required 
-                    value={stockMax} 
-                    onChange={(e) => setStockMax(Number(e.target.value))} 
-                    style={{ width: '100%', height: '38px', padding: '0 10px', boxSizing: 'border-box', fontSize: '13px' }} 
+                  <input
+                    type="number"
+                    min="1"
+                    required
+                    value={stockMax}
+                    onChange={(e) => setStockMax(Number(e.target.value))}
+                    style={{ width: '100%', height: '38px', padding: '0 10px', boxSizing: 'border-box', fontSize: '13px' }}
                   />
                 </div>
 
@@ -511,9 +628,9 @@ function Detalle_producto({ isOpen, onClose, articuloId, onUpdate }) {
                   <label style={{ fontSize: '11px', fontWeight: '600', color: 'var(--gray-600)', marginBottom: '5px', display: 'block' }}>
                     Alcance
                   </label>
-                  <select 
-                    value={selectedDepositoPolitica} 
-                    onChange={(e) => setSelectedDepositoPolitica(e.target.value)} 
+                  <select
+                    value={selectedDepositoPolitica}
+                    onChange={(e) => setSelectedDepositoPolitica(e.target.value)}
                     style={{ width: '100%', height: '38px', padding: '0 10px', boxSizing: 'border-box', fontSize: '13px', lineHeight: '38px' }}
                   >
                     <option value="TODOS">Consolidado (Todos)</option>

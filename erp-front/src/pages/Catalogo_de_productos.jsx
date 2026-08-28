@@ -2,6 +2,143 @@ import { useState, useMemo, useEffect } from 'react';
 import Modal from '../components/Modal';
 import Detalle_producto from './Detalle_producto';
 
+// Caché en memoria para evitar repetición de peticiones
+const imageMemoryCache = new Map();
+
+// Componente de Búsqueda Automática de Imágenes (MediaWiki Action API)
+function AutoProductImage({ brand, model, description, category, query, alt, style }) {
+  const [imageUrl, setImageUrl] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    const junkWords = ['sin especificar', 'estándar', 'estandar', 's/ean', 's/c', 'n/a', 'null', 'undefined', 'todas', 'articulo'];
+
+    const cleanWord = (text) => {
+      if (!text) return '';
+      const t = String(text).trim();
+      return junkWords.includes(t.toLowerCase()) ? '' : t;
+    };
+
+    const b = cleanWord(brand);
+    const m = cleanWord(model);
+    const d = cleanWord(description);
+    const c = cleanWord(category);
+
+    let searchTerms = [];
+    if (query) {
+      searchTerms.push(query.replace(/sin especificar|estándar|estandar|s\/c/gi, '').trim());
+    } else {
+      if (b && m) searchTerms.push(`${b} ${m}`);
+      if (b) searchTerms.push(`${b} instrument`);
+      if (d) searchTerms.push(d);
+      if (c) searchTerms.push(c);
+      searchTerms.push('musical instrument');
+    }
+
+    const primaryTerm = searchTerms[0] || 'musical instrument';
+
+    if (imageMemoryCache.has(primaryTerm)) {
+      setImageUrl(imageMemoryCache.get(primaryTerm));
+      setLoading(false);
+      return;
+    }
+
+    const cachedStorage = sessionStorage.getItem(`img_cache_${primaryTerm}`);
+    if (cachedStorage) {
+      imageMemoryCache.set(primaryTerm, cachedStorage);
+      setImageUrl(cachedStorage);
+      setLoading(false);
+      return;
+    }
+
+    let isMounted = true;
+    setLoading(true);
+    setHasError(false);
+
+    const fetchImage = async () => {
+      try {
+        let foundImage = null;
+
+        for (const term of searchTerms) {
+          if (!term || term.length < 2) continue;
+
+          const endpoint = `https://en.wikipedia.org/w/api.php?action=query&origin=*&format=json&generator=search&gsrsearch=${encodeURIComponent(
+            term
+          )}&gsrlimit=1&prop=pageimages&pithumbsize=600`;
+
+          const res = await fetch(endpoint);
+          if (!res.ok) continue;
+
+          const data = await res.json();
+          if (data?.query?.pages) {
+            const pages = data.query.pages;
+            const firstPageKey = Object.keys(pages)[0];
+            const src = pages[firstPageKey]?.thumbnail?.source;
+            if (src) {
+              foundImage = src;
+              break;
+            }
+          }
+        }
+
+        if (isMounted) {
+          if (foundImage) {
+            imageMemoryCache.set(primaryTerm, foundImage);
+            sessionStorage.setItem(`img_cache_${primaryTerm}`, foundImage);
+            setImageUrl(foundImage);
+          } else {
+            setHasError(true);
+          }
+        }
+      } catch {
+        if (isMounted) setHasError(true);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    fetchImage();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [brand, model, description, category, query]);
+
+  if (hasError || !imageUrl) {
+    return (
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        strokeWidth="1.3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        style={{ width: '54px', height: '54px', stroke: 'var(--gray-700)', ...style }}
+      >
+        <path d="M9 18V5l12-2v13" />
+        <circle cx="6" cy="18" r="3" />
+        <circle cx="18" cy="16" r="3" />
+      </svg>
+    );
+  }
+
+  return (
+    <img
+      src={imageUrl}
+      alt={alt || 'Instrumento'}
+      onError={() => setHasError(true)}
+      style={{
+        width: '100%',
+        height: '100%',
+        objectFit: 'cover',
+        opacity: loading ? 0 : 1,
+        transition: 'opacity 0.25s ease',
+        ...style,
+      }}
+    />
+  );
+}
+
 // Componente de Stock Dinámico por Depósito
 const ProductStock = ({ articuloId }) => {
   const [stockData, setStockData] = useState({ consolidado: '-', desglose: [] });
@@ -57,11 +194,10 @@ function Catalogo_de_productos() {
   const [products, setProducts] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBrand, setSelectedBrand] = useState('Todas');
-  const [selectedStatus, setSelectedStatus] = useState('Todas');
-  const [lifecycleFilter, setLifecycleFilter] = useState('activos'); // 'activos' | 'bajas' | 'todos'
+  const [lifecycleFilter, setLifecycleFilter] = useState('activos');
   const [sortBy, setSortBy] = useState('relevantes');
   const [activeCategory, setActiveCategory] = useState('Todas');
-  const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'table'
+  const [viewMode, setViewMode] = useState('grid');
 
   // Modal Detalle
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
@@ -413,69 +549,76 @@ function Catalogo_de_productos() {
               No se encontraron productos para los filtros seleccionados.
             </div>
           ) : (
-            filteredProducts.map((prod) => (
-              <div className="product-card" key={prod.id} style={{ opacity: prod.estado ? 1 : 0.72 }}>
-                <div className="product-thumb">
-                  <span className="thumb-tag">{getCategoryName(prod.categoria_id)}</span>
-                  <span className="thumb-code">{prod.codigo_interno}</span>
-                  <svg viewBox="0 0 24 24" fill="none" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M9 18V5l12-2v13" />
-                    <circle cx="6" cy="18" r="3" />
-                    <circle cx="18" cy="16" r="3" />
-                  </svg>
-                </div>
+            filteredProducts.map((prod) => {
+              const brandText = getBrandName(prod.marca_id);
+              const categoryText = getCategoryName(prod.categoria_id);
 
-                <div className="product-body">
-                  <span className="product-brand">{getBrandName(prod.marca_id)}</span>
-                  <h3 className="product-name">{getBrandName(prod.marca_id)} {prod.modelo || prod.descripcion}</h3>
-                  <span className="product-model">Modelo {prod.modelo || 'Estándar'} · EAN {prod.codigo_ean13}</span>
-
-                  <div className="product-meta-row">
-                    <span className="product-price">${Number(prod.precio_actual).toLocaleString('es-AR')}</span>
-                    <span className={`badge ${prod.estado ? 'badge-green' : 'badge-amber'}`}>
-                      <span className="badge-dot"></span>
-                      {prod.estado ? 'Activo' : 'Baja'}
-                    </span>
+              return (
+                <div className="product-card" key={prod.id} style={{ opacity: prod.estado ? 1 : 0.72 }}>
+                  <div className="product-thumb">
+                    <span className="thumb-tag">{categoryText}</span>
+                    <span className="thumb-code">{prod.codigo_interno}</span>
+                    <AutoProductImage
+                      brand={brandText}
+                      model={prod.modelo}
+                      description={prod.descripcion}
+                      category={categoryText}
+                      alt={prod.descripcion}
+                    />
                   </div>
 
-                  <ProductStock articuloId={prod.id} />
+                  <div className="product-body">
+                    <span className="product-brand">{brandText}</span>
+                    <h3 className="product-name">{brandText} {prod.modelo || prod.descripcion}</h3>
+                    <span className="product-model">Modelo {prod.modelo || 'Estándar'} · EAN {prod.codigo_ean13}</span>
 
-                  <div className="product-card-actions">
-                    <button className="btn btn-outline" onClick={() => handleOpenDetailModal(prod.id)}>
-                      Ver detalle
-                    </button>
+                    <div className="product-meta-row">
+                      <span className="product-price">${Number(prod.precio_actual).toLocaleString('es-AR')}</span>
+                      <span className={`badge ${prod.estado ? 'badge-green' : 'badge-amber'}`}>
+                        <span className="badge-dot"></span>
+                        {prod.estado ? 'Activo' : 'Baja'}
+                      </span>
+                    </div>
 
-                    {prod.estado ? (
-                      <button
-                        className="icon-btn btn-icon-only"
-                        title="Dar de baja producto"
-                        onClick={() => {
-                          setProductToDeactivate(prod);
-                          setIsDeactivateModalOpen(true);
-                        }}
-                      >
-                        <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <circle cx="12" cy="12" r="10" />
-                          <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
-                        </svg>
+                    <ProductStock articuloId={prod.id} />
+
+                    <div className="product-card-actions">
+                      <button className="btn btn-outline" onClick={() => handleOpenDetailModal(prod.id)}>
+                        Ver detalle
                       </button>
-                    ) : (
-                      <button
-                        className="btn btn-outline btn-sm"
-                        style={{ color: 'var(--green)', borderColor: 'var(--green)' }}
-                        title="Reactivar producto en catálogo activo"
-                        onClick={() => {
-                          setProductToReactivate(prod);
-                          setIsReactivateModalOpen(true);
-                        }}
-                      >
-                        Reactivar
-                      </button>
-                    )}
+
+                      {prod.estado ? (
+                        <button
+                          className="icon-btn btn-icon-only"
+                          title="Dar de baja producto"
+                          onClick={() => {
+                            setProductToDeactivate(prod);
+                            setIsDeactivateModalOpen(true);
+                          }}
+                        >
+                          <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="10" />
+                            <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+                          </svg>
+                        </button>
+                      ) : (
+                        <button
+                          className="btn btn-outline btn-sm"
+                          style={{ color: 'var(--green)', borderColor: 'var(--green)' }}
+                          title="Reactivar producto en catálogo activo"
+                          onClick={() => {
+                            setProductToReactivate(prod);
+                            setIsReactivateModalOpen(true);
+                          }}
+                        >
+                          Reactivar
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       )}
