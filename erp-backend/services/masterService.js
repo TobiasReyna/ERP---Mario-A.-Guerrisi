@@ -2,7 +2,7 @@ const { supabaseAdmin } = require('../config/supabase');
 
 class MasterService {
     static async getCategorias() {
-        const { data, error } = await supabaseAdmin.from('categorias').select('*');
+        const { data, error } = await supabaseAdmin.from('categorias').select('id, nombre').eq('estado', true);
         if (error) throw new Error(`Error consultando categorias: ${error.message}`);
         return data;
     }

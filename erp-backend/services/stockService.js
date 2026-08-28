@@ -181,7 +181,8 @@ class StockService {
                 id,
                 descripcion,
                 codigo_interno,
-                categorias(nombre),
+                categoria_id,
+                categorias(id, nombre),
                 existencias (
                     cantidad,
                     depositos (nombre)
@@ -220,6 +221,7 @@ class StockService {
                 name: art.descripcion,
                 code: art.codigo_interno,
                 category: art.categorias?.nombre || 'Sin categoría',
+                categoria_id: art.categoria_id,
                 central,
                 margalef,
                 status
