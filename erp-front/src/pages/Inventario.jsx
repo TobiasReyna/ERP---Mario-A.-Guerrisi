@@ -9,13 +9,13 @@ function Inventario() {
 
   useEffect(() => {
     fetch('http://localhost:3001/api/stock/inventory')
-      .then(res => res.json())
-      .then(data => {
+      .then((res) => res.json())
+      .then((data) => {
         if (data && data.data) {
           setItems(data.data);
         }
       })
-      .catch(err => console.error('Error fetching inventory:', err));
+      .catch((err) => console.error('Error fetching inventory:', err));
   }, []);
 
   // Banner de confirmación
@@ -29,7 +29,7 @@ function Inventario() {
     destino: 'margalef',
     cantidad: 3,
     motivo: 'Rebalanceo de stock',
-    responsable: 'Juan Pérez'
+    responsable: 'Juan Pérez',
   });
 
   const selectedItem = items[selectedProductIndex] || items[0] || { central: 0, margalef: 0, name: '' };
@@ -126,26 +126,6 @@ function Inventario() {
             {tab}
           </button>
         ))}
-      </div>
-
-      {/* LEYENDA VISUAL */}
-      <div className="inventory-legend">
-        <div className="legend-item">
-          <span className="legend-swatch" style={{ background: 'var(--white)', border: '1px solid var(--gray-300)' }}></span>
-          Stock por depósito
-        </div>
-        <div className="legend-item">
-          <span className="legend-swatch" style={{ background: 'var(--gray-50)', border: '2px solid var(--gray-300)' }}></span>
-          Stock consolidado (suma)
-        </div>
-        <div className="legend-item">
-          <span className="legend-swatch" style={{ background: 'var(--crit)' }}></span>
-          Crítico (≤ mínimo)
-        </div>
-        <div className="legend-item">
-          <span className="legend-swatch" style={{ background: 'var(--amber)' }}></span>
-          Requiere reposición
-        </div>
       </div>
 
       {/* FILTROS */}
@@ -291,7 +271,7 @@ function Inventario() {
                   setTransferData({
                     ...transferData,
                     origen: orig,
-                    destino: orig === 'central' ? 'margalef' : 'central'
+                    destino: orig === 'central' ? 'margalef' : 'central',
                   });
                 }}
               >

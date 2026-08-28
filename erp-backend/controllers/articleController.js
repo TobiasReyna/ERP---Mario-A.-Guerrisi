@@ -1,12 +1,11 @@
 const ArticleService = require('../services/articleService');
 
 // Inyectando usuario para Sprint 1
-const TEST_USER_ID = "TU_UUID_REAL_AQUI";
+const TEST_USER_ID = "7ab3d65c-eecc-4f0b-98a1-2c53efce620e";
 
 const crearArticulo = async (req, res) => {
     try {
         const { 
-            codigo_interno, 
             descripcion, 
             codigo_ean13, 
             categoria_id, 
@@ -17,7 +16,7 @@ const crearArticulo = async (req, res) => {
         } = req.body;
 
         // 1. Validaciones básicas del payload frontend
-        if (!codigo_interno || !descripcion || !codigo_ean13 || !categoria_id || !marca_id || !pais_origen || precio_actual === undefined) {
+        if (!descripcion || !codigo_ean13 || !categoria_id || !marca_id || !pais_origen || precio_actual === undefined) {
             return res.status(400).json({ error: 'Faltan campos obligatorios en el request.' });
         }
 
@@ -27,7 +26,6 @@ const crearArticulo = async (req, res) => {
 
         // 2. Delegar al servicio
         const nuevoArticulo = await ArticleService.crearArticulo({
-            codigo_interno,
             descripcion,
             codigo_ean13,
             categoria_id,
@@ -62,8 +60,28 @@ const obtenerArticulosActivos = async (req, res) => {
         const articulos = await ArticleService.obtenerArticulosActivos();
         return res.status(200).json({ data: articulos });
     } catch (error) {
-        console.error('[API] Error GET /api/articles:', error);
+        console.error('[API] Error GET /api/articles/activos:', error);
         return res.status(500).json({ error: error.message || 'Error interno al obtener artículos.' });
+    }
+};
+
+const obtenerArticulosInactivos = async (req, res) => {
+    try {
+        const articulos = await ArticleService.obtenerArticulosInactivos();
+        return res.status(200).json({ data: articulos });
+    } catch (error) {
+        console.error('[API] Error GET /api/articles/inactivos:', error);
+        return res.status(500).json({ error: error.message || 'Error interno al obtener artículos inactivos.' });
+    }
+};
+
+const obtenerTodosArticulos = async (req, res) => {
+    try {
+        const articulos = await ArticleService.obtenerTodosArticulos();
+        return res.status(200).json({ data: articulos });
+    } catch (error) {
+        console.error('[API] Error GET /api/articles/todos:', error);
+        return res.status(500).json({ error: error.message || 'Error interno al obtener todos los artículos.' });
     }
 };
 
@@ -140,15 +158,36 @@ const darBajaLogica = async (req, res) => {
             data: articuloBaja
         });
     } catch (error) {
+        if (error.message.includes('Cannot coerce the result to a single JSON object') || error.message.includes('JSON object requested')) {
+            return res.status(404).json({ error: 'El artículo que intenta dar de baja no existe.' });
+            }
         console.error('[API] Error PATCH /api/articles/:id/status:', error);
         return res.status(500).json({ error: error.message || 'Error interno al dar de baja el artículo.' });
+    }
+};
+
+const darAltaLogica = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const articuloAlta = await ArticleService.darAltaLogica(id);
+        
+        return res.status(200).json({
+            message: 'Artículo reactivado con éxito.',
+            data: articuloAlta
+        });
+    } catch (error) {
+        console.error('[API] Error PATCH /api/articles/:id/reactivate:', error);
+        return res.status(500).json({ error: error.message || 'Error interno al reactivar el artículo.' });
     }
 };
 
 module.exports = {
     crearArticulo,
     obtenerArticulosActivos,
+    obtenerArticulosInactivos,
+    obtenerTodosArticulos,
     obtenerArticuloPorId,
     modificarArticulo,
-    darBajaLogica
+    darBajaLogica,
+    darAltaLogica
 };

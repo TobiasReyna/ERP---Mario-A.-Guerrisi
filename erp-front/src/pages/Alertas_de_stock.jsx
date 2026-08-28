@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import Modal from '../components/Modal';
+import { exportToExcel } from '../utils/exportExcel';
 
 function Alertas_de_stock() {
   const [alertas, setAlertas] = useState([]);
@@ -23,13 +24,13 @@ function Alertas_de_stock() {
         setLoadingAlertas(false);
       }
     };
+
     const fetchActivities = async () => {
       try {
         const res = await fetch('http://localhost:3001/api/system/activity');
         if (res.ok) {
           const json = await res.json();
-          const readIds = JSON.parse(localStorage.getItem('readAlertsIds') || '[]');
-          const mapped = (json.data || []).map(a => {
+          const mapped = (json.data || []).map((a) => {
             const dateObj = new Date(a.fecha);
             const timeStr = `${String(dateObj.getDate()).padStart(2, '0')}/${String(dateObj.getMonth() + 1).padStart(2, '0')}/${dateObj.getFullYear()} · ${String(dateObj.getHours()).padStart(2, '0')}:${String(dateObj.getMinutes()).padStart(2, '0')}`;
             const id = `act-${a.id}`;
@@ -40,15 +41,16 @@ function Alertas_de_stock() {
               time: timeStr,
               category: a.tipo === 'MOVIMIENTOS' ? 'Movimientos' : 'Catálogo',
               type: a.typeLabel,
-              unread: !readIds.includes(id)
+              unread: true,
             };
           });
           setActivities(mapped);
         }
       } catch (err) {
-        console.error("Error fetching activities:", err);
+        console.error('Error fetching activities:', err);
       }
     };
+
     fetchAlertas();
     fetchActivities();
   }, []);
@@ -60,6 +62,7 @@ function Alertas_de_stock() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [orderQty, setOrderQty] = useState(1);
+  const [isExporting, setIsExporting] = useState(false);
 
   const unreadActivityCount = useMemo(() => activities.filter((a) => a.unread).length, [activities]);
 
@@ -69,7 +72,48 @@ function Alertas_de_stock() {
   };
 
   const handleExportExcel = () => {
-    showToast('Listado de reposición exportado correctamente en formato Excel.');
+    if (!alertas || alertas.length === 0) {
+      showToast('No hay productos que requieran reposición para exportar.');
+      return;
+    }
+
+    try {
+      setIsExporting(true);
+
+      const formattedItems = alertas.map((row) => {
+        const stockActual = Number(row.stock_actual ?? 0);
+        const stockMin = Number(row.stock_minimo ?? 0);
+        const isCrit = stockActual <= stockMin / 2;
+
+        // Priorizar el código interno real del artículo
+        const codigoInterno =
+          row.codigo_interno ||
+          row.codigo ||
+          row.code ||
+          row.articulo_codigo ||
+          (row.articulo_id ? String(row.articulo_id).substring(0, 8) : 'S/C');
+
+        return {
+          codigo: codigoInterno,
+          nombre: row.articulo_nombre || row.descripcion || 'Sin descripción',
+          stockActual: stockActual,
+          stockMin: stockMin,
+          stockMax: Number(row.stock_maximo ?? 0),
+          sugerido: Number(row.cantidad_sugerida ?? 0),
+          deposito: row.deposito_nombre || 'Depósito Central',
+          prioridad: isCrit ? 'Crítico' : 'Reposición',
+        };
+      });
+
+      const today = new Date().toISOString().slice(0, 10);
+      exportToExcel(formattedItems, `Reposicion_Stock_${today}.xlsx`);
+      showToast('Listado exportado correctamente en formato tabla con estilos.');
+    } catch (err) {
+      console.error('Error exportando a Excel:', err);
+      showToast('Ocurrió un error al generar el archivo Excel.');
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const handleOpenRepositionModal = (item) => {
@@ -98,16 +142,6 @@ function Alertas_de_stock() {
 
   return (
     <div>
-      {/* ENCABEZADO */}
-      <div className="section-heading">
-        <div>
-          <h2>Alertas y notificaciones</h2>
-          <span className="desc">
-            Reposición de stock (HU-06) y actividad general del sistema, en una sola pantalla
-          </span>
-        </div>
-      </div>
-
       {/* BANNER DE CONFIRMACIÓN */}
       {toastMessage && (
         <div className="confirm-banner">
@@ -138,7 +172,7 @@ function Alertas_de_stock() {
         </button>
       </div>
 
-      {/* ===================== TAB 1: REPOSICIÓN DE STOCK (HU-06) ===================== */}
+      {/* ===================== TAB 1: REPOSICIÓN DE STOCK ===================== */}
       {activeTab === 'reposicion' && (
         <div>
           {/* TARJETA RESUMEN */}
@@ -159,15 +193,15 @@ function Alertas_de_stock() {
             </div>
             <div className="alert-summary-stats">
               <div className="alert-summary-stat">
-                <div className="n">{alertas.filter(a => a.stock_actual <= (a.stock_minimo / 2)).length}</div>
+                <div className="n">{alertas.filter((a) => a.stock_actual <= a.stock_minimo / 2).length}</div>
                 <div className="l">Críticos</div>
               </div>
               <div className="alert-summary-stat">
-                <div className="n">{alertas.filter(a => a.stock_actual > (a.stock_minimo / 2)).length}</div>
+                <div className="n">{alertas.filter((a) => a.stock_actual > a.stock_minimo / 2).length}</div>
                 <div className="l">Reposición</div>
               </div>
               <div className="alert-summary-stat">
-                <div className="n">{new Set(alertas.map(a => a.deposito_id)).size}</div>
+                <div className="n">{new Set(alertas.map((a) => a.deposito_id)).size}</div>
                 <div className="l">Depósitos</div>
               </div>
             </div>
@@ -195,7 +229,7 @@ function Alertas_de_stock() {
           <div className="alert-cards">
             {loadingAlertas && <div style={{ padding: '20px', color: 'var(--gray-500)' }}>Cargando alertas críticas...</div>}
             {errorAlertas && <div style={{ padding: '20px', color: 'var(--red)' }}>Error: {errorAlertas}</div>}
-            {!loadingAlertas && !errorAlertas && alertas.filter(a => a.stock_actual <= (a.stock_minimo / 2)).length === 0 && (
+            {!loadingAlertas && !errorAlertas && alertas.filter((a) => a.stock_actual <= a.stock_minimo / 2).length === 0 && (
               <div style={{ padding: '20px', color: 'var(--gray-500)' }}>No hay productos en estado crítico.</div>
             )}
             {!loadingAlertas && !errorAlertas && alertas.filter(a => a.stock_actual <= (a.stock_minimo / 2)).map((card, idx) => (
@@ -205,23 +239,24 @@ function Alertas_de_stock() {
                     <div className="alert-card-name">{card.articulo_descripcion}</div>
                     <div className="alert-card-sku">ID: {card.articulo_id.substring(0,8)}</div>
                   </div>
-                  <span className="badge badge-red">
-                    <span className="badge-dot"></span>Crítico
-                  </span>
-                </div>
 
-                <div className="alert-card-metrics">
-                  <div className="alert-metric crit">
-                    <div className="n">{card.stock_actual}</div>
-                    <div className="l">Actual</div>
-                  </div>
-                  <div className="alert-metric">
-                    <div className="n">{card.stock_minimo}</div>
-                    <div className="l">Mínimo</div>
-                  </div>
-                  <div className="alert-metric">
-                    <div className="n">{card.stock_maximo}</div>
-                    <div className="l">Máximo</div>
+                  <div className="alert-card-metrics">
+                    <div className="alert-metric crit">
+                      <div className="n">{card.stock_actual}</div>
+                      <div className="l">Actual</div>
+                    </div>
+                    <div className="alert-metric">
+                      <div className="n">{card.stock_minimo}</div>
+                      <div className="l">Mínimo</div>
+                    </div>
+                    <div className="alert-metric">
+                      <div className="n">{card.stock_maximo}</div>
+                      <div className="l">Máximo</div>
+                    </div>
+                    <div className="alert-metric suggest">
+                      <div className="n">{card.cantidad_sugerida}</div>
+                      <div className="l">Reponer</div>
+                    </div>
                   </div>
                   <div className="alert-metric suggest">
                     <div className="n">{card.cantidad_sugerida_reposicion}</div>
@@ -248,8 +283,8 @@ function Alertas_de_stock() {
                     Generar reposición
                   </button>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* LISTADO COMPLETO Y EXPORTAR A EXCEL */}
@@ -260,13 +295,17 @@ function Alertas_de_stock() {
                 Incluye productos críticos y en reposición — base para generar la orden de compra
               </span>
             </div>
-            <button className="btn btn-outline" onClick={handleExportExcel}>
+            <button 
+              className="btn btn-outline" 
+              onClick={handleExportExcel}
+              disabled={loadingAlertas || alertas.length === 0 || isExporting}
+            >
               <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
                 <path d="M14 2v6h6" />
                 <path d="m9 15 3 3 3-3M12 12v6" />
               </svg>
-              Exportar a Excel
+              {isExporting ? 'Exportando...' : 'Exportar a Excel'}
             </button>
           </div>
 
@@ -275,6 +314,7 @@ function Alertas_de_stock() {
               <table>
                 <thead>
                   <tr>
+                    <th>Código</th>
                     <th>Producto</th>
                     <th>Stock actual</th>
                     <th>Mínimo</th>
@@ -287,21 +327,22 @@ function Alertas_de_stock() {
                 <tbody>
                   {loadingAlertas && (
                     <tr>
-                      <td colSpan="7" style={{ textAlign: 'center', padding: '20px', color: 'var(--gray-500)' }}>Cargando datos...</td>
+                      <td colSpan="8" style={{ textAlign: 'center', padding: '20px', color: 'var(--gray-500)' }}>Cargando datos...</td>
                     </tr>
                   )}
                   {errorAlertas && (
                     <tr>
-                      <td colSpan="7" style={{ textAlign: 'center', padding: '20px', color: 'var(--red)' }}>Error: {errorAlertas}</td>
+                      <td colSpan="8" style={{ textAlign: 'center', padding: '20px', color: 'var(--red)' }}>Error: {errorAlertas}</td>
                     </tr>
                   )}
                   {!loadingAlertas && !errorAlertas && alertas.length === 0 && (
                     <tr>
-                      <td colSpan="7" style={{ textAlign: 'center', padding: '20px', color: 'var(--gray-500)' }}>No hay productos que requieran reposición.</td>
+                      <td colSpan="8" style={{ textAlign: 'center', padding: '20px', color: 'var(--gray-500)' }}>No hay productos que requieran reposición.</td>
                     </tr>
                   )}
                   {!loadingAlertas && !errorAlertas && alertas.map((row) => {
-                    const isCrit = row.stock_actual <= (row.stock_minimo / 2);
+                    const isCrit = row.stock_actual <= row.stock_minimo / 2;
+                    const cod = row.codigo_interno || row.codigo || row.code || row.articulo_codigo || (row.articulo_id ? String(row.articulo_id).substring(0, 8) : 'S/C');
                     return (
                       <tr key={`${row.articulo_id}_${row.deposito_id}`}>
                         <td className="cell-strong">{row.articulo_descripcion}</td>
