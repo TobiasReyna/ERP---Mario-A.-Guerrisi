@@ -46,11 +46,16 @@ input, select, textarea { font-family: inherit; }
 
 /* Transiciones y respuesta al clic */
 button, .btn, .category-chip, .warehouse-tab, .icon-btn, .tab-btn {
-  transition: all 0.15s ease-in-out;
+  transition: transform 0.14s var(--ease-spring),
+              background-color 0.15s ease,
+              border-color 0.15s ease,
+              box-shadow 0.15s ease,
+              color 0.15s ease;
   user-select: none;
 }
+
 button:active, .btn:active, .category-chip:active, .warehouse-tab:active, .icon-btn:active, .tab-btn:active {
-  transform: scale(0.97);
+  transform: scale(0.96);
 }
 
 /* ===================== APP SHELL ===================== */
@@ -578,4 +583,157 @@ tbody tr:hover { background: var(--gray-50); }
 @keyframes modalFadeIn {
   from { opacity: 0; transform: translateY(8px) scale(0.99); }
   to { opacity: 1; transform: translateY(0) scale(1); }
+}
+/* ==========================================================================
+   SISTEMA DE ANIMACIÓN Y ESTÉTICA HIGH-END (LINEAR / VERCEL STYLE)
+   ========================================================================== */
+
+:root {
+  --ease-spring-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-elastic: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* 1. Barra láser de carga superior al cambiar de página */
+.page-transition::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2.5px;
+  background: linear-gradient(90deg, var(--red) 0%, #FF6B7A 50%, var(--red) 100%);
+  box-shadow: 0 0 10px rgba(227, 49, 65, 0.6), 0 0 20px rgba(227, 49, 65, 0.3);
+  z-index: 9999;
+  animation: laserSweep 0.35s ease-out forwards;
+}
+
+@keyframes laserSweep {
+  0% { transform: scaleX(0); transform-origin: left; opacity: 1; }
+  70% { transform: scaleX(1); transform-origin: left; opacity: 1; }
+  100% { transform: scaleX(1); opacity: 0; }
+}
+
+/* 2. Entrada de pantalla cinemática con Blur + Spring */
+@keyframes cinematicEntrance {
+  0% {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+    filter: blur(5px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+.page-transition {
+  animation: cinematicEntrance 0.32s var(--ease-spring-out) forwards;
+  will-change: transform, opacity, filter;
+  width: 100%;
+}
+
+/* 3. Entrada escalonada y elevación de tarjetas */
+@keyframes cardSweepIn {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.product-card, .stat-card, .alert-card {
+  animation: cardSweepIn 0.35s var(--ease-spring-out) both;
+  transition: transform 0.22s var(--ease-spring-out), 
+              box-shadow 0.22s ease, 
+              border-color 0.22s ease;
+  will-change: transform;
+}
+
+.product-card:nth-child(1) { animation-delay: 0.03s; }
+.product-card:nth-child(2) { animation-delay: 0.06s; }
+.product-card:nth-child(3) { animation-delay: 0.09s; }
+.product-card:nth-child(4) { animation-delay: 0.12s; }
+.product-card:nth-child(5) { animation-delay: 0.15s; }
+.product-card:nth-child(6) { animation-delay: 0.18s; }
+.product-card:nth-child(7) { animation-delay: 0.21s; }
+.product-card:nth-child(8) { animation-delay: 0.24s; }
+
+.product-card:hover {
+  transform: translateY(-4px) scale(1.01);
+  box-shadow: 0 14px 28px -10px rgba(17, 17, 17, 0.12),
+              0 4px 10px -2px rgba(17, 17, 17, 0.04);
+  border-color: rgba(227, 49, 65, 0.4);
+}
+
+.product-thumb svg {
+  transition: transform 0.3s var(--ease-spring-out);
+}
+.product-card:hover .product-thumb svg {
+  transform: scale(1.08) rotate(-2deg);
+}
+
+/* 4. Modales de cristal con efecto resorte */
+.modal-overlay {
+  backdrop-filter: blur(8px) saturate(160%);
+  -webkit-backdrop-filter: blur(8px) saturate(160%);
+  background: rgba(17, 17, 17, 0.45);
+  animation: overlayFadeIn 0.2s ease forwards;
+}
+
+@keyframes overlayFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modalSpringPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.92) translateY(20px);
+    filter: blur(4px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    filter: blur(0);
+  }
+}
+
+.modal {
+  animation: modalSpringPop 0.32s var(--ease-spring-out) forwards;
+  box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.25),
+              0 0 0 1px rgba(0, 0, 0, 0.05);
+}
+
+/* 5. Pulsación viva para alertas críticas */
+@keyframes pulseCrit {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.35); opacity: 0.6; }
+}
+
+.badge-red .badge-dot, .notif-dot.crit, .alert-mini-dot.crit {
+  animation: pulseCrit 1.8s infinite ease-in-out;
+}
+
+/* 6. Barras de existencias elásticas */
+@keyframes growBarSpring {
+  0% { transform: scaleX(0); }
+  70% { transform: scaleX(1.03); }
+  100% { transform: scaleX(1); }
+}
+
+.compare-bar-fill, .bar-fill {
+  transform-origin: left;
+  animation: growBarSpring 0.45s var(--ease-spring-out) forwards;
+}
+
+/* 7. Hover suave en filas de tablas */
+tbody tr {
+  transition: background-color 0.15s ease, transform 0.15s ease;
+}
+tbody tr:hover {
+  background-color: #F3F3F7 !important;
 }
