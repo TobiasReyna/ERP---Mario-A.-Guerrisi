@@ -227,8 +227,10 @@ class StockService {
             .select(`
                 id,
                 descripcion,
+                modelo,
                 codigo_interno,
                 categoria_id,
+                marcas(id, nombre),
                 categorias(id, nombre),
                 existencias (
                     cantidad,
@@ -266,6 +268,8 @@ class StockService {
             return {
                 id: art.id,
                 name: art.descripcion,
+                marca: art.marcas?.nombre,
+                modelo: art.modelo,
                 code: art.codigo_interno,
                 category: art.categorias?.nombre || 'Sin categoría',
                 categoria_id: art.categoria_id,

@@ -195,7 +195,7 @@ function Inventario() {
                   const consol = item.central + item.margalef;
                   return (
                     <tr key={item.id}>
-                      <td className="cell-strong">{item.name}</td>
+                      <td className="cell-strong">{`${item.marca || ''} ${item.modelo || ''}`.trim()}</td>
                       <td className="cell-mono">{item.code}</td>
 
                       {activeTab === 'Ambos depósitos' && (
