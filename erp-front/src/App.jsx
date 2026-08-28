@@ -28,8 +28,8 @@ function App() {
   const [isUserOpen, setIsUserOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   
-  const [ultimaLectura, setUltimaLectura] = useState(() => {
-    return localStorage.getItem('alertasLeidas') || '0';
+  const [leidas, setLeidas] = useState(() => {
+    return JSON.parse(localStorage.getItem('notificacionesLeidas')) || [];
   });
 
   useEffect(() => {
@@ -39,25 +39,19 @@ function App() {
     ])
     .then(([alertsRes, activityRes]) => {
       let combined = [];
-      const storedLastRead = localStorage.getItem('alertasLeidas') || '0';
-      setUltimaLectura(storedLastRead);
+      const storedLeidas = JSON.parse(localStorage.getItem('notificacionesLeidas')) || [];
+      setLeidas(storedLeidas);
       
       if (alertsRes.data) {
         combined = combined.concat(alertsRes.data.map(alert => {
           const isCritical = alert.stock_actual <= 0;
           const id = `alert-${alert.articulo_id}-${alert.deposito_id}`;
-          // Generate a deterministic past date based on ID to avoid always being "new" on reload
-          // or just use a fallback date. If no date is provided by backend, we must simulate it carefully.
-          // Since the instruction says "compará la fecha de cada ítem", we assume rawDate is used.
-          // To make the bug fix visible, we set alerts to a date slightly in the past (e.g. 1 hour ago)
-          const pastDate = new Date(Date.now() - 3600000);
           return {
             id,
             type: isCritical ? 'crit' : 'warn',
             title: isCritical ? 'Stock crítico:' : 'Reposición sugerida:',
             text: `${alert.articulo_nombre} en ${alert.deposito_nombre}. Quedan ${alert.stock_actual} unidades. Sugerida: ${alert.cantidad_sugerida}.`,
-            time: 'Ahora',
-            rawDate: pastDate
+            time: 'Ahora'
           };
         }));
       }
@@ -78,25 +72,27 @@ function App() {
         }));
       }
 
-      // Calculate unread dynamically based on ultimaLectura
-      const combinedWithUnread = combined.map(n => {
-        return {
-          ...n,
-          unread: n.rawDate.getTime() > parseInt(storedLastRead, 10)
-        };
-      });
-
-      combinedWithUnread.sort((a, b) => b.rawDate - a.rawDate);
-      setNotifications(combinedWithUnread);
+      // Restore rawDate sorting if available (alerts might not have it now, but we'll sort activities)
+      combined.sort((a, b) => (b.rawDate || new Date()) - (a.rawDate || new Date()));
+      setNotifications(combined);
     })
     .catch(err => console.error("Error fetching notifications:", err));
+  }, []);
+
+  // Update leidas from storage periodically if we want, or just rely on state
+  useEffect(() => {
+    const handleStorage = () => {
+      setLeidas(JSON.parse(localStorage.getItem('notificacionesLeidas')) || []);
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
   }, []);
 
   const notifRef = useRef(null);
   const userRef = useRef(null);
 
-  // Recalcular el badge usando la fecha de cada notificación
-  const unreadCount = notifications.filter(n => n.rawDate.getTime() > parseInt(ultimaLectura, 10)).length;
+  // Recalcular el badge verificando si cada notificación está en el array `leidas`
+  const unreadCount = notifications.filter(n => !leidas.includes(n.id)).length;
 
   const currentRouteInfo = ROUTE_INFO[location.pathname] || {
     title: 'Sistema ERP',
@@ -119,12 +115,13 @@ function App() {
 
   const handleMarkAllRead = (e) => {
     e.stopPropagation();
-    const nowStr = Date.now().toString();
-    localStorage.setItem('alertasLeidas', nowStr);
-    setUltimaLectura(nowStr);
+    const allIds = notifications.map(n => n.id);
+    // Merge existing read ids just in case there are other read notifications not currently in state
+    const currentLeidas = JSON.parse(localStorage.getItem('notificacionesLeidas')) || [];
+    const newLeidas = Array.from(new Set([...currentLeidas, ...allIds]));
     
-    // Actualizar estado de React en ese mismo momento para que el cambio visual sea instantáneo
-    setNotifications(notifications.map(n => ({ ...n, unread: false })));
+    localStorage.setItem('notificacionesLeidas', JSON.stringify(newLeidas));
+    setLeidas(newLeidas);
   };
 
   const handleNotifClick = (id) => {
@@ -267,13 +264,15 @@ function App() {
                     )}
                   </div>
                   <div className="notif-list">
-                    {notifications.map((n) => (
+                    {notifications.map((n) => {
+                      const isUnread = !leidas.includes(n.id);
+                      return (
                       <div
                         key={n.id}
-                        className={`notif-item ${n.unread ? 'unread' : ''}`}
+                        className={`notif-item ${isUnread ? 'unread' : ''}`}
                         onClick={() => handleNotifClick(n.id)}
                       >
-                        {n.unread ? (
+                        {isUnread ? (
                           <span className={`notif-dot ${n.type}`}></span>
                         ) : (
                           <svg style={{ width: '16px', height: '16px', stroke: 'var(--green)', flexShrink: 0, marginTop: '2px' }} viewBox="0 0 24 24" fill="none" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
@@ -287,7 +286,8 @@ function App() {
                           <div className="notif-time">{n.time}</div>
                         </div>
                       </div>
-                    ))}
+                    );
+                  })}
                   </div>
                   <div className="dropdown-foot">
                     <a

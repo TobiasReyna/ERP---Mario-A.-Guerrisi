@@ -11,12 +11,20 @@ function Alertas_de_stock() {
   const [activityFilter, setActivityFilter] = useState('Todas');
   const [activities, setActivities] = useState([]);
   
-  const [ultimaLectura, setUltimaLectura] = useState('0');
+  const [leidas, setLeidas] = useState(() => {
+    return JSON.parse(localStorage.getItem('notificacionesLeidas')) || [];
+  });
+
+  // Listen to storage events just in case marked from topbar
+  useEffect(() => {
+    const handleStorage = () => {
+      setLeidas(JSON.parse(localStorage.getItem('notificacionesLeidas')) || []);
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
 
   useEffect(() => {
-    // 1. Sincronizá el estado inicial leyendo la clave al montar
-    const storedLastRead = localStorage.getItem('alertasLeidas') || '0';
-    setUltimaLectura(storedLastRead);
 
     const fetchAlertas = async () => {
       try {
@@ -71,8 +79,16 @@ function Alertas_de_stock() {
   const [isExporting, setIsExporting] = useState(false);
 
   const unreadActivityCount = useMemo(() => {
-    return activities.filter((a) => a.rawDate.getTime() > parseInt(ultimaLectura, 10)).length;
-  }, [activities, ultimaLectura]);
+    return activities.filter((a) => !leidas.includes(a.id)).length;
+  }, [activities, leidas]);
+
+  const marcarLeida = (id) => {
+    if (leidas.includes(id)) return;
+    
+    const nuevasLeidas = [...leidas, id];
+    setLeidas(nuevasLeidas);
+    localStorage.setItem('notificacionesLeidas', JSON.stringify(nuevasLeidas));
+  };
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -139,7 +155,7 @@ function Alertas_de_stock() {
   // Filtrado pestaña actividad
   const filteredActivities = useMemo(() => {
     return activities.filter((act) => {
-      const isUnread = act.rawDate.getTime() > parseInt(ultimaLectura, 10);
+      const isUnread = !leidas.includes(act.id);
       if (activityFilter === 'Todas') return true;
       if (activityFilter === 'No leídas') return isUnread;
       if (activityFilter === 'Stock') return act.title.toLowerCase().includes('stock') || act.text.toLowerCase().includes('stock');
@@ -147,7 +163,7 @@ function Alertas_de_stock() {
       if (activityFilter === 'Catálogo') return act.category === 'Catálogo';
       return true;
     });
-  }, [activities, activityFilter, ultimaLectura]);
+  }, [activities, activityFilter, leidas]);
 
   return (
     <div>
@@ -403,11 +419,13 @@ function Alertas_de_stock() {
               </div>
             ) : (
               filteredActivities.map((act) => {
-                const isUnread = act.rawDate.getTime() > parseInt(ultimaLectura, 10);
+                const isUnread = !leidas.includes(act.id);
                 return (
                   <div
                     key={act.id}
                     className={`notif-page-item ${isUnread ? 'unread' : ''}`}
+                    onClick={() => marcarLeida(act.id)}
+                    style={{ cursor: 'pointer' }}
                   >
                     <div className={`notif-page-icon ${!isUnread ? 'ok' : act.type}`}>
                       {(!isUnread || act.type === 'ok') && (
