@@ -27,9 +27,9 @@ function App() {
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [isUserOpen, setIsUserOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  
-  const [leidas, setLeidas] = useState(() => {
-    return JSON.parse(localStorage.getItem('notificacionesLeidas')) || [];
+
+  const [ultimaLectura, setUltimaLectura] = useState(() => {
+    return localStorage.getItem('alertasLeidas') || '0';
   });
 
   useEffect(() => {
@@ -39,19 +39,21 @@ function App() {
     ])
     .then(([alertsRes, activityRes]) => {
       let combined = [];
-      const storedLeidas = JSON.parse(localStorage.getItem('notificacionesLeidas')) || [];
-      setLeidas(storedLeidas);
-      
+      const storedLastRead = localStorage.getItem('alertasLeidas') || '0';
+      setUltimaLectura(storedLastRead);
+
       if (alertsRes.data) {
         combined = combined.concat(alertsRes.data.map(alert => {
           const isCritical = alert.stock_actual <= 0;
           const id = `alert-${alert.articulo_id}-${alert.deposito_id}`;
+          const pastDate = new Date(Date.now() - 3600000);
           return {
             id,
             type: isCritical ? 'crit' : 'warn',
             title: isCritical ? 'Stock crítico:' : 'Reposición sugerida:',
             text: `${alert.articulo_nombre} en ${alert.deposito_nombre}. Quedan ${alert.stock_actual} unidades. Sugerida: ${alert.cantidad_sugerida}.`,
-            time: 'Ahora'
+            time: 'Ahora',
+            rawDate: pastDate
           };
         }));
       }
@@ -72,34 +74,29 @@ function App() {
         }));
       }
 
-      // Restore rawDate sorting if available (alerts might not have it now, but we'll sort activities)
-      combined.sort((a, b) => (b.rawDate || new Date()) - (a.rawDate || new Date()));
-      setNotifications(combined);
+      const combinedWithUnread = combined.map(n => {
+        return {
+          ...n,
+          unread: n.rawDate.getTime() > parseInt(storedLastRead, 10)
+        };
+      });
+
+      combinedWithUnread.sort((a, b) => b.rawDate - a.rawDate);
+      setNotifications(combinedWithUnread);
     })
     .catch(err => console.error("Error fetching notifications:", err));
-  }, []);
-
-  // Update leidas from storage periodically if we want, or just rely on state
-  useEffect(() => {
-    const handleStorage = () => {
-      setLeidas(JSON.parse(localStorage.getItem('notificacionesLeidas')) || []);
-    };
-    window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
   }, []);
 
   const notifRef = useRef(null);
   const userRef = useRef(null);
 
-  // Recalcular el badge verificando si cada notificación está en el array `leidas`
-  const unreadCount = notifications.filter(n => !leidas.includes(n.id)).length;
+  const unreadCount = notifications.filter(n => n.rawDate.getTime() > parseInt(ultimaLectura, 10)).length;
 
   const currentRouteInfo = ROUTE_INFO[location.pathname] || {
     title: 'Sistema ERP',
     subtitle: 'Mario A. Guerrisi Instrumentos Musicales',
   };
 
-  // Cerrar dropdowns al hacer clic fuera
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (notifRef.current && !notifRef.current.contains(e.target)) {
@@ -115,13 +112,10 @@ function App() {
 
   const handleMarkAllRead = (e) => {
     e.stopPropagation();
-    const allIds = notifications.map(n => n.id);
-    // Merge existing read ids just in case there are other read notifications not currently in state
-    const currentLeidas = JSON.parse(localStorage.getItem('notificacionesLeidas')) || [];
-    const newLeidas = Array.from(new Set([...currentLeidas, ...allIds]));
-    
-    localStorage.setItem('notificacionesLeidas', JSON.stringify(newLeidas));
-    setLeidas(newLeidas);
+    const nowStr = Date.now().toString();
+    localStorage.setItem('alertasLeidas', nowStr);
+    setUltimaLectura(nowStr);
+    setNotifications(notifications.map(n => ({ ...n, unread: false })));
   };
 
   const handleNotifClick = (id) => {
@@ -235,6 +229,19 @@ function App() {
           </div>
 
           <div className="topbar-right">
+            <div className="global-search">
+              <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="7" />
+                <path d="m21 21-4.3-4.3" />
+              </svg>
+              <input
+                type="text"
+                placeholder="Buscar artículo, EAN o marca..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={handleSearchKeyDown}
+              />
+            </div>
 
             {/* NOTIFICACIONES */}
             <div className="topbar-item" ref={notifRef}>
@@ -264,30 +271,33 @@ function App() {
                     )}
                   </div>
                   <div className="notif-list">
-                    {notifications.map((n) => {
-                      const isUnread = !leidas.includes(n.id);
-                      return (
-                      <div
-                        key={n.id}
-                        className={`notif-item ${isUnread ? 'unread' : ''}`}
-                        onClick={() => handleNotifClick(n.id)}
-                      >
-                        {isUnread ? (
-                          <span className={`notif-dot ${n.type}`}></span>
-                        ) : (
-                          <svg style={{ width: '16px', height: '16px', stroke: 'var(--green)', flexShrink: 0, marginTop: '2px' }} viewBox="0 0 24 24" fill="none" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M20 6 9 17l-5-5" />
-                          </svg>
-                        )}
-                        <div className="notif-body">
-                          <div className="notif-text">
-                            <strong>{n.title}</strong> {n.text}
-                          </div>
-                          <div className="notif-time">{n.time}</div>
-                        </div>
+                    {notifications.length === 0 ? (
+                      <div style={{ padding: '24px', textAlign: 'center', fontSize: '12.5px', color: 'var(--gray-500)' }}>
+                        No hay notificaciones pendientes.
                       </div>
-                    );
-                  })}
+                    ) : (
+                      notifications.map((n) => (
+                        <div
+                          key={n.id}
+                          className={`notif-item ${n.unread ? 'unread' : ''}`}
+                          onClick={() => handleNotifClick(n.id)}
+                        >
+                          {n.unread ? (
+                            <span className={`notif-dot ${n.type}`}></span>
+                          ) : (
+                            <svg style={{ width: '16px', height: '16px', stroke: 'var(--green)', flexShrink: 0, marginTop: '2px' }} viewBox="0 0 24 24" fill="none" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M20 6 9 17l-5-5" />
+                            </svg>
+                          )}
+                          <div className="notif-body">
+                            <div className="notif-text">
+                              <strong>{n.title}</strong> {n.text}
+                            </div>
+                            <div className="notif-time">{n.time}</div>
+                          </div>
+                        </div>
+                      ))
+                    )}
                   </div>
                   <div className="dropdown-foot">
                     <a
@@ -363,17 +373,19 @@ function App() {
           </div>
         </header>
 
-        {/* CONTENIDO PRINCIPAL */}
+        {/* CONTENIDO PRINCIPAL CON ANIMACIÓN GPU */}
         <main className="content">
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/Catalogo_de_productos" element={<Catalogo_de_productos />} />
-            <Route path="/Inventario" element={<Inventario />} />
-            <Route path="/Movimientos" element={<Movimientos />} />
-            <Route path="/Alertas_de_stock" element={<Alertas_de_stock />} />
-            <Route path="/Detalle_producto" element={<Detalle_producto />} />
-            <Route path="/Perfil" element={<Perfil />} />
-          </Routes>
+          <div key={location.pathname} className="page-transition">
+            <Routes location={location}>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/Catalogo_de_productos" element={<Catalogo_de_productos />} />
+              <Route path="/Inventario" element={<Inventario />} />
+              <Route path="/Movimientos" element={<Movimientos />} />
+              <Route path="/Alertas_de_stock" element={<Alertas_de_stock />} />
+              <Route path="/Detalle_producto" element={<Detalle_producto />} />
+              <Route path="/Perfil" element={<Perfil />} />
+            </Routes>
+          </div>
         </main>
       </div>
     </div>
