@@ -35,17 +35,19 @@ function App() {
     ])
     .then(([alertsRes, activityRes]) => {
       let combined = [];
+      const readIds = JSON.parse(localStorage.getItem('readAlertsIds') || '[]');
       
       if (alertsRes.data) {
         combined = combined.concat(alertsRes.data.map(alert => {
           const isCritical = alert.stock_actual <= 0;
+          const id = `alert-${alert.articulo_id}-${alert.deposito_id}`;
           return {
-            id: `alert-${alert.articulo_id}-${alert.deposito_id}`,
+            id,
             type: isCritical ? 'crit' : 'warn',
             title: isCritical ? 'Stock crítico:' : 'Reposición sugerida:',
             text: `${alert.articulo_nombre} en ${alert.deposito_nombre}. Quedan ${alert.stock_actual} unidades. Sugerida: ${alert.cantidad_sugerida}.`,
             time: 'Ahora',
-            unread: true,
+            unread: !readIds.includes(id),
             rawDate: new Date()
           };
         }));
@@ -55,13 +57,14 @@ function App() {
         combined = combined.concat(activityRes.data.map(a => {
           const dateObj = new Date(a.fecha);
           const timeStr = `${String(dateObj.getDate()).padStart(2, '0')}/${String(dateObj.getMonth() + 1).padStart(2, '0')}/${dateObj.getFullYear()} · ${String(dateObj.getHours()).padStart(2, '0')}:${String(dateObj.getMinutes()).padStart(2, '0')}`;
+          const id = `act-${a.id}`;
           return {
-            id: `act-${a.id}`,
+            id,
             type: a.typeLabel,
             title: a.titulo + ':',
             text: a.descripcion,
             time: timeStr,
-            unread: true,
+            unread: !readIds.includes(id),
             rawDate: dateObj
           };
         }));
@@ -99,10 +102,22 @@ function App() {
 
   const handleMarkAllRead = (e) => {
     e.stopPropagation();
+    const readIds = JSON.parse(localStorage.getItem('readAlertsIds') || '[]');
+    notifications.forEach(n => {
+      if (!readIds.includes(n.id)) {
+        readIds.push(n.id);
+      }
+    });
+    localStorage.setItem('readAlertsIds', JSON.stringify(readIds));
     setNotifications(notifications.map(n => ({ ...n, unread: false })));
   };
 
   const handleNotifClick = (id) => {
+    const readIds = JSON.parse(localStorage.getItem('readAlertsIds') || '[]');
+    if (!readIds.includes(id)) {
+      readIds.push(id);
+      localStorage.setItem('readAlertsIds', JSON.stringify(readIds));
+    }
     setNotifications(notifications.map(n => n.id === id ? { ...n, unread: false } : n));
     setIsNotifOpen(false);
     navigate('/Alertas_de_stock');

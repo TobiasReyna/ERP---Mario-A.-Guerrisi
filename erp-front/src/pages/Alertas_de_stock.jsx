@@ -30,17 +30,27 @@ function Alertas_de_stock() {
         const res = await fetch('http://localhost:3001/api/system/activity');
         if (res.ok) {
           const json = await res.json();
+<<<<<<< HEAD
           const mapped = (json.data || []).map((a) => {
+=======
+          const readIds = JSON.parse(localStorage.getItem('readAlertsIds') || '[]');
+          const mapped = (json.data || []).map(a => {
+>>>>>>> feature/conexion_inventario
             const dateObj = new Date(a.fecha);
             const timeStr = `${String(dateObj.getDate()).padStart(2, '0')}/${String(dateObj.getMonth() + 1).padStart(2, '0')}/${dateObj.getFullYear()} · ${String(dateObj.getHours()).padStart(2, '0')}:${String(dateObj.getMinutes()).padStart(2, '0')}`;
+            const id = `act-${a.id}`;
             return {
-              id: a.id,
+              id: id,
               title: a.titulo,
               text: a.descripcion,
               time: timeStr,
               category: a.tipo === 'MOVIMIENTOS' ? 'Movimientos' : 'Catálogo',
               type: a.typeLabel,
+<<<<<<< HEAD
               unread: true,
+=======
+              unread: !readIds.includes(id)
+>>>>>>> feature/conexion_inventario
             };
           });
           setActivities(mapped);
@@ -231,6 +241,7 @@ function Alertas_de_stock() {
             {!loadingAlertas && !errorAlertas && alertas.filter((a) => a.stock_actual <= a.stock_minimo / 2).length === 0 && (
               <div style={{ padding: '20px', color: 'var(--gray-500)' }}>No hay productos en estado crítico.</div>
             )}
+<<<<<<< HEAD
             {!loadingAlertas && !errorAlertas && alertas.filter((a) => a.stock_actual <= a.stock_minimo / 2).map((card) => {
               const codigoCard = card.codigo_interno || card.codigo || card.code || card.articulo_codigo || (card.articulo_id ? String(card.articulo_id).substring(0, 8) : 'S/C');
               return (
@@ -243,6 +254,14 @@ function Alertas_de_stock() {
                     <span className="badge badge-red">
                       <span className="badge-dot"></span>Crítico
                     </span>
+=======
+            {!loadingAlertas && !errorAlertas && alertas.filter(a => a.stock_actual <= (a.stock_minimo / 2)).map((card, idx) => (
+              <div className="alert-card" key={`${card.articulo_id}_${card.deposito_id}`}>
+                <div className="alert-card-head">
+                  <div>
+                    <div className="alert-card-name">{card.articulo_descripcion}</div>
+                    <div className="alert-card-sku">ID: {card.articulo_id.substring(0,8)}</div>
+>>>>>>> feature/conexion_inventario
                   </div>
 
                   <div className="alert-card-metrics">
@@ -263,6 +282,7 @@ function Alertas_de_stock() {
                       <div className="l">Reponer</div>
                     </div>
                   </div>
+<<<<<<< HEAD
 
                   <div className="alert-card-foot">
                     <span className="alert-card-wh">
@@ -283,6 +303,40 @@ function Alertas_de_stock() {
                       Generar reposición
                     </button>
                   </div>
+=======
+                  <div className="alert-metric">
+                    <div className="n">{card.stock_minimo}</div>
+                    <div className="l">Mínimo</div>
+                  </div>
+                  <div className="alert-metric">
+                    <div className="n">{card.stock_maximo}</div>
+                    <div className="l">Máximo</div>
+                  </div>
+                  <div className="alert-metric suggest">
+                    <div className="n">{card.cantidad_sugerida_reposicion}</div>
+                    <div className="l">Reponer</div>
+                  </div>
+                </div>
+
+                <div className="alert-card-foot">
+                  <span className="alert-card-wh">
+                    <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 8 12 3 3 8l9 5 9-5Z" />
+                      <path d="M3 8v8l9 5 9-5V8" />
+                    </svg>
+                    {card.deposito_nombre}
+                  </span>
+                  <button
+                    className="btn btn-outline btn-sm"
+                    onClick={() => handleOpenRepositionModal({
+                      name: card.articulo_descripcion,
+                      code: card.articulo_id.substring(0,8),
+                      suggested: card.cantidad_sugerida_reposicion
+                    })}
+                  >
+                    Generar reposición
+                  </button>
+>>>>>>> feature/conexion_inventario
                 </div>
               );
             })}
@@ -346,14 +400,18 @@ function Alertas_de_stock() {
                     const cod = row.codigo_interno || row.codigo || row.code || row.articulo_codigo || (row.articulo_id ? String(row.articulo_id).substring(0, 8) : 'S/C');
                     return (
                       <tr key={`${row.articulo_id}_${row.deposito_id}`}>
+<<<<<<< HEAD
                         <td style={{ fontFamily: 'monospace', color: 'var(--gray-600)' }}>{cod}</td>
                         <td className="cell-strong">{row.articulo_nombre}</td>
+=======
+                        <td className="cell-strong">{row.articulo_descripcion}</td>
+>>>>>>> feature/conexion_inventario
                         <td className={`stock-cell ${isCrit ? 'crit' : 'low'}`}>
                           {row.stock_actual}
                         </td>
                         <td>{row.stock_minimo}</td>
                         <td>{row.stock_maximo}</td>
-                        <td className="cell-strong">{row.cantidad_sugerida}</td>
+                        <td className="cell-strong">{row.cantidad_sugerida_reposicion}</td>
                         <td>{row.deposito_nombre}</td>
                         <td>
                           <span className={`badge ${isCrit ? 'badge-red' : 'badge-amber'}`}>
@@ -397,6 +455,11 @@ function Alertas_de_stock() {
                   key={act.id}
                   className={`notif-page-item ${act.unread ? 'unread' : ''}`}
                   onClick={() => {
+                    const readIds = JSON.parse(localStorage.getItem('readAlertsIds') || '[]');
+                    if (!readIds.includes(act.id)) {
+                      readIds.push(act.id);
+                      localStorage.setItem('readAlertsIds', JSON.stringify(readIds));
+                    }
                     setActivities(activities.map((a) => (a.id === act.id ? { ...a, unread: false } : a)));
                   }}
                   style={{ cursor: 'pointer' }}
