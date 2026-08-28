@@ -28,17 +28,19 @@ function Alertas_de_stock() {
         const res = await fetch('http://localhost:3001/api/system/activity');
         if (res.ok) {
           const json = await res.json();
+          const readIds = JSON.parse(localStorage.getItem('readAlertsIds') || '[]');
           const mapped = (json.data || []).map(a => {
             const dateObj = new Date(a.fecha);
             const timeStr = `${String(dateObj.getDate()).padStart(2, '0')}/${String(dateObj.getMonth() + 1).padStart(2, '0')}/${dateObj.getFullYear()} · ${String(dateObj.getHours()).padStart(2, '0')}:${String(dateObj.getMinutes()).padStart(2, '0')}`;
+            const id = `act-${a.id}`;
             return {
-              id: a.id,
+              id: id,
               title: a.titulo,
               text: a.descripcion,
               time: timeStr,
               category: a.tipo === 'MOVIMIENTOS' ? 'Movimientos' : 'Catálogo',
               type: a.typeLabel,
-              unread: true
+              unread: !readIds.includes(id)
             };
           });
           setActivities(mapped);
@@ -352,6 +354,11 @@ function Alertas_de_stock() {
                   key={act.id}
                   className={`notif-page-item ${act.unread ? 'unread' : ''}`}
                   onClick={() => {
+                    const readIds = JSON.parse(localStorage.getItem('readAlertsIds') || '[]');
+                    if (!readIds.includes(act.id)) {
+                      readIds.push(act.id);
+                      localStorage.setItem('readAlertsIds', JSON.stringify(readIds));
+                    }
                     setActivities(activities.map((a) => (a.id === act.id ? { ...a, unread: false } : a)));
                   }}
                   style={{ cursor: 'pointer' }}
