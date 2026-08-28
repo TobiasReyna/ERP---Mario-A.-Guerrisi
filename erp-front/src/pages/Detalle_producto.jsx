@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import Modal from '../components/Modal';
 
+// TEMPORAL: mismo usuario fijo que se usa en Movimientos.jsx, hasta que exista login/auth real.
+const TEMP_USER_ID = '7ab3d65c-eecc-4f0b-98a1-2c53efce620e';
+
 // Caché en memoria para evitar llamadas redundantes
 const imageMemoryCache = new Map();
 
@@ -117,7 +120,6 @@ function Detalle_producto({ isOpen, onClose, articuloId, onUpdate }) {
   const [stockInfo, setStockInfo] = useState({ consolidado: 0, depositos: [] });
   const [historialMovimientos, setHistorialMovimientos] = useState([]);
   const [depositosDisponibles, setDepositosDisponibles] = useState([]);
-  const [motivosAjuste, setMotivosAjuste] = useState([]);
   const [brandsList, setBrandsList] = useState([]);
   const [categoriesList, setCategoriesList] = useState([]);
   const [countriesList, setCountriesList] = useState([]);
@@ -127,7 +129,6 @@ function Detalle_producto({ isOpen, onClose, articuloId, onUpdate }) {
   const [confirmBanner, setConfirmBanner] = useState(null);
 
   const [isTransferOpen, setIsTransferOpen] = useState(false);
-  const [isAdjustOpen, setIsAdjustOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isConfirmEditOpen, setIsConfirmEditOpen] = useState(false);
 
@@ -152,14 +153,6 @@ function Detalle_producto({ isOpen, onClose, articuloId, onUpdate }) {
     motivo: 'Rebalanceo de stock',
   });
 
-  const [adjustData, setAdjustData] = useState({
-    deposito_id: '',
-    motivo_id: '',
-    tipo: 'positivo',
-    cantidad: 1,
-    observacion: '',
-  });
-
   const showConfirm = (text) => {
     setConfirmBanner(text);
     setTimeout(() => setConfirmBanner(null), 4000);
@@ -172,12 +165,11 @@ function Detalle_producto({ isOpen, onClose, articuloId, onUpdate }) {
       setLoading(true);
       setError(null);
 
-      const [artRes, stockRes, histRes, depRes, motRes, brandRes, catRes, countRes] = await Promise.all([
+      const [artRes, stockRes, histRes, depRes, brandRes, catRes, countRes] = await Promise.all([
         fetch(`http://localhost:3001/api/articles/${articuloId}`),
         fetch(`http://localhost:3001/api/stock/${articuloId}`),
         fetch(`http://localhost:3001/api/stock/${articuloId}/history`),
         fetch(`http://localhost:3001/api/deposits`),
-        fetch(`http://localhost:3001/api/adjustment-reasons`),
         fetch(`http://localhost:3001/api/brands`),
         fetch(`http://localhost:3001/api/categories`),
         fetch(`http://localhost:3001/api/countries`),
@@ -189,7 +181,6 @@ function Detalle_producto({ isOpen, onClose, articuloId, onUpdate }) {
       const stockJson = stockRes.ok ? await stockRes.json() : { total: 0, depositos: [] };
       const histJson = histRes.ok ? await histRes.json() : { data: [] };
       const depJson = depRes.ok ? await depRes.json() : { data: [] };
-      const motJson = motRes.ok ? await motRes.json() : { data: [] };
       const brandJson = brandRes.ok ? await brandRes.json() : { data: [] };
       const catJson = catRes.ok ? await catRes.json() : { data: [] };
       const countJson = countRes.ok ? await countRes.json() : { data: [] };
@@ -241,16 +232,6 @@ function Detalle_producto({ isOpen, onClose, articuloId, onUpdate }) {
           ...prev,
           origen_id: deps[0].id,
           destino_id: deps[1].id,
-        }));
-      }
-
-      const mots = motJson.data || [];
-      setMotivosAjuste(mots);
-      if (deps.length > 0 && mots.length > 0) {
-        setAdjustData((prev) => ({
-          ...prev,
-          deposito_id: deps[0].id,
-          motivo_id: mots[0].id,
         }));
       }
     } catch (err) {
@@ -325,7 +306,7 @@ function Detalle_producto({ isOpen, onClose, articuloId, onUpdate }) {
         precio_actual: Number(editFormData.precio_actual) || 0,
         precio: Number(editFormData.precio_actual) || 0,
         codigo_interno: codigoInternoActual,
-        usuario_id: '00000000-0000-0000-0000-000000000001',
+        usuario_id: TEMP_USER_ID,
       };
 
       const res = await fetch(`http://localhost:3001/api/articles/${articuloId}`, {
@@ -365,7 +346,7 @@ function Detalle_producto({ isOpen, onClose, articuloId, onUpdate }) {
           deposito_destino_id: transferData.destino_id,
           cantidad: Number(transferData.cantidad),
           motivo: transferData.motivo,
-          usuario_id: '00000000-0000-0000-0000-000000000001',
+          usuario_id: TEMP_USER_ID,
         }),
       });
 
@@ -378,35 +359,6 @@ function Detalle_producto({ isOpen, onClose, articuloId, onUpdate }) {
       if (onUpdate) onUpdate();
     } catch (err) {
       alert(`Error en la transferencia: ${err.message}`);
-    }
-  };
-
-  const handleConfirmAdjust = async (e) => {
-    e.preventDefault();
-    try {
-      const res = await fetch('http://localhost:3001/api/stock/adjust', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          articulo_id: articuloId,
-          deposito_id: adjustData.deposito_id,
-          motivo_id: adjustData.motivo_id,
-          tipo: adjustData.tipo,
-          cantidad: Number(adjustData.cantidad),
-          observacion: adjustData.observacion,
-          usuario_id: '00000000-0000-0000-0000-000000000001',
-        }),
-      });
-
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.message || 'Error al guardar el ajuste');
-
-      setIsAdjustOpen(false);
-      showConfirm('Ajuste de inventario registrado correctamente.');
-      loadProductDetails();
-      if (onUpdate) onUpdate();
-    } catch (err) {
-      alert(`Error en el ajuste: ${err.message}`);
     }
   };
 
@@ -557,9 +509,6 @@ function Detalle_producto({ isOpen, onClose, articuloId, onUpdate }) {
                 </button>
                 <button className="btn btn-outline" style={{ fontSize: '12px', padding: '6px 10px' }} onClick={() => setIsTransferOpen(true)}>
                   Transferir stock
-                </button>
-                <button className="btn btn-outline" style={{ fontSize: '12px', padding: '6px 10px' }} onClick={() => setIsAdjustOpen(true)}>
-                  Registrar ajuste
                 </button>
               </div>
             </div>
@@ -838,49 +787,6 @@ function Detalle_producto({ isOpen, onClose, articuloId, onUpdate }) {
             <div className="form-field" style={{ flex: '2 1 200px' }}>
               <label>Motivo</label>
               <input type="text" value={transferData.motivo} onChange={(e) => setTransferData({ ...transferData, motivo: e.target.value })} />
-            </div>
-          </div>
-        </form>
-      </Modal>
-
-      {/* SUB-MODAL AJUSTE */}
-      <Modal
-        isOpen={isAdjustOpen}
-        onClose={() => setIsAdjustOpen(false)}
-        title="Registrar Ajuste / Merma"
-        footer={
-          <>
-            <button className="btn btn-outline" onClick={() => setIsAdjustOpen(false)}>Cancelar</button>
-            <button className="btn btn-primary" onClick={handleConfirmAdjust}>Guardar Ajuste</button>
-          </>
-        }
-      >
-        <form onSubmit={handleConfirmAdjust} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-            <div className="form-field" style={{ flex: '1 1 180px' }}>
-              <label>Depósito</label>
-              <select value={adjustData.deposito_id} onChange={(e) => setAdjustData({ ...adjustData, deposito_id: e.target.value })}>
-                {depositosDisponibles.map((d) => <option key={d.id} value={d.id}>{d.nombre}</option>)}
-              </select>
-            </div>
-            <div className="form-field" style={{ flex: '1 1 180px' }}>
-              <label>Tipo</label>
-              <select value={adjustData.tipo} onChange={(e) => setAdjustData({ ...adjustData, tipo: e.target.value })}>
-                <option value="positivo">Ajuste positivo (+)</option>
-                <option value="negativo">Ajuste negativo / Merma (-)</option>
-              </select>
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-            <div className="form-field" style={{ flex: '2 1 200px' }}>
-              <label>Motivo</label>
-              <select value={adjustData.motivo_id} onChange={(e) => setAdjustData({ ...adjustData, motivo_id: e.target.value })}>
-                {motivosAjuste.map((m) => <option key={m.id} value={m.id}>{m.nombre}</option>)}
-              </select>
-            </div>
-            <div className="form-field" style={{ flex: '1 1 120px' }}>
-              <label>Cantidad</label>
-              <input type="number" min="1" required value={adjustData.cantidad} onChange={(e) => setAdjustData({ ...adjustData, cantidad: Number(e.target.value) })} />
             </div>
           </div>
         </form>
