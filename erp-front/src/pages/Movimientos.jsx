@@ -1,6 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import Modal from '../components/Modal';
 
+// TEMPORAL: hasta que exista login/auth real, se usa un usuario fijo.
+// Reemplazar por el UUID real de un usuario existente en la tabla `usuarios` de Supabase.
+const TEMP_USER_ID = '7ab3d65c-eecc-4f0b-98a1-2c53efce620e';
+
 function Movimientos() {
   const [movements, setMovements] = useState([]);
 
@@ -230,7 +234,8 @@ const [selectedArticleId, setSelectedArticleId] = useState('');
         deposito_id: selectedDepositId,          
         cantidad_anterior: baseStock,
         cantidad_nueva: calculatedResultStock,
-        motivo_id: selectedReasonId || null                
+        motivo_id: selectedReasonId || null,
+        usuario_id: TEMP_USER_ID
       };
 
       if (!isAdjustment) {
@@ -241,7 +246,8 @@ const [selectedArticleId, setSelectedArticleId] = useState('');
            articulo_id: selectedArticleId,
            deposito_origen_id: selectedDepositId,
            deposito_destino_id: targetId,
-           cantidad: Number(qty)
+           cantidad: Number(qty),
+           usuario_id: TEMP_USER_ID
         };
       }
 
