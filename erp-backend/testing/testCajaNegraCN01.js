@@ -1,4 +1,4 @@
-const API_URL = 'http://localhost:3001/api/articles?limit=2&page=1';
+const API_URL = 'http://localhost:3001/api/articles?limit=5&page=2';
 
 async function testCajaNegraCN01() {
   console.log("🚀 Iniciando Test CN-01: Paginación en Listado de Artículos...\n");

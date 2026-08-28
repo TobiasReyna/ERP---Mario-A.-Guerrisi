@@ -300,11 +300,13 @@ function Alertas_de_stock() {
                     </span>
                     <button
                       className="btn btn-outline btn-sm"
-                      onClick={() => handleOpenRepositionModal({
+                      onClick={() =>{handleOpenRepositionModal({
                         name: card.articulo_descripcion,
                         code: codigoCard,
                         suggested: card.reposicion_sugerida,
-                      })}
+                      });
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
                     >
                       Generar reposición
                     </button>

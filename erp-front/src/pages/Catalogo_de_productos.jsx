@@ -583,7 +583,7 @@ function Catalogo_de_productos() {
                     <ProductStock articuloId={prod.id} />
 
                     <div className="product-card-actions">
-                      <button className="btn btn-outline" onClick={() => handleOpenDetailModal(prod.id)}>
+                      <button className="btn btn-outline" onClick={() => {handleOpenDetailModal(prod.id); window.scrollTo({ top: 0, behavior: 'smooth' });}}>
                         Ver detalle
                       </button>
 
@@ -594,6 +594,7 @@ function Catalogo_de_productos() {
                           onClick={() => {
                             setProductToDeactivate(prod);
                             setIsDeactivateModalOpen(true);
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
                           }}
                         >
                           <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
