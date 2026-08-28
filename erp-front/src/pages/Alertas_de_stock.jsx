@@ -200,7 +200,7 @@ function Alertas_de_stock() {
               <div className="alert-card" key={`${card.articulo_id}_${card.deposito_id}`}>
                 <div className="alert-card-head">
                   <div>
-                    <div className="alert-card-name">{card.articulo_nombre}</div>
+                    <div className="alert-card-name">{card.articulo_descripcion}</div>
                     <div className="alert-card-sku">ID: {card.articulo_id.substring(0,8)}</div>
                   </div>
                   <span className="badge badge-red">
@@ -222,7 +222,7 @@ function Alertas_de_stock() {
                     <div className="l">Máximo</div>
                   </div>
                   <div className="alert-metric suggest">
-                    <div className="n">{card.cantidad_sugerida}</div>
+                    <div className="n">{card.cantidad_sugerida_reposicion}</div>
                     <div className="l">Reponer</div>
                   </div>
                 </div>
@@ -238,9 +238,9 @@ function Alertas_de_stock() {
                   <button
                     className="btn btn-outline btn-sm"
                     onClick={() => handleOpenRepositionModal({
-                      name: card.articulo_nombre,
+                      name: card.articulo_descripcion,
                       code: card.articulo_id.substring(0,8),
-                      suggested: card.cantidad_sugerida
+                      suggested: card.cantidad_sugerida_reposicion
                     })}
                   >
                     Generar reposición
@@ -302,13 +302,13 @@ function Alertas_de_stock() {
                     const isCrit = row.stock_actual <= (row.stock_minimo / 2);
                     return (
                       <tr key={`${row.articulo_id}_${row.deposito_id}`}>
-                        <td className="cell-strong">{row.articulo_nombre}</td>
+                        <td className="cell-strong">{row.articulo_descripcion}</td>
                         <td className={`stock-cell ${isCrit ? 'crit' : 'low'}`}>
                           {row.stock_actual}
                         </td>
                         <td>{row.stock_minimo}</td>
                         <td>{row.stock_maximo}</td>
-                        <td className="cell-strong">{row.cantidad_sugerida}</td>
+                        <td className="cell-strong">{row.cantidad_sugerida_reposicion}</td>
                         <td>{row.deposito_nombre}</td>
                         <td>
                           <span className={`badge ${isCrit ? 'badge-red' : 'badge-amber'}`}>
