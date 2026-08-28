@@ -265,12 +265,27 @@ function Catalogo_de_productos() {
   };
 
   // Reactivar producto
-  const handleConfirmReactivate = () => {
+  const handleConfirmReactivate = async () => {
     if (!productToReactivate) return;
-    setProducts(products.map(p => p.id === productToReactivate.id ? { ...p, estado: true } : p));
-    setIsReactivateModalOpen(false);
-    showToast(`El producto "${productToReactivate.descripcion}" fue reactivado en el catálogo activo.`);
-    setProductToReactivate(null);
+
+    try {
+      const response = await fetch(`http://localhost:3001/api/articles/${productToReactivate.id}/reactivate`, {
+        method: 'PATCH'
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error al reactivar el producto');
+      }
+
+      setProducts(products.map(p => p.id === productToReactivate.id ? { ...p, estado: true } : p));
+      setIsReactivateModalOpen(false);
+      showToast(`El producto "${getBrandName(productToReactivate.marca_id)} ${productToReactivate.modelo}" fue reactivado en el catálogo activo.`);
+      setProductToReactivate(null);
+    } catch (error) {
+      console.error(error);
+      alert(error.message);
+    }
   };
 
 
@@ -782,7 +797,7 @@ function Catalogo_de_productos() {
         }
       >
         <p style={{ fontSize: '13.5px', color: 'var(--gray-700)', lineHeight: '1.6' }}>
-          ¿Deseás reactivar <strong>{productToReactivate?.descripcion} ({productToReactivate?.codigo_interno})</strong>? El producto volverá a estar disponible para movimientos y consultas en el catálogo activo.
+          ¿Deseás reactivar <strong>{getBrandName(productToReactivate?.marca_id)} {productToReactivate?.modelo}</strong>? El producto volverá a estar disponible para movimientos y consultas en el catálogo activo.
         </p>
       </Modal>
     </div>

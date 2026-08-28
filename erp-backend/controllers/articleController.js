@@ -165,6 +165,21 @@ const darBajaLogica = async (req, res) => {
     }
 };
 
+const darAltaLogica = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const articuloAlta = await ArticleService.darAltaLogica(id);
+        
+        return res.status(200).json({
+            message: 'Artículo reactivado con éxito.',
+            data: articuloAlta
+        });
+    } catch (error) {
+        console.error('[API] Error PATCH /api/articles/:id/reactivate:', error);
+        return res.status(500).json({ error: error.message || 'Error interno al reactivar el artículo.' });
+    }
+};
+
 module.exports = {
     crearArticulo,
     obtenerArticulosActivos,
@@ -172,5 +187,6 @@ module.exports = {
     obtenerTodosArticulos,
     obtenerArticuloPorId,
     modificarArticulo,
-    darBajaLogica
+    darBajaLogica,
+    darAltaLogica
 };

@@ -135,6 +135,20 @@ class ArticleService {
         }
         return data;
     }
+
+    static async darAltaLogica(id) {
+        const { data, error } = await supabaseAdmin
+            .from('articulos')
+            .update({ estado: true })
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) {
+            throw new Error(`Error en base de datos: ${error.message}`);
+        }
+        return data;
+    }
 }
 
 module.exports = ArticleService;

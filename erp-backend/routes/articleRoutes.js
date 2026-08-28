@@ -23,4 +23,7 @@ router.put('/:id', articleController.modificarArticulo);
 // PATCH /api/articles/:id/status - Baja lógica de un artículo
 router.patch('/:id/status', articleController.darBajaLogica);
 
+// PATCH /api/articles/:id/reactivate - Alta lógica de un artículo
+router.patch('/:id/reactivate', articleController.darAltaLogica);
+
 module.exports = router;
