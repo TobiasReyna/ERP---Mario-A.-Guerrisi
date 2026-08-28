@@ -51,7 +51,7 @@ CREATE TABLE public.usuarios (
 );
 CREATE TABLE public.articulos (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
-  codigo_interno text NOT NULL UNIQUE,
+  codigo_interno text NOT NULL DEFAULT ('COD-'::text || lpad((nextval('sq_articulos_codigo'::regclass))::text, 5, '0'::text)) UNIQUE,
   descripcion text NOT NULL,
   codigo_ean13 text NOT NULL UNIQUE,
   categoria_id uuid NOT NULL,
@@ -83,8 +83,8 @@ CREATE TABLE public.existencias (
   cantidad integer NOT NULL DEFAULT 0,
   fecha_hora_actualizacion timestamp without time zone NOT NULL DEFAULT now(),
   id_art_x_dep uuid NOT NULL DEFAULT gen_random_uuid(),
-  stock_min smallint,
-  stock_max smallint,
+  stock_min smallint DEFAULT '0'::smallint,
+  stock_max smallint DEFAULT '0'::smallint,
   CONSTRAINT existencias_pkey PRIMARY KEY (id_art_x_dep),
   CONSTRAINT exitencias_articulo_id_fkey FOREIGN KEY (articulo_id) REFERENCES public.articulos(id),
   CONSTRAINT exitencias_deposito_id_fkey FOREIGN KEY (deposito_id) REFERENCES public.depositos(id)
