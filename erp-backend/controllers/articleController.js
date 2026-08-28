@@ -1,7 +1,7 @@
 const ArticleService = require('../services/articleService');
 
 // Inyectando usuario para Sprint 1
-const TEST_USER_ID = "TU_UUID_REAL_AQUI";
+const TEST_USER_ID = "TU_USER_ID";
 
 const crearArticulo = async (req, res) => {
     try {
@@ -140,6 +140,9 @@ const darBajaLogica = async (req, res) => {
             data: articuloBaja
         });
     } catch (error) {
+        if (error.message.includes('Cannot coerce the result to a single JSON object') || error.message.includes('JSON object requested')) {
+            return res.status(404).json({ error: 'El artículo que intenta dar de baja no existe.' });
+            }
         console.error('[API] Error PATCH /api/articles/:id/status:', error);
         return res.status(500).json({ error: error.message || 'Error interno al dar de baja el artículo.' });
     }
