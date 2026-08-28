@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import Modal from '../components/Modal';
+import { exportToExcel } from '../utils/exportExcel';
 
 function Alertas_de_stock() {
   const [alertas, setAlertas] = useState([]);
@@ -23,12 +24,13 @@ function Alertas_de_stock() {
         setLoadingAlertas(false);
       }
     };
+
     const fetchActivities = async () => {
       try {
         const res = await fetch('http://localhost:3001/api/system/activity');
         if (res.ok) {
           const json = await res.json();
-          const mapped = (json.data || []).map(a => {
+          const mapped = (json.data || []).map((a) => {
             const dateObj = new Date(a.fecha);
             const timeStr = `${String(dateObj.getDate()).padStart(2, '0')}/${String(dateObj.getMonth() + 1).padStart(2, '0')}/${dateObj.getFullYear()} · ${String(dateObj.getHours()).padStart(2, '0')}:${String(dateObj.getMinutes()).padStart(2, '0')}`;
             return {
@@ -38,15 +40,16 @@ function Alertas_de_stock() {
               time: timeStr,
               category: a.tipo === 'MOVIMIENTOS' ? 'Movimientos' : 'Catálogo',
               type: a.typeLabel,
-              unread: true
+              unread: true,
             };
           });
           setActivities(mapped);
         }
       } catch (err) {
-        console.error("Error fetching activities:", err);
+        console.error('Error fetching activities:', err);
       }
     };
+
     fetchAlertas();
     fetchActivities();
   }, []);
@@ -58,6 +61,7 @@ function Alertas_de_stock() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [orderQty, setOrderQty] = useState(1);
+  const [isExporting, setIsExporting] = useState(false);
 
   const unreadActivityCount = useMemo(() => activities.filter((a) => a.unread).length, [activities]);
 
@@ -66,8 +70,37 @@ function Alertas_de_stock() {
     setTimeout(() => setToastMessage(null), 4000);
   };
 
-  const handleExportExcel = () => {
-    showToast('Listado de reposición exportado correctamente en formato Excel.');
+  const handleExportExcel = async () => {
+    if (alertas.length === 0) {
+      showToast('No hay productos que requieran reposición para exportar.');
+      return;
+    }
+
+    try {
+      setIsExporting(true);
+      const excelRows = alertas.map((row) => {
+        const isCrit = row.stock_actual <= row.stock_minimo / 2;
+        return {
+          'Código': row.articulo_id ? String(row.articulo_id).substring(0, 8) : 'N/A',
+          'Producto': row.articulo_nombre,
+          'Stock Actual': row.stock_actual,
+          'Stock Mínimo': row.stock_minimo,
+          'Stock Máximo': row.stock_maximo,
+          'Reposición Sugerida': row.cantidad_sugerida,
+          'Depósito / Alcance': row.deposito_nombre,
+          'Prioridad': isCrit ? 'Crítico' : 'Reposición',
+        };
+      });
+
+      const today = new Date().toISOString().slice(0, 10);
+      await exportToExcel(excelRows, `Reposicion_Stock_${today}.xlsx`, 'Reposición Sugerida');
+      showToast('Listado de reposición exportado correctamente en formato Excel.');
+    } catch (err) {
+      console.error('Error exportando a Excel:', err);
+      showToast('Ocurrió un error al generar el archivo Excel.');
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const handleOpenRepositionModal = (item) => {
@@ -96,15 +129,6 @@ function Alertas_de_stock() {
 
   return (
     <div>
-      {/* ENCABEZADO */}
-      <div className="section-heading">
-        <div>
-          <h2>Alertas y notificaciones</h2>
-          <span className="desc">
-            Reposición de stock (HU-06) y actividad general del sistema, en una sola pantalla
-          </span>
-        </div>
-      </div>
 
       {/* BANNER DE CONFIRMACIÓN */}
       {toastMessage && (
@@ -157,15 +181,15 @@ function Alertas_de_stock() {
             </div>
             <div className="alert-summary-stats">
               <div className="alert-summary-stat">
-                <div className="n">{alertas.filter(a => a.stock_actual <= (a.stock_minimo / 2)).length}</div>
+                <div className="n">{alertas.filter((a) => a.stock_actual <= a.stock_minimo / 2).length}</div>
                 <div className="l">Críticos</div>
               </div>
               <div className="alert-summary-stat">
-                <div className="n">{alertas.filter(a => a.stock_actual > (a.stock_minimo / 2)).length}</div>
+                <div className="n">{alertas.filter((a) => a.stock_actual > a.stock_minimo / 2).length}</div>
                 <div className="l">Reposición</div>
               </div>
               <div className="alert-summary-stat">
-                <div className="n">{new Set(alertas.map(a => a.deposito_id)).size}</div>
+                <div className="n">{new Set(alertas.map((a) => a.deposito_id)).size}</div>
                 <div className="l">Depósitos</div>
               </div>
             </div>
@@ -193,15 +217,15 @@ function Alertas_de_stock() {
           <div className="alert-cards">
             {loadingAlertas && <div style={{ padding: '20px', color: 'var(--gray-500)' }}>Cargando alertas críticas...</div>}
             {errorAlertas && <div style={{ padding: '20px', color: 'var(--red)' }}>Error: {errorAlertas}</div>}
-            {!loadingAlertas && !errorAlertas && alertas.filter(a => a.stock_actual <= (a.stock_minimo / 2)).length === 0 && (
+            {!loadingAlertas && !errorAlertas && alertas.filter((a) => a.stock_actual <= a.stock_minimo / 2).length === 0 && (
               <div style={{ padding: '20px', color: 'var(--gray-500)' }}>No hay productos en estado crítico.</div>
             )}
-            {!loadingAlertas && !errorAlertas && alertas.filter(a => a.stock_actual <= (a.stock_minimo / 2)).map((card, idx) => (
+            {!loadingAlertas && !errorAlertas && alertas.filter((a) => a.stock_actual <= a.stock_minimo / 2).map((card) => (
               <div className="alert-card" key={`${card.articulo_id}_${card.deposito_id}`}>
                 <div className="alert-card-head">
                   <div>
                     <div className="alert-card-name">{card.articulo_nombre}</div>
-                    <div className="alert-card-sku">ID: {card.articulo_id.substring(0,8)}</div>
+                    <div className="alert-card-sku">ID: {card.articulo_id.substring(0, 8)}</div>
                   </div>
                   <span className="badge badge-red">
                     <span className="badge-dot"></span>Crítico
@@ -239,8 +263,8 @@ function Alertas_de_stock() {
                     className="btn btn-outline btn-sm"
                     onClick={() => handleOpenRepositionModal({
                       name: card.articulo_nombre,
-                      code: card.articulo_id.substring(0,8),
-                      suggested: card.cantidad_sugerida
+                      code: card.articulo_id.substring(0, 8),
+                      suggested: card.cantidad_sugerida,
                     })}
                   >
                     Generar reposición
@@ -258,13 +282,17 @@ function Alertas_de_stock() {
                 Incluye productos críticos y en reposición — base para generar la orden de compra
               </span>
             </div>
-            <button className="btn btn-outline" onClick={handleExportExcel}>
+            <button 
+              className="btn btn-outline" 
+              onClick={handleExportExcel}
+              disabled={loadingAlertas || alertas.length === 0 || isExporting}
+            >
               <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
                 <path d="M14 2v6h6" />
                 <path d="m9 15 3 3 3-3M12 12v6" />
               </svg>
-              Exportar a Excel
+              {isExporting ? 'Exportando...' : 'Exportar a Excel'}
             </button>
           </div>
 
@@ -299,7 +327,7 @@ function Alertas_de_stock() {
                     </tr>
                   )}
                   {!loadingAlertas && !errorAlertas && alertas.map((row) => {
-                    const isCrit = row.stock_actual <= (row.stock_minimo / 2);
+                    const isCrit = row.stock_actual <= row.stock_minimo / 2;
                     return (
                       <tr key={`${row.articulo_id}_${row.deposito_id}`}>
                         <td className="cell-strong">{row.articulo_nombre}</td>
