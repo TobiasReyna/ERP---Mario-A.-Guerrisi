@@ -2,44 +2,34 @@ import { useState, useEffect, useMemo } from 'react';
 import Modal from '../components/Modal';
 import { supabase } from '../config/supabaseClient';
 
-// TEMPORAL: hasta que exista login/auth real, se usa un usuario fijo.
-// Reemplazar por el UUID real de un usuario existente en la tabla `usuarios` de Supabase.
-const TEMP_USER_ID = '7ab3d65c-eecc-4f0b-98a1-2c53efce620e';
-
 function Movimientos() {
-  const [movements, setMovements] = useState([]);
-
+  const [allMovements, setAllMovements] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
 
   // Filtros
   const [selectedType, setSelectedType] = useState('Todos');
   const [selectedWarehouse, setSelectedWarehouse] = useState('Todos');
   const [selectedUser, setSelectedUser] = useState('Todos');
   const [searchQuery, setSearchQuery] = useState('');
-  const [filteredMovements, setFilteredMovements] = useState([]);
-  const [isLoadingFilters, setIsLoadingFilters] = useState(false);
 
   // Toast confirmación
   const [confirmToast, setConfirmToast] = useState(null);
 
   // Modal registrar movimiento
   const [isModalOpen, setIsModalOpen] = useState(false);
-  
-  // Real DB States
-  const [dbArticles, setDbArticles] = useState([]);
-  const [dbDeposits, setDbDeposits] = useState([]);
-  const [dbReasons, setDbReasons] = useState([]);
- 
+
+  // Catálogos maestros
   const [dbFetchProd, setDbFetchProd] = useState([]);
   const [dbFetchDepo, setDbFetchDepo] = useState([]);
   const [dbFetchUsu, setDbFetchUsu] = useState([]);
   const [dbFetchMot, setDbFetchMot] = useState([]);
 
-  
+  // Formulario modal
   const [selectedArticleId, setSelectedArticleId] = useState('');
   const [selectedDepositId, setSelectedDepositId] = useState('');
   const [selectedReasonId, setSelectedReasonId] = useState('');
-  const [baseStock, setBaseStock] = useState(0);
   const [selectedDestinationDepositId, setSelectedDestinationDepositId] = useState('');
+  const [baseStock, setBaseStock] = useState(0);
 
   const [movementType, setMovementType] = useState('entrada');
   const [qty, setQty] = useState(5);
@@ -48,279 +38,165 @@ function Movimientos() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
 
-  //asi todo croto hago un insert distinto
- 
-
-  const fetchHistory = async (articles) => {
+  // =========================================================================
+  // 1. CARGA DE HISTORIAL (AJUSTES + TRANSFERENCIAS)
+  // =========================================================================
+  const fetchAllMovements = async () => {
+    setIsLoading(true);
     try {
-      const allHistories = await Promise.all(
-        articles.map(art =>
-          fetch(`http://localhost:3001/api/stock/${art.id}/history`)
-            .then(res => res.json())
-            .then(json => (json.data || []).map(m => ({ ...m, product: art.descripcion })))
-            .catch(() => [])
-        )
-      );
+      const [artRes, depRes, usuRes, motRes, ajRes, trRes] = await Promise.all([
+        supabase.from('articulos').select('id, descripcion, modelo'),
+        supabase.from('depositos').select('id, nombre'),
+        supabase.from('usuarios').select('id, nombre'),
+        supabase.from('motivos_ajustes').select('id, nombre'),
+        supabase.from('ajustes_stock').select('*'),
+        supabase.from('transferencias_stock').select('*'),
+      ]);
 
-      const combined = allHistories.flat();
-      
-      const formatted = combined.map((m, i) => {
-        const dateObj = new Date(m.fecha);
-        const dateFormatted = `${String(dateObj.getDate()).padStart(2, '0')}/${String(dateObj.getMonth() + 1).padStart(2, '0')}/${dateObj.getFullYear()} ${String(dateObj.getHours()).padStart(2, '0')}:${String(dateObj.getMinutes()).padStart(2, '0')}`;
-        
-        let typeLabel = m.tipo_movimiento;
-        let typeClass = '';
-        let qtyStr = '';
-        let reason = '';
-        let warehouse = '';
-        let stockChange = '-';
+      const artMap = new Map((artRes.data || []).map((a) => [a.id, a]));
+      const depMap = new Map((depRes.data || []).map((d) => [d.id, d.nombre]));
+      const usuMap = new Map((usuRes.data || []).map((u) => [u.id, u.nombre]));
+      const motMap = new Map((motRes.data || []).map((m) => [m.id, m.nombre]));
 
-        if (m.tipo_movimiento === 'AJUSTE') {
-           if (m.cantidad_afectada >= 0) {
-             typeLabel = 'AJUSTE POS.';
-             typeClass = 'type-ajuste-pos';
-             qtyStr = `+${m.cantidad_afectada}`;
-           } else {
-             typeLabel = 'AJUSTE NEG.';
-             typeClass = 'type-ajuste-neg';
-             qtyStr = `${m.cantidad_afectada}`;
-           }
-           const motivoMatch = m.detalle.match(/Motivo: (.+?) en (.+?)\. Stock anterior/);
-           if (motivoMatch) {
-              reason = motivoMatch[1];
-              warehouse = motivoMatch[2];
-           } else {
-              reason = m.detalle;
-           }
-           const stockMatch = m.detalle.match(/Stock anterior: (.+?) -> Nuevo: (.+)/);
-           if (stockMatch) {
-              stockChange = `${stockMatch[1]} → ${stockMatch[2]}`;
-           }
-        } else if (m.tipo_movimiento === 'TRANSFERENCIA') {
-           typeLabel = 'TRANSFERENCIA';
-           typeClass = 'type-transferencia';
-           qtyStr = `${m.cantidad_afectada}`;
-           const depMatch = m.detalle.match(/De: (.+?) Hacia: (.+)/);
-           if (depMatch) {
-             warehouse = `${depMatch[1]} → ${depMatch[2]}`;
-           }
-           reason = 'Transferencia'; 
-           stockChange = '-';
-        }
+      const lista = [];
 
-        return {
-           id: `hist-${i}-${dateObj.getTime()}`,
-           date: dateFormatted,
-           rawDate: dateObj,
-           product: m.product,
-           type: typeLabel,
-           typeClass,
-           warehouse,
-           qty: qtyStr,
-           reason,
-           user: 'Juan Pérez',
-           stockChange
-        };
-      });
+      // A. Mapeo de Ajustes (Tienen stock anterior y nuevo)
+      if (ajRes.data) {
+        ajRes.data.forEach((a) => {
+          const dateObj = new Date(a.fecha_hora_registro);
+          const dateFormatted = `${String(dateObj.getDate()).padStart(2, '0')}/${String(dateObj.getMonth() + 1).padStart(2, '0')}/${dateObj.getFullYear()} ${String(dateObj.getHours()).padStart(2, '0')}:${String(dateObj.getMinutes()).padStart(2, '0')}`;
 
-      formatted.sort((a, b) => b.rawDate - a.rawDate);
-      setMovements(formatted);
+          const art = artMap.get(a.articulo_id);
+          const depNombre = depMap.get(a.deposito_id) || 'Depósito';
+          const usuNombre = usuMap.get(a.usuario_id) || 'Administrador de Sistema';
+          const motNombre = motMap.get(a.motivo_id) || 'Ajuste de inventario';
+
+          const cantAnt = a.cantidad_anterior ?? 0;
+          const cantNue = a.cantidad_nueva ?? 0;
+          const delta = cantNue - cantAnt;
+          const tipoLabel = delta >= 0 ? 'Ajuste positivo' : 'Ajuste negativo';
+
+          lista.push({
+            id: `aj-${a.id}`,
+            rawDate: dateObj,
+            date: dateFormatted,
+            product: art?.descripcion || 'Producto no especificado',
+            model: art?.modelo || 'Estándar',
+            type: tipoLabel,
+            warehouse: depNombre,
+            qty: delta >= 0 ? `+${delta}` : `${delta}`,
+            reason: motNombre,
+            user: usuNombre,
+            stockChange: `${cantAnt} → ${cantNue}`,
+          });
+        });
+      }
+
+      // B. Mapeo de Transferencias
+      if (trRes.data) {
+        trRes.data.forEach((t) => {
+          const dateObj = new Date(t.fecha_hora_registro);
+          const dateFormatted = `${String(dateObj.getDate()).padStart(2, '0')}/${String(dateObj.getMonth() + 1).padStart(2, '0')}/${dateObj.getFullYear()} ${String(dateObj.getHours()).padStart(2, '0')}:${String(dateObj.getMinutes()).padStart(2, '0')}`;
+
+          const art = artMap.get(t.articulo_id);
+          const origen = depMap.get(t.deposito_origen_id) || 'Origen';
+          const destino = depMap.get(t.deposito_destino_id) || 'Destino';
+          const usuNombre = usuMap.get(t.usuario_id) || 'Usuario de Sistema';
+          const motNombre = motMap.get(t.motivo_id) || 'Transferencia';
+
+          const isSameWarehouse = t.deposito_origen_id === t.deposito_destino_id;
+          const warehouseDisplay = isSameWarehouse ? origen : `${origen} → ${destino}`;
+
+          lista.push({
+            id: `tr-${t.id}`,
+            rawDate: dateObj,
+            date: dateFormatted,
+            product: art?.descripcion || 'Producto no especificado',
+            model: art?.modelo || 'Estándar',
+            type: 'Transferencia',
+            warehouse: warehouseDisplay,
+            qty: `${t.cantidad}`,
+            reason: motNombre,
+            user: usuNombre,
+            stockChange: '-',
+          });
+        });
+      }
+
+      lista.sort((a, b) => b.rawDate - a.rawDate);
+      setAllMovements(lista);
     } catch (err) {
-      console.error('Error fetching history:', err);
-    }
-  };
-  const fetchProducts = async () => {
-    try {
-      const {data, error} = await supabase.from('articulos').select('*');
-      if (error) {
-        throw error;
-      }
-      setDbFetchProd(data)
-    } catch (err) {
-      console.error('Error fetching products:', err);
-    }
-  };
-  const fetchDepositos = async () => {
-    try {
-      const {data, error} = await supabase.from('depositos').select('*');
-      if (error) {
-        throw error;
-      }
-      setDbFetchDepo(data)
-    } catch (err) {
-      console.error('Error fetching products:', err);
-    }
-  };
-  const fetchUsuarios = async () => {
-    try {
-      const {data, error} = await supabase.from('usuarios').select('*');
-      if (error) {
-        throw error;
-      }
-      setDbFetchUsu(data)
-    } catch (err) {
-      console.error('Error fetching products:', err);
-    }
-  };
-  const fetchMotivos = async () => {
-    try {
-      const {data, error} = await supabase.from('motivos_ajustes').select('*');
-      if (error) {
-        throw error;
-      }
-      setDbFetchMot(data)
-    } catch (err) {
-      console.error('Error fetching products:', err);
-    }
-  };
-  const fetchStock = async () => {
-  // Si falta alguna de las dos selecciones en el modal, no consultamos la DB
-  if (!selectedArticleId || !selectedDepositId) return;
-
-  try {
-    const { data, error } = await supabase
-      .from('existencias')
-      .select('cantidad')
-      .eq('articulo_id', selectedArticleId) // Filtra por el UUID del artículo
-      .eq('deposito_id', selectedDepositId); // Filtra por el UUID del depósito
-
-    if (error) throw error;
-
-    // Si la fila existe en la tabla, tomamos su cantidad. Si no existe, asumimos 0.
-    if (data && data.length > 0) {
-      setBaseStock(data[0].cantidad);
-    } else {
-      setBaseStock(0);
-    }
-  } catch (err) {
-    console.error('Error fetching stock de existencias:', err);
-    setBaseStock(0);
-  }
-};
-
-
-  useEffect(() => {
-  async function fetchFilteredData() {
-    setIsLoadingFilters(true);
-    
-    try {
-      // 1. JOIN anidado: articulos -> categorias / marcas
-      let query = supabase
-       .from('transferencias_stock') 
-       .select(`*,
-         articulos ( 
-           descripcion, 
-           categorias ( nombre ),
-           marcas ( nombre )
-         ),
-         motivos_ajustes ( nombre ),
-         usuarios ( nombre ),
-         origen:depositos!deposito_origen_id ( nombre )
-        `);
-
-      if (selectedType !== 'Todos') {
-        const typeMapping = {
-          'Entrada': 'ENTRADA',
-          'Salida': 'SALIDA',
-          'Ajuste positivo': 'AJUSTE POS.',
-          'Ajuste negativo': 'AJUSTE NEG.',
-          'Transferencia': 'TRANSFERENCIA'
-        };
-        query = query.eq('tipo_movimiento', typeMapping[selectedType]); 
-      }
-
-      if (selectedWarehouse !== 'Todos') {
-        query = query.ilike('deposito', `%${selectedWarehouse}%`);
-      }
-
-      if (selectedUser !== 'Todos') {
-        query = query.eq('usuario', selectedUser);
-      }
-
-      if (searchQuery.trim() !== '') {
-        query = query.or(`producto.ilike.%${searchQuery}%,motivo.ilike.%${searchQuery}%`);
-      }
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-
-      const formattedData = (data || []).map((row, i) => {
-        let fechaLimpia = row.fecha_hora_registro 
-          ? row.fecha_hora_registro.split('.')[0].replace('T', ' ') 
-          : '';
-
-        // 2. Extraemos el nombre de la categoría (o marca) navegando por el objeto anidado
-        let nombreCategoria = row.articulos?.categorias?.nombre || '-';
-        let nombreMarca = row.articulos?.marcas?.nombre || '';
-
-        return {
-          id: row.id || `hist-${i}`,
-          date: fechaLimpia, 
-          product: row.articulos?.descripcion || 'Producto desconocido', 
-          type: nombreCategoria, // Puedes cambiarlo a nombreMarca si prefieres mostrar la marca
-          typeClass: '', 
-          warehouse: row.origen?.nombre || 'Depósito desconocido', 
-          qty: row.cantidad, 
-          reason: row.motivos_ajustes?.nombre || 'Transferencia',
-          user: row.usuarios?.nombre || 'Usuario desconocido',
-          stockChange: '-' 
-        };
-      });
-
-      setFilteredMovements(formattedData);
-
-    } catch (error) {
-      console.error('Error al filtrar en Supabase:', error.message);
+      console.error('Error cargando movimientos:', err);
     } finally {
-      setIsLoadingFilters(false);
+      setIsLoading(false);
     }
-  }
+  };
 
-  fetchFilteredData();
-}, [selectedType, selectedWarehouse, selectedUser, searchQuery]);
-
+  // =========================================================================
+  // 2. CARGA DE CATÁLOGOS MAESTROS
+  // =========================================================================
   useEffect(() => {
-    const fetchMasterData = async () => {
+    const loadCatalogs = async () => {
       try {
-        const [resArt, resDep, resRea] = await Promise.all([
-          fetch('http://localhost:3001/api/existencias'),
-          fetch('http://localhost:3001/api/depositos'),
-          fetch('http://localhost:3001/api/motivos_ajustes')
+        const [pRes, dRes, uRes, mRes] = await Promise.all([
+          supabase.from('articulos').select('*').eq('estado', true),
+          supabase.from('depositos').select('*'),
+          supabase.from('usuarios').select('*'),
+          supabase.from('motivos_ajustes').select('*'),
         ]);
-        const art = await resArt.json();
-        const dep = await resDep.json();
-        const rea = await resRea.json();
-        
-        setDbArticles(art.data || []);
-        setDbDeposits(dep.data || []);
-        setDbReasons(rea.data || []);
 
-        if (art.data?.length > 0) setSelectedArticleId(art.data[0].id);
-        if (dep.data?.length > 0) setSelectedDepositId(dep.data[0].id);
-
-        if (art.data && art.data.length > 0) {
-          await fetchHistory(art.data);
+        if (pRes.data && pRes.data.length > 0) {
+          setDbFetchProd(pRes.data);
+          setSelectedArticleId(pRes.data[0].id);
+        }
+        if (dRes.data && dRes.data.length > 0) {
+          setDbFetchDepo(dRes.data);
+          setSelectedDepositId(dRes.data[0].id);
+        }
+        if (uRes.data && uRes.data.length > 0) {
+          setDbFetchUsu(uRes.data);
+          setUser(uRes.data[0].id);
+        }
+        if (mRes.data) {
+          setDbFetchMot(mRes.data);
+          if (mRes.data.length > 0) setSelectedReasonId(mRes.data[0].id);
         }
       } catch (err) {
-        console.error('Error cargando catálogos del servidor local:', err);
+        console.error('Error cargando catálogos:', err);
       }
     };
 
-    // Llamadas iniciales a Supabase
-    fetchProducts();
-    fetchDepositos();
-    fetchUsuarios();
-    fetchMotivos();
-    fetchMasterData();
+    loadCatalogs();
+    fetchAllMovements();
   }, []);
 
-  useEffect(() => {
-    if (selectedArticleId && selectedDepositId) {
-      fetchStock(); 
+  // Obtener stock actual de la combinación Artículo-Depósito
+  const fetchCurrentStock = async () => {
+    if (!selectedArticleId || !selectedDepositId) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('existencias')
+        .select('cantidad')
+        .eq('articulo_id', selectedArticleId)
+        .eq('deposito_id', selectedDepositId)
+        .maybeSingle();
+
+      if (error) throw error;
+      setBaseStock(data?.cantidad ?? 0);
+    } catch (err) {
+      console.error('Error obteniendo existencias:', err);
+      setBaseStock(0);
     }
+  };
+
+  useEffect(() => {
+    fetchCurrentStock();
   }, [selectedArticleId, selectedDepositId]);
 
+  // =========================================================================
+  // 3. CÁLCULO DE STOCK RESULTANTE
+  // =========================================================================
   const isAdjustment = movementType === 'ajuste-pos' || movementType === 'ajuste-neg';
 
   const calculatedResultStock = useMemo(() => {
@@ -332,27 +208,56 @@ function Movimientos() {
 
   const isNegativeStock = calculatedResultStock < 0;
 
+  // =========================================================================
+  // 4. FILTRADO REACTIVO
+  // =========================================================================
+  const filteredMovements = useMemo(() => {
+    return allMovements.filter((mov) => {
+      const matchesType =
+        selectedType === 'Todos' ||
+        (selectedType === 'Entrada' && mov.type === 'Ajuste positivo') ||
+        (selectedType === 'Salida' && mov.type === 'Ajuste negativo') ||
+        mov.type.toLowerCase().includes(selectedType.toLowerCase());
+
+      const matchesWarehouse =
+        selectedWarehouse === 'Todos' ||
+        mov.warehouse.toLowerCase().includes(selectedWarehouse.toLowerCase());
+
+      const matchesUser =
+        selectedUser === 'Todos' || mov.user === selectedUser;
+
+      const matchesSearch =
+        searchQuery.trim() === '' ||
+        mov.product.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        mov.reason.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        mov.model.toLowerCase().includes(searchQuery.toLowerCase());
+
+      return matchesType && matchesWarehouse && matchesUser && matchesSearch;
+    });
+  }, [allMovements, selectedType, selectedWarehouse, selectedUser, searchQuery]);
+
   const showToast = (msg) => {
     setConfirmToast(msg);
     setTimeout(() => setConfirmToast(null), 4000);
   };
 
-  // Filtrado
-
-
   const handleOpenModal = () => {
-    if (dbArticles.length > 0) setSelectedArticleId(dbArticles[0].id);
-    if (dbDeposits.length > 0) setSelectedDepositId(dbDeposits[0].id);
-    setSelectedReasonId('');
+    if (dbFetchProd.length > 0) setSelectedArticleId(dbFetchProd[0].id);
+    if (dbFetchDepo.length > 0) setSelectedDepositId(dbFetchDepo[0].id);
+    if (dbFetchUsu.length > 0) setUser(dbFetchUsu[0].id);
+    if (dbFetchMot.length > 0) setSelectedReasonId(dbFetchMot[0].id);
+    setSelectedDestinationDepositId('');
     setMovementType('entrada');
     setQty(5);
-    setUser('');
     setHasReasonError(false);
     setSubmitError(null);
     setIsModalOpen(true);
   };
 
-    const handleConfirmMovement = async (e) => {
+  // =========================================================================
+  // 5. REGISTRO SEGURO A TRAVÉS DEL BACKEND (Bypasea RLS)
+  // =========================================================================
+  const handleConfirmMovement = async (e) => {
     e.preventDefault();
 
     if (isAdjustment && !selectedReasonId) {
@@ -369,117 +274,102 @@ function Movimientos() {
     setIsSubmitting(true);
 
     try {
-      // ========================================================
-      // 1. REGISTRO DEL HISTORIAL
-      // ========================================================
-      const registroHistorial = {
-      articulo_id: selectedArticleId,
-      deposito_origen_id: selectedDepositId,
-      // Si es transferencia usa el destino seleccionado, si no, repite el origen
-      deposito_destino_id: movementType === 'transferencia' ? selectedDestinationDepositId : selectedDepositId,
-      cantidad: Number(qty),
-      motivo_id: selectedReasonId || null,
-      usuario_id: user || null,
-      tipo_movimiento: movementType,
-      ip_origen: '127.0.0.1' // <-- Agregado para cumplir con la restricción NOT NULL
-    };
+      const activeUser = user || (dbFetchUsu.length > 0 ? dbFetchUsu[0].id : null);
 
-    const { error: historyError } = await supabase
-      .from('transferencias_stock')
-      .insert([registroHistorial]);
-
-      if (historyError) throw new Error(`Error en historial: ${historyError.message}`);
-
-      // ========================================================
-      // 2. ACTUALIZACIÓN DE EXISTENCIAS (Lógica Condicional)
-      // ========================================================
       if (movementType === 'transferencia') {
-      // --- A. Restar al origen ---
-      const { error: errorOrigen } = await supabase
-        .from('existencias')
-        .update({ cantidad: baseStock - Number(qty) })
-        .eq('articulo_id', selectedArticleId)
-        .eq('deposito_id', selectedDepositId);
-
-      if (errorOrigen) throw new Error(`Error al descontar del origen: ${errorOrigen.message}`);
-
-      // --- B. Sumar al destino ---
-      const { data: destData, error: destError } = await supabase
-        .from('existencias')
-        .select('cantidad') // Aquí buscamos la cantidad actual
-        .eq('articulo_id', selectedArticleId)
-        .eq('deposito_id', selectedDestinationDepositId)
-        .maybeSingle();
-
-      if (destError) throw new Error(`Error verificando destino: ${destError.message}`);
-
-      if (destData) {
-        const { error: updateDestError } = await supabase
-          .from('existencias')
-          .update({ cantidad: destData.cantidad + Number(qty) })
-          .eq('articulo_id', selectedArticleId)
-          .eq('deposito_id', selectedDestinationDepositId);
-
-        if (updateDestError) throw new Error(`Error al sumar en destino: ${updateDestError.message}`);
-      } else {
-        const { error: insertDestError } = await supabase
-          .from('existencias')
-          .insert([{
+        // Transferencia Inter-depósito
+        const res = await fetch('http://localhost:3001/api/stock/transfer', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
             articulo_id: selectedArticleId,
-            deposito_id: selectedDestinationDepositId,
-            cantidad: Number(qty)
-            // No enviamos id_art_x_dep, Supabase lo generará automáticamente si es un UUID con default
-          }]);
+            deposito_origen_id: selectedDepositId,
+            deposito_destino_id: selectedDestinationDepositId,
+            cantidad: Number(qty),
+            usuario_id: activeUser,
+          }),
+        });
 
-        if (insertDestError) throw new Error(`Error al crear stock en destino: ${insertDestError.message}`);
-      }
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || json.message || 'Error en la transferencia');
 
-    } else {
-      // --- LÓGICA NORMAL (Entrada, Salida, Ajustes) ---
-      const { data: existingRecord, error: checkError } = await supabase
-        .from('existencias')
-        .select('id_art_x_dep') // <-- ¡CORREGIDO! Antes decía 'id'
-        .eq('articulo_id', selectedArticleId)
-        .eq('deposito_id', selectedDepositId)
-        .maybeSingle();
-
-      if (checkError) throw new Error(`Error al verificar stock: ${checkError.message}`);
-
-      if (existingRecord) {
-        const { error: updateError } = await supabase
+        // Actualizar existencias en memoria/base de datos
+        await supabase
           .from('existencias')
-          .update({ cantidad: calculatedResultStock })
+          .update({ cantidad: baseStock - Number(qty) })
           .eq('articulo_id', selectedArticleId)
           .eq('deposito_id', selectedDepositId);
 
-        if (updateError) throw new Error(`Error al actualizar stock: ${updateError.message}`);
-      } else {
-        const { error: insertError } = await supabase
+        const { data: destData } = await supabase
           .from('existencias')
-          .insert([{
+          .select('cantidad')
+          .eq('articulo_id', selectedArticleId)
+          .eq('deposito_id', selectedDestinationDepositId)
+          .maybeSingle();
+
+        if (destData) {
+          await supabase
+            .from('existencias')
+            .update({ cantidad: (destData.cantidad || 0) + Number(qty) })
+            .eq('articulo_id', selectedArticleId)
+            .eq('deposito_id', selectedDestinationDepositId);
+        } else {
+          await supabase.from('existencias').insert([
+            {
+              articulo_id: selectedArticleId,
+              deposito_id: selectedDestinationDepositId,
+              cantidad: Number(qty),
+            },
+          ]);
+        }
+      } else {
+        // Ajuste / Entrada / Salida (Se guarda en ajustes_stock vía Backend)
+        const res = await fetch('http://localhost:3001/api/stock/adjust', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
             articulo_id: selectedArticleId,
             deposito_id: selectedDepositId,
-            cantidad: calculatedResultStock
-          }]);
+            cantidad_anterior: Number(baseStock),
+            cantidad_nueva: Number(calculatedResultStock),
+            motivo_id: selectedReasonId || dbFetchMot[0]?.id,
+            usuario_id: activeUser,
+          }),
+        });
 
-        if (insertError) throw new Error(`Error al crear registro de stock: ${insertError.message}`);
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || json.message || 'Error al registrar ajuste');
+
+        // Actualizar tabla existencias
+        const { data: existRecord } = await supabase
+          .from('existencias')
+          .select('cantidad')
+          .eq('articulo_id', selectedArticleId)
+          .eq('deposito_id', selectedDepositId)
+          .maybeSingle();
+
+        if (existRecord) {
+          await supabase
+            .from('existencias')
+            .update({ cantidad: Number(calculatedResultStock) })
+            .eq('articulo_id', selectedArticleId)
+            .eq('deposito_id', selectedDepositId);
+        } else {
+          await supabase.from('existencias').insert([
+            {
+              articulo_id: selectedArticleId,
+              deposito_id: selectedDepositId,
+              cantidad: Number(calculatedResultStock),
+            },
+          ]);
+        }
       }
-    }
 
-      // ========================================================
-      // 3. FINALIZACIÓN Y LIMPIEZA
-      // ========================================================
-      await fetchStock();
+      await fetchAllMovements();
+      await fetchCurrentStock();
 
-      setSelectedReasonId('');
-      if (typeof setSelectedDestinationDepositId === 'function') {
-        setSelectedDestinationDepositId('');
-      }
-      setMovementType('entrada');
-      setQty(5);
       setIsModalOpen(false);
       showToast('Movimiento registrado y stock actualizado con éxito.');
-
     } catch (err) {
       setSubmitError(err.message);
     } finally {
@@ -493,7 +383,9 @@ function Movimientos() {
       <div className="section-heading">
         <div>
           <h2>Movimientos y ajustes de stock</h2>
-          <span className="desc">Entradas, salidas, ajustes y transferencias entre Tienda Central y Galería Margalef</span>
+          <span className="desc">
+            Entradas, salidas, ajustes y transferencias entre Tienda Central y Galería Margalef
+          </span>
         </div>
         <button className="btn btn-primary" onClick={handleOpenModal}>
           <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -530,19 +422,24 @@ function Movimientos() {
         <div className="select-field">
           Depósito:
           <select value={selectedWarehouse} onChange={(e) => setSelectedWarehouse(e.target.value)}>
-            <option>Todos</option>
-            <option>Tienda Central</option>
-            <option>Galería Margalef</option>
+            <option value="Todos">Todos los depósitos</option>
+            {dbFetchDepo.map((d) => (
+              <option key={d.id} value={d.nombre}>
+                {d.nombre}
+              </option>
+            ))}
           </select>
         </div>
 
         <div className="select-field">
           Usuario:
           <select value={selectedUser} onChange={(e) => setSelectedUser(e.target.value)}>
-            <option>Todos</option>
-            <option>Juan Pérez</option>
-            <option>María Gómez</option>
-            <option>Carlos Ruiz</option>
+            <option value="Todos">Todos los usuarios</option>
+            {dbFetchUsu.map((u) => (
+              <option key={u.id} value={u.nombre}>
+                {u.nombre}
+              </option>
+            ))}
           </select>
         </div>
 
@@ -553,7 +450,7 @@ function Movimientos() {
           </svg>
           <input
             type="text"
-            placeholder="Buscar producto o código"
+            placeholder="Buscar producto o modelo..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -577,7 +474,13 @@ function Movimientos() {
               </tr>
             </thead>
             <tbody>
-              {filteredMovements.length === 0 ? (
+              {isLoading ? (
+                <tr>
+                  <td colSpan="8" style={{ textAlign: 'center', padding: '32px', color: 'var(--gray-500)' }}>
+                    Cargando movimientos...
+                  </td>
+                </tr>
+              ) : filteredMovements.length === 0 ? (
                 <tr>
                   <td colSpan="8" style={{ textAlign: 'center', padding: '32px', color: 'var(--gray-500)' }}>
                     No se encontraron movimientos registrados bajo los filtros seleccionados.
@@ -588,12 +491,20 @@ function Movimientos() {
                   <tr key={mov.id}>
                     <td>{mov.date}</td>
                     <td className="cell-strong">{mov.product}</td>
-                    <td>{mov.type}</td>
+                    <td>{mov.model}</td>
                     <td>{mov.warehouse}</td>
                     <td className="cell-strong">{mov.qty}</td>
                     <td>{mov.reason}</td>
                     <td>{mov.user}</td>
-                    <td className="cell-mono">{mov.stockChange}</td>
+                    <td
+                      className="cell-mono"
+                      style={{
+                        fontWeight: '700',
+                        color: mov.stockChange !== '-' ? 'var(--gray-900)' : 'var(--gray-400)',
+                      }}
+                    >
+                      {mov.stockChange}
+                    </td>
                   </tr>
                 ))
               )}
@@ -602,7 +513,7 @@ function Movimientos() {
         </div>
       </div>
 
-      {/* MODAL REGISTRAR MOVIMIENTO (HU-02) */}
+      {/* MODAL REGISTRAR MOVIMIENTO */}
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
@@ -624,6 +535,7 @@ function Movimientos() {
               <strong>Error:</strong> {submitError}
             </div>
           )}
+
           <div className="form-row">
             <div className="form-field full">
               <label>Producto<span className="req">*</span></label>
@@ -631,25 +543,22 @@ function Movimientos() {
                 value={selectedArticleId}
                 onChange={(e) => setSelectedArticleId(e.target.value)}
               >
-                <option value="" disabled>Selecciona un producto</option>
-                {
-                  dbFetchProd.map(p => (<option key={p.id} value={p.id}>{p.descripcion}</option>))
-                }
+                {dbFetchProd.map((p) => (
+                  <option key={p.id} value={p.id}>{p.descripcion}</option>
+                ))}
               </select>
             </div>
           </div>
 
           <div className="form-row">
             <div className="form-field">
-              <label>Depósito<span className="req">*</span></label>
+              <label>Depósito Origen<span className="req">*</span></label>
               <select
                 value={selectedDepositId}
                 onChange={(e) => setSelectedDepositId(e.target.value)}
               >
-                <option value="" disabled>Selecciona un depósito</option>
-                {dbFetchDepo.map(d => (
+                {dbFetchDepo.map((d) => (
                   <option key={d.id} value={d.id}>{d.nombre}</option>
-                  
                 ))}
               </select>
             </div>
@@ -663,32 +572,34 @@ function Movimientos() {
                   setHasReasonError(false);
                 }}
               >
-                <option value="entrada">Entrada</option>
-                <option value="salida">Salida</option>
-                <option value="ajuste-pos">Ajuste positivo</option>
-                <option value="ajuste-neg">Ajuste negativo</option>
-                <option value="transferencia">Transferencia</option>
+                <option value="entrada">Entrada (+)</option>
+                <option value="salida">Salida (-)</option>
+                <option value="ajuste-pos">Ajuste positivo (+)</option>
+                <option value="ajuste-neg">Ajuste negativo (-)</option>
+                <option value="transferencia">Transferencia entre depósitos</option>
               </select>
             </div>
           </div>
-                {movementType === 'transferencia' && (
-                <div className="form-row">
-                  <div className="form-field full">
-                    <label>Depósito Destino<span className="req">*</span></label>
-                    <select
-                      value={selectedDestinationDepositId}
-                      onChange={(e) => setSelectedDestinationDepositId(e.target.value)}
-                    >
-                      <option value="" disabled>Selecciona el depósito destino</option>
-                      {dbFetchDepo
-                        .filter(d => d.id !== selectedDepositId) // Evita que se transfiera al mismo depósito
-                        .map(d => (
-                          <option key={d.id} value={d.id}>{d.nombre}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              )}
+
+          {movementType === 'transferencia' && (
+            <div className="form-row">
+              <div className="form-field full">
+                <label>Depósito Destino<span className="req">*</span></label>
+                <select
+                  value={selectedDestinationDepositId}
+                  onChange={(e) => setSelectedDestinationDepositId(e.target.value)}
+                >
+                  <option value="" disabled>Selecciona el depósito destino</option>
+                  {dbFetchDepo
+                    .filter((d) => d.id !== selectedDepositId)
+                    .map((d) => (
+                      <option key={d.id} value={d.id}>{d.nombre}</option>
+                    ))}
+                </select>
+              </div>
+            </div>
+          )}
+
           <div className="form-row">
             <div className="form-field">
               <label>Cantidad<span className="req">*</span></label>
@@ -703,13 +614,10 @@ function Movimientos() {
             </div>
 
             <div className="form-field">
-              <label>Usuario responsable</label>
+              <label>Usuario responsable<span className="req">*</span></label>
               <select value={user} onChange={(e) => setUser(e.target.value)}>
-                <option value="" disabled>Selecciona un usuario</option>
-
-                {dbFetchUsu.map(u => (
+                {dbFetchUsu.map((u) => (
                   <option key={u.id} value={u.id}>{u.nombre}</option>
-                  
                 ))}
               </select>
             </div>
@@ -727,14 +635,13 @@ function Movimientos() {
                   setHasReasonError(false);
                 }}
               >
-                <option value="">Seleccionar motivo…</option>
-                {dbFetchMot.map(r => (
+                {dbFetchMot.map((r) => (
                   <option key={r.id} value={r.id}>{r.nombre}</option>
                 ))}
               </select>
 
               {!isAdjustment && (
-                <span className="field-hint">Obligatorio para ajustes y mermas.</span>
+                <span className="field-hint">Opcional para entradas/transferencias; obligatorio para ajustes.</span>
               )}
 
               {hasReasonError && (
@@ -750,16 +657,23 @@ function Movimientos() {
           </div>
 
           <div className="form-field">
-            <label>Vista previa de stock</label>
+            <label>Vista previa de existencias</label>
             <div className="stock-preview">
               <div className="sp-item">
-                {/* Mostramos baseStock que es el valor numérico que acabamos de traer */}
                 <div className="n">{baseStock}</div>
-                <div className="l">Stock anterior</div>
+                <div className="l">Stock actual</div>
               </div>
               <div className="sp-arrow">→</div>
               <div className="sp-item">
-                <div className="n" style={{ color: movementType.includes('neg') || movementType === 'salida' || movementType === 'transferencia' ? 'var(--crit)' : 'var(--green)' }}>
+                <div
+                  className="n"
+                  style={{
+                    color:
+                      movementType.includes('neg') || movementType === 'salida' || movementType === 'transferencia'
+                        ? 'var(--crit)'
+                        : 'var(--green)',
+                  }}
+                >
                   {calculatedResultStock}
                 </div>
                 <div className="l">Stock resultante</div>
@@ -771,7 +685,7 @@ function Movimientos() {
                   <circle cx="12" cy="12" r="10" />
                   <path d="M12 8v4M12 16h.01" />
                 </svg>
-                Stock insuficiente.
+                Stock insuficiente en el depósito de origen.
               </span>
             )}
           </div>
