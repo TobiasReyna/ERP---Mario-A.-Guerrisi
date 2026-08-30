@@ -1,39 +1,51 @@
 import { useState, useEffect, useCallback } from 'react';
 import Modal from '../components/Modal';
 
-// TEMPORAL: mismo usuario fijo que se usa en Movimientos.jsx, hasta que exista login/auth real.
-const TEMP_USER_ID = '7ab3d65c-eecc-4f0b-98a1-2c53efce620e';
-
-// Caché en memoria para evitar llamadas redundantes
+// Caché en memoria para evitar llamadas redundantes a la API de imágenes
 const imageMemoryCache = new Map();
 
-function AutoProductImage({ query, alt, style }) {
+// Componente de Búsqueda Automática de Imágenes (MediaWiki API con Proporciones Estandarizadas)
+function AutoProductImage({ brand, model, description, category, query, alt, style }) {
   const [imageUrl, setImageUrl] = useState(null);
   const [loading, setLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
 
   useEffect(() => {
-    if (!query || query.trim() === '') {
+    const junkWords = ['sin especificar', 'estándar', 'estandar', 's/ean', 's/c', 'n/a', 'null', 'undefined', 'todas', 'articulo'];
+
+    const cleanWord = (text) => {
+      if (!text) return '';
+      const t = String(text).trim();
+      return junkWords.includes(t.toLowerCase()) ? '' : t;
+    };
+
+    const b = cleanWord(brand);
+    const m = cleanWord(model);
+    const d = cleanWord(description);
+    const c = cleanWord(category);
+
+    let searchTerms = [];
+    if (query) {
+      searchTerms.push(query.replace(/sin especificar|estándar|estandar|s\/c/gi, '').trim());
+    } else {
+      if (b && m) searchTerms.push(`${b} ${m}`);
+      if (b) searchTerms.push(`${b} instrument`);
+      if (d) searchTerms.push(d);
+      if (c) searchTerms.push(c);
+      searchTerms.push('musical instrument');
+    }
+
+    const primaryTerm = searchTerms[0] || 'musical instrument';
+
+    if (imageMemoryCache.has(primaryTerm)) {
+      setImageUrl(imageMemoryCache.get(primaryTerm));
       setLoading(false);
       return;
     }
 
-    const cleanQuery = query
-      .replace(/[^\w\s-]/gi, '')
-      .split(' ')
-      .slice(0, 3)
-      .join(' ')
-      .trim();
-
-    if (imageMemoryCache.has(cleanQuery)) {
-      setImageUrl(imageMemoryCache.get(cleanQuery));
-      setLoading(false);
-      return;
-    }
-
-    const cachedStorage = sessionStorage.getItem(`img_cache_${cleanQuery}`);
+    const cachedStorage = sessionStorage.getItem(`img_cache_${primaryTerm}`);
     if (cachedStorage) {
-      imageMemoryCache.set(cleanQuery, cachedStorage);
+      imageMemoryCache.set(primaryTerm, cachedStorage);
       setImageUrl(cachedStorage);
       setLoading(false);
       return;
@@ -45,24 +57,35 @@ function AutoProductImage({ query, alt, style }) {
 
     const fetchImage = async () => {
       try {
-        let res = await fetch(
-          `https://es.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(cleanQuery)}`
-        );
-        let data = res.ok ? await res.json() : null;
+        let foundImage = null;
 
-        if (!data || !data.thumbnail?.source) {
-          res = await fetch(
-            `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(cleanQuery)}`
-          );
-          data = res.ok ? await res.json() : null;
+        for (const term of searchTerms) {
+          if (!term || term.length < 2) continue;
+
+          const endpoint = `https://en.wikipedia.org/w/api.php?action=query&origin=*&format=json&generator=search&gsrsearch=${encodeURIComponent(
+            term
+          )}&gsrlimit=1&prop=pageimages&pithumbsize=600`;
+
+          const res = await fetch(endpoint);
+          if (!res.ok) continue;
+
+          const data = await res.json();
+          if (data?.query?.pages) {
+            const pages = data.query.pages;
+            const firstPageKey = Object.keys(pages)[0];
+            const src = pages[firstPageKey]?.thumbnail?.source;
+            if (src) {
+              foundImage = src;
+              break;
+            }
+          }
         }
 
         if (isMounted) {
-          if (data && data.thumbnail?.source) {
-            const highResUrl = data.thumbnail.source.replace(/\/\d+px-/, '/600px-');
-            imageMemoryCache.set(cleanQuery, highResUrl);
-            sessionStorage.setItem(`img_cache_${cleanQuery}`, highResUrl);
-            setImageUrl(highResUrl);
+          if (foundImage) {
+            imageMemoryCache.set(primaryTerm, foundImage);
+            sessionStorage.setItem(`img_cache_${primaryTerm}`, foundImage);
+            setImageUrl(foundImage);
           } else {
             setHasError(true);
           }
@@ -79,7 +102,7 @@ function AutoProductImage({ query, alt, style }) {
     return () => {
       isMounted = false;
     };
-  }, [query]);
+  }, [brand, model, description, category, query]);
 
   if (hasError || !imageUrl) {
     return (
@@ -101,14 +124,18 @@ function AutoProductImage({ query, alt, style }) {
   return (
     <img
       src={imageUrl}
-      alt={alt || query}
+      alt={alt || 'Instrumento'}
       onError={() => setHasError(true)}
       style={{
-        width: '100%',
-        height: '100%',
-        objectFit: 'cover',
+        maxWidth: '100%',
+        maxHeight: '100%',
+        width: 'auto',
+        height: 'auto',
+        objectFit: 'contain',
+        objectPosition: 'center',
+        filter: 'drop-shadow(0 4px 8px rgba(0, 0, 0, 0.1))',
         opacity: loading ? 0 : 1,
-        transition: 'opacity 0.3s ease',
+        transition: 'opacity 0.25s ease',
         ...style,
       }}
     />
@@ -120,6 +147,7 @@ function Detalle_producto({ isOpen, onClose, articuloId, onUpdate }) {
   const [stockInfo, setStockInfo] = useState({ consolidado: 0, depositos: [] });
   const [historialMovimientos, setHistorialMovimientos] = useState([]);
   const [depositosDisponibles, setDepositosDisponibles] = useState([]);
+  const [motivosAjuste, setMotivosAjuste] = useState([]);
   const [brandsList, setBrandsList] = useState([]);
   const [categoriesList, setCategoriesList] = useState([]);
   const [countriesList, setCountriesList] = useState([]);
@@ -128,6 +156,8 @@ function Detalle_producto({ isOpen, onClose, articuloId, onUpdate }) {
   const [error, setError] = useState(null);
   const [confirmBanner, setConfirmBanner] = useState(null);
 
+  const [isTransferOpen, setIsTransferOpen] = useState(false);
+  const [isAdjustOpen, setIsAdjustOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isConfirmEditOpen, setIsConfirmEditOpen] = useState(false);
 
@@ -145,6 +175,21 @@ function Detalle_producto({ isOpen, onClose, articuloId, onUpdate }) {
     precio_actual: '',
   });
 
+  const [transferData, setTransferData] = useState({
+    origen_id: '',
+    destino_id: '',
+    cantidad: 1,
+    motivo: 'Rebalanceo de stock',
+  });
+
+  const [adjustData, setAdjustData] = useState({
+    deposito_id: '',
+    motivo_id: '',
+    tipo: 'positivo',
+    cantidad: 1,
+    observacion: '',
+  });
+
   const showConfirm = (text) => {
     setConfirmBanner(text);
     setTimeout(() => setConfirmBanner(null), 4000);
@@ -157,11 +202,12 @@ function Detalle_producto({ isOpen, onClose, articuloId, onUpdate }) {
       setLoading(true);
       setError(null);
 
-      const [artRes, stockRes, histRes, depRes, brandRes, catRes, countRes] = await Promise.all([
+      const [artRes, stockRes, histRes, depRes, motRes, brandRes, catRes, countRes] = await Promise.all([
         fetch(`http://localhost:3001/api/articles/${articuloId}`),
         fetch(`http://localhost:3001/api/stock/${articuloId}`),
         fetch(`http://localhost:3001/api/stock/${articuloId}/history`),
         fetch(`http://localhost:3001/api/deposits`),
+        fetch(`http://localhost:3001/api/adjustment-reasons`),
         fetch(`http://localhost:3001/api/brands`),
         fetch(`http://localhost:3001/api/categories`),
         fetch(`http://localhost:3001/api/countries`),
@@ -173,6 +219,7 @@ function Detalle_producto({ isOpen, onClose, articuloId, onUpdate }) {
       const stockJson = stockRes.ok ? await stockRes.json() : { total: 0, depositos: [] };
       const histJson = histRes.ok ? await histRes.json() : { data: [] };
       const depJson = depRes.ok ? await depRes.json() : { data: [] };
+      const motJson = motRes.ok ? await motRes.json() : { data: [] };
       const brandJson = brandRes.ok ? await brandRes.json() : { data: [] };
       const catJson = catRes.ok ? await catRes.json() : { data: [] };
       const countJson = countRes.ok ? await countRes.json() : { data: [] };
@@ -198,12 +245,12 @@ function Detalle_producto({ isOpen, onClose, articuloId, onUpdate }) {
         precio_actual: artData.precio_actual ?? 0,
       });
 
-      const rawDepositos = stockJson.data?.depositos || stockJson.depositos || stockJson.data?.desglose || [];
+      const rawDepositos = stockJson.data?.desglose || stockJson.data?.depositos || stockJson.depositos || [];
       const totalStock =
-        stockJson.data?.stock_total ??
         stockJson.data?.stock_consolidado ??
+        stockJson.data?.stock_total ??
         stockJson.total ??
-        rawDepositos.reduce((acc, d) => acc + (Number(d.stock_actual || d.cantidad) || 0), 0);
+        rawDepositos.reduce((acc, d) => acc + (Number(d.stock_actual ?? d.cantidad) || 0), 0);
 
       setStockInfo({
         consolidado: totalStock,
@@ -219,6 +266,23 @@ function Detalle_producto({ isOpen, onClose, articuloId, onUpdate }) {
 
       const deps = depJson.data || [];
       setDepositosDisponibles(deps);
+      if (deps.length >= 2) {
+        setTransferData((prev) => ({
+          ...prev,
+          origen_id: deps[0].id,
+          destino_id: deps[1].id,
+        }));
+      }
+
+      const mots = motJson.data || [];
+      setMotivosAjuste(mots);
+      if (deps.length > 0 && mots.length > 0) {
+        setAdjustData((prev) => ({
+          ...prev,
+          deposito_id: deps[0].id,
+          motivo_id: mots[0].id,
+        }));
+      }
     } catch (err) {
       console.error('Error cargando detalle del producto:', err);
       setError(err.message);
@@ -291,7 +355,7 @@ function Detalle_producto({ isOpen, onClose, articuloId, onUpdate }) {
         precio_actual: Number(editFormData.precio_actual) || 0,
         precio: Number(editFormData.precio_actual) || 0,
         codigo_interno: codigoInternoActual,
-        usuario_id: TEMP_USER_ID,
+        usuario_id: '00000000-0000-0000-0000-000000000001',
       };
 
       const res = await fetch(`http://localhost:3001/api/articles/${articuloId}`, {
@@ -314,6 +378,94 @@ function Detalle_producto({ isOpen, onClose, articuloId, onUpdate }) {
     }
   };
 
+  const handleConfirmTransfer = async (e) => {
+    e.preventDefault();
+    if (transferData.origen_id === transferData.destino_id) {
+      alert('El depósito de origen y destino no pueden ser iguales.');
+      return;
+    }
+
+    const depOrigen = stockInfo.depositos.find((d) => (d.deposito_id || d.id) === transferData.origen_id);
+    const stockDisponible = Number(depOrigen?.stock_actual ?? depOrigen?.cantidad) || 0;
+
+    if (stockDisponible < Number(transferData.cantidad)) {
+      alert(`Stock insuficiente en el depósito de origen. Disponibles: ${stockDisponible} unidades.`);
+      return;
+    }
+
+    try {
+      const res = await fetch('http://localhost:3001/api/stock/transfer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          articulo_id: articuloId,
+          deposito_origen_id: transferData.origen_id,
+          deposito_destino_id: transferData.destino_id,
+          cantidad: Number(transferData.cantidad),
+          motivo: transferData.motivo || 'Rebalanceo de stock',
+          usuario_id: '00000000-0000-0000-0000-000000000001',
+        }),
+      });
+
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || json.message || 'Error al ejecutar transferencia');
+
+      setIsTransferOpen(false);
+      showConfirm('Transferencia realizada correctamente.');
+      loadProductDetails();
+      if (onUpdate) onUpdate();
+    } catch (err) {
+      alert(`Error en la transferencia: ${err.message}`);
+    }
+  };
+
+  const handleConfirmAdjust = async (e) => {
+    e.preventDefault();
+
+    // Obtener stock actual del depósito seleccionado para calcular cantidad anterior y nueva
+    const depExistente = stockInfo.depositos.find((d) => (d.deposito_id || d.id) === adjustData.deposito_id);
+    const cantidad_anterior = Number(depExistente?.stock_actual ?? depExistente?.cantidad) || 0;
+    
+    let cantidad_nueva = cantidad_anterior;
+    const delta = Number(adjustData.cantidad);
+
+    if (adjustData.tipo === 'positivo') {
+      cantidad_nueva = cantidad_anterior + delta;
+    } else {
+      cantidad_nueva = Math.max(0, cantidad_anterior - delta);
+    }
+
+    if (cantidad_anterior === cantidad_nueva) {
+      alert('La cantidad modificada debe ser diferente al stock actual.');
+      return;
+    }
+
+    try {
+      const res = await fetch('http://localhost:3001/api/stock/adjust', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          articulo_id: articuloId,
+          deposito_id: adjustData.deposito_id,
+          cantidad_anterior,
+          cantidad_nueva,
+          motivo_id: adjustData.motivo_id,
+          usuario_id: '00000000-0000-0000-0000-000000000001',
+        }),
+      });
+
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || json.message || 'Error al guardar el ajuste');
+
+      setIsAdjustOpen(false);
+      showConfirm('Ajuste de inventario registrado correctamente.');
+      loadProductDetails();
+      if (onUpdate) onUpdate();
+    } catch (err) {
+      alert(`Error en el ajuste: ${err.message}`);
+    }
+  };
+
   const handleSaveStockConfig = async (e) => {
     e.preventDefault();
     try {
@@ -324,11 +476,12 @@ function Detalle_producto({ isOpen, onClose, articuloId, onUpdate }) {
           stock_minimo: Number(stockMin),
           stock_maximo: Number(stockMax),
           deposito_id: selectedDepositoPolitica === 'TODOS' ? null : selectedDepositoPolitica,
+          usuario_id: '00000000-0000-0000-0000-000000000001',
         }),
       });
 
       const json = await res.json();
-      if (!res.ok) throw new Error(json.message || 'Error al actualizar políticas');
+      if (!res.ok) throw new Error(json.error || json.message || 'Error al actualizar políticas');
 
       showConfirm('Políticas de stock mínimo y máximo actualizadas.');
       loadProductDetails();
@@ -392,20 +545,25 @@ function Detalle_producto({ isOpen, onClose, articuloId, onUpdate }) {
               </div>
             )}
 
-            {/* BANNER VISUAL CON FOTO AUTOMÁTICA */}
+            {/* BANNER VISUAL CON FOTO PROPORCIONAL */}
             <div style={{
               width: '100%',
-              height: '180px',
-              background: 'var(--gray-100)',
+              height: '190px',
+              background: 'var(--white)',
               borderRadius: '8px',
               overflow: 'hidden',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               border: '1px solid var(--gray-200)',
+              padding: '14px',
+              boxSizing: 'border-box'
             }}>
               <AutoProductImage
-                query={`${resolvedBrand} ${articulo.modelo || articulo.descripcion}`.trim()}
+                brand={resolvedBrand}
+                model={articulo.modelo}
+                description={articulo.descripcion}
+                category={resolvedCategory}
                 alt={productCommercialTitle}
               />
             </div>
@@ -438,7 +596,7 @@ function Detalle_producto({ isOpen, onClose, articuloId, onUpdate }) {
               )}
             </div>
 
-            {/* KPIS Y BOTONES */}
+            {/* KPIS Y ACCIONES */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
               <div style={{ display: 'flex', gap: '20px' }}>
                 <div>
@@ -459,6 +617,12 @@ function Detalle_producto({ isOpen, onClose, articuloId, onUpdate }) {
                   </svg>
                   Editar producto
                 </button>
+                <button className="btn btn-outline" style={{ fontSize: '12px', padding: '6px 10px' }} onClick={() => setIsTransferOpen(true)}>
+                  Transferir stock
+                </button>
+                <button className="btn btn-outline" style={{ fontSize: '12px', padding: '6px 10px' }} onClick={() => setIsAdjustOpen(true)}>
+                  Registrar ajuste
+                </button>
               </div>
             </div>
 
@@ -471,10 +635,10 @@ function Detalle_producto({ isOpen, onClose, articuloId, onUpdate }) {
                 <div className="compare-bars">
                   {stockInfo.depositos.map((dep, idx) => {
                     const stockVal = Number(dep.stock_actual ?? dep.cantidad) || 0;
-                    const depNombre = dep.deposito_nombre || dep.nombre || 'Depósito';
+                    const depNombre = dep.deposito_nombre || dep.depositos?.nombre || dep.nombre || 'Depósito';
                     const percent = stockInfo.consolidado > 0 ? Math.round((stockVal / stockInfo.consolidado) * 100) : 0;
                     return (
-                      <div className="compare-bar-row" key={dep.deposito_id || idx} style={{ marginBottom: '6px' }}>
+                      <div className="compare-bar-row" key={dep.deposito_id || dep.id || idx} style={{ marginBottom: '6px' }}>
                         <span className="compare-bar-label" style={{ fontSize: '12px', minWidth: '110px' }}>{depNombre}</span>
                         <div className="compare-bar-track" style={{ height: '8px', flex: 1 }}>
                           <div className={`compare-bar-fill ${idx % 2 === 1 ? 'alt' : ''}`} style={{ width: `${percent}%` }}></div>
@@ -555,7 +719,7 @@ function Detalle_producto({ isOpen, onClose, articuloId, onUpdate }) {
                 ) : (
                   historialMovimientos.slice(0, 5).map((m, idx) => (
                     <div key={m.id || idx} style={{ fontSize: '12px', padding: '6px 10px', background: 'var(--gray-50)', borderRadius: '4px', display: 'flex', justifyContent: 'space-between' }}>
-                      <span><strong>{m.tipo}</strong>: {m.motivo || 'Operación'}</span>
+                      <span><strong>{m.tipo_movimiento || m.tipo}</strong>: {m.detalle || m.motivo || 'Operación'}</span>
                       <span style={{ color: 'var(--gray-600)' }}>{m.fecha || m.fecha_hora_registro}</span>
                     </div>
                   ))
@@ -699,6 +863,107 @@ function Detalle_producto({ isOpen, onClose, articuloId, onUpdate }) {
             <li>Si hubo cambio de precio, se registrará el valor anterior en el historial de auditoría.</li>
           </ul>
         </div>
+      </Modal>
+
+      {/* SUB-MODAL TRANSFERENCIA */}
+      <Modal
+        isOpen={isTransferOpen}
+        onClose={() => setIsTransferOpen(false)}
+        title="Transferir Stock"
+        footer={
+          <>
+            <button className="btn btn-outline" onClick={() => setIsTransferOpen(false)}>Cancelar</button>
+            <button className="btn btn-primary" onClick={handleConfirmTransfer}>Confirmar</button>
+          </>
+        }
+      >
+        <form onSubmit={handleConfirmTransfer} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+            <div className="form-field" style={{ flex: '1 1 180px' }}>
+              <label>Origen</label>
+              <select value={transferData.origen_id} onChange={(e) => setTransferData({ ...transferData, origen_id: e.target.value })}>
+                {depositosDisponibles.map((d) => {
+                  const depExist = stockInfo.depositos.find((st) => (st.deposito_id || st.id) === d.id);
+                  const cant = Number(depExist?.stock_actual ?? depExist?.cantidad) || 0;
+                  return (
+                    <option key={d.id} value={d.id}>
+                      {d.nombre} ({cant} disponibles)
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+            <div className="form-field" style={{ flex: '1 1 180px' }}>
+              <label>Destino</label>
+              <select value={transferData.destino_id} onChange={(e) => setTransferData({ ...transferData, destino_id: e.target.value })}>
+                {depositosDisponibles.map((d) => (
+                  <option key={d.id} value={d.id}>{d.nombre}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+            <div className="form-field" style={{ flex: '1 1 120px' }}>
+              <label>Cantidad</label>
+              <input type="number" min="1" required value={transferData.cantidad} onChange={(e) => setTransferData({ ...transferData, cantidad: Number(e.target.value) })} />
+            </div>
+            <div className="form-field" style={{ flex: '2 1 200px' }}>
+              <label>Motivo</label>
+              <input type="text" value={transferData.motivo} onChange={(e) => setTransferData({ ...transferData, motivo: e.target.value })} />
+            </div>
+          </div>
+        </form>
+      </Modal>
+
+      {/* SUB-MODAL AJUSTE */}
+      <Modal
+        isOpen={isAdjustOpen}
+        onClose={() => setIsAdjustOpen(false)}
+        title="Registrar Ajuste / Merma"
+        footer={
+          <>
+            <button className="btn btn-outline" onClick={() => setIsAdjustOpen(false)}>Cancelar</button>
+            <button className="btn btn-primary" onClick={handleConfirmAdjust}>Guardar Ajuste</button>
+          </>
+        }
+      >
+        <form onSubmit={handleConfirmAdjust} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+            <div className="form-field" style={{ flex: '1 1 180px' }}>
+              <label>Depósito</label>
+              <select value={adjustData.deposito_id} onChange={(e) => setAdjustData({ ...adjustData, deposito_id: e.target.value })}>
+                {depositosDisponibles.map((d) => {
+                  const depExist = stockInfo.depositos.find((st) => (st.deposito_id || st.id) === d.id);
+                  const cant = Number(depExist?.stock_actual ?? depExist?.cantidad) || 0;
+                  return (
+                    <option key={d.id} value={d.id}>
+                      {d.nombre} (Actual: {cant} uds.)
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+            <div className="form-field" style={{ flex: '1 1 180px' }}>
+              <label>Tipo de ajuste</label>
+              <select value={adjustData.tipo} onChange={(e) => setAdjustData({ ...adjustData, tipo: e.target.value })}>
+                <option value="positivo">Ajuste positivo (+) / Entrada</option>
+                <option value="negativo">Ajuste negativo (-) / Merma o Rotura</option>
+              </select>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+            <div className="form-field" style={{ flex: '2 1 200px' }}>
+              <label>Motivo</label>
+              <select value={adjustData.motivo_id} onChange={(e) => setAdjustData({ ...adjustData, motivo_id: e.target.value })}>
+                {motivosAjuste.map((m) => <option key={m.id} value={m.id}>{m.nombre}</option>)}
+              </select>
+            </div>
+            <div className="form-field" style={{ flex: '1 1 120px' }}>
+              <label>Cantidad a afectar</label>
+              <input type="number" min="1" required value={adjustData.cantidad} onChange={(e) => setAdjustData({ ...adjustData, cantidad: Number(e.target.value) })} />
+            </div>
+          </div>
+        </form>
       </Modal>
     </>
   );

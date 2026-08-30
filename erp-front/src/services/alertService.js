@@ -12,8 +12,9 @@ export const getReplenishmentData = async () => {
       estado,
       marcas ( nombre ),
       categorias ( nombre ),
-      politicas_reposicion_deposito (
+      stock (
         deposito_id,
+        stock_actual,
         stock_minimo,
         stock_maximo,
         depositos ( nombre )
@@ -24,29 +25,42 @@ export const getReplenishmentData = async () => {
   if (error) throw error;
 
   return (data || []).map((art) => {
-    // Si tienen una tabla de stock por depósito o políticas por depósito:
-    const politicas = art.politicas_reposicion_deposito || [];
-    
-    // Calcular mínimos y máximos consolidados
-    const minConsolidado = politicas.reduce((acc, p) => acc + (p.stock_minimo || 0), 0) || 5;
-    const maxConsolidado = politicas.reduce((acc, p) => acc + (p.stock_maximo || 0), 0) || 12;
+    const existencias = art.stock || [];
 
-    // Stock actual (se toma del campo de stock o cálculo de movimientos)
-    const stockActual = art.stock_actual ?? 0;
+    // 1. Calcular existencias y umbrales consolidados reales
+    const stockActual = existencias.reduce(
+      (acc, s) => acc + (Number(s.stock_actual) || 0),
+      0
+    );
+
+    const minConsolidado = existencias.length > 0
+      ? existencias.reduce((acc, s) => acc + (Number(s.stock_minimo) || 0), 0)
+      : 5; // Fallback solo si no tiene registros de stock configurados
+
+    const maxConsolidado = existencias.length > 0
+      ? existencias.reduce((acc, s) => acc + (Number(s.stock_maximo) || 0), 0)
+      : 15;
+
+    // 2. Cantidad sugerida a comprar/reponer para llegar al stock máximo
     const sugerido = Math.max(0, maxConsolidado - stockActual);
 
+    // 3. Determinación estricta de prioridades
     let prioridad = 'Normal';
-    if (stockActual <= minConsolidado) {
+    if (stockActual <= 0) {
       prioridad = 'Crítico';
+    } else if (stockActual <= minConsolidado) {
+      prioridad = 'Bajo stock';
     } else if (stockActual < maxConsolidado) {
       prioridad = 'Reposición';
     }
 
     return {
       id: art.id,
-      codigo: art.codigo_interno,
+      codigo: art.codigo_interno || String(art.id).substring(0, 8),
       descripcion: art.descripcion,
-      marca: art.marcas?.nombre || 'S/M',
+      modelo: art.modelo || 'Estándar',
+      ean: art.codigo_ean13 || 'S/EAN',
+      marca: art.marcas?.nombre || 'Sin marca',
       categoria: art.categorias?.nombre || 'General',
       stockActual,
       stockMinimo: minConsolidado,
@@ -54,6 +68,13 @@ export const getReplenishmentData = async () => {
       sugerido,
       alcance: 'Consolidado',
       prioridad,
+      desglose: existencias.map((s) => ({
+        depositoId: s.deposito_id,
+        depositoNombre: s.depositos?.nombre || 'Depósito',
+        stockActual: Number(s.stock_actual) || 0,
+        stockMinimo: Number(s.stock_minimo) || 0,
+        stockMaximo: Number(s.stock_maximo) || 0,
+      })),
     };
   });
 };

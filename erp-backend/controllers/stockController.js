@@ -135,29 +135,34 @@ const obtenerHistorial = async (req, res) => {
 };
 
 const actualizarPoliticas = async (req, res) => {
-    try {
-        const { articulo_id } = req.params;
-        const { deposito_id, stock_minimo, stock_maximo, usuario_id } = req.body;
+  try {
+    const { articulo_id } = req.params;
+    const { deposito_id, stock_minimo, stock_maximo, usuario_id } = req.body;
 
-        if (!deposito_id || stock_minimo === undefined || stock_maximo === undefined || !usuario_id) {
-            return res.status(400).json({ error: 'Faltan campos (deposito_id, stock_minimo, stock_maximo, usuario_id).' });
-        }
-
-        const politicas = await StockService.actualizarPoliticas(articulo_id, {
-            deposito_id,
-            stock_minimo,
-            stock_maximo,
-            usuario_id
-        });
-
-        return res.status(200).json({
-            message: 'Políticas actualizadas correctamente.',
-            data: politicas 
-        });
-    } catch (error) {
-        console.error('[API] Error PUT /api/stock/policies/:articulo_id:', error);
-        return res.status(500).json({ error: error.message || 'Error actualizando políticas.' });
+    // Se valida únicamente que los umbrales numéricos estén presentes
+    if (stock_minimo === undefined || stock_maximo === undefined) {
+      return res.status(400).json({ error: 'Faltan campos obligatorios (stock_minimo, stock_maximo).' });
     }
+
+    if (Number(stock_minimo) > Number(stock_maximo)) {
+      return res.status(400).json({ error: 'El stock mínimo no puede ser mayor al stock máximo.' });
+    }
+
+    const politicas = await StockService.actualizarPoliticas(articulo_id, {
+      deposito_id: (deposito_id === 'TODOS' || !deposito_id) ? null : deposito_id,
+      stock_minimo: Number(stock_minimo),
+      stock_maximo: Number(stock_maximo),
+      usuario_id: usuario_id || null
+    });
+
+    return res.status(200).json({
+      message: 'Políticas actualizadas correctamente.',
+      data: politicas 
+    });
+  } catch (error) {
+    console.error('[API] Error PUT /api/stock/policies/:articulo_id:', error);
+    return res.status(500).json({ error: error.message || 'Error actualizando políticas.' });
+  }
 };
 
 const obtenerAlertas = async (req, res) => {

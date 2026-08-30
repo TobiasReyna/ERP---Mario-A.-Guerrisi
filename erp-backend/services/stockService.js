@@ -141,24 +141,105 @@ class StockService {
         return historial;
     }
 
-    static async actualizarPoliticas(articulo_id, payload) {
+static async actualizarPoliticas(articulo_id, payload) {
         const { deposito_id, stock_minimo, stock_maximo, usuario_id } = payload;
         
+        let targetDepositos = [];
+
+        // 1. Si viene un depósito específico, aplicamos solo a ese
+        if (deposito_id && deposito_id !== 'TODOS') {
+            targetDepositos = [deposito_id];
+        } else {
+            // 2. Si es null o 'TODOS', traemos todos los depósitos registrados
+            const { data: depositos, error: depError } = await supabaseAdmin
+                .from('depositos')
+                .select('id');
+
+            if (depError) {
+                throw new Error(`Error obteniendo depósitos: ${depError.message}`);
+            }
+
+            targetDepositos = (depositos || []).map(d => d.id);
+        }
+
+        if (targetDepositos.length === 0) {
+            throw new Error('No se encontraron depósitos disponibles en el sistema.');
+        }
+
+        // 3. Crear lote de registros para hacer upsert masivo
+        const recordsToUpsert = targetDepositos.map(depId => {
+            const item = {
+                articulo_id,
+                deposito_id: depId,
+                stock_minimo: Number(stock_minimo),
+                stock_maximo: Number(stock_maximo)
+            };
+            if (usuario_id) {
+                item.actualizado_por = usuario_id;
+            }
+            return item;
+        });
+
+        // 4. Ejecutar upsert en politicas_reposicion_deposito
         const { data, error } = await supabaseAdmin
             .from('politicas_reposicion_deposito')
-            .upsert({
-                articulo_id,
-                deposito_id,
-                stock_minimo,
-                stock_maximo,
-                actualizado_por: usuario_id
-            }, { onConflict: 'articulo_id, deposito_id' })
-            .select()
-            .single();
+            .upsert(recordsToUpsert, { onConflict: 'articulo_id, deposito_id' })
+            .select();
 
         if (error) {
             throw new Error(`Error al actualizar políticas: ${error.message}`);
         }
+
+        return data;
+    }static async actualizarPoliticas(articulo_id, payload) {
+        const { deposito_id, stock_minimo, stock_maximo, usuario_id } = payload;
+        
+        let targetDepositos = [];
+
+        // 1. Si viene un depósito específico, aplicamos solo a ese
+        if (deposito_id && deposito_id !== 'TODOS') {
+            targetDepositos = [deposito_id];
+        } else {
+            // 2. Si es null o 'TODOS', traemos todos los depósitos registrados
+            const { data: depositos, error: depError } = await supabaseAdmin
+                .from('depositos')
+                .select('id');
+
+            if (depError) {
+                throw new Error(`Error obteniendo depósitos: ${depError.message}`);
+            }
+
+            targetDepositos = (depositos || []).map(d => d.id);
+        }
+
+        if (targetDepositos.length === 0) {
+            throw new Error('No se encontraron depósitos disponibles en el sistema.');
+        }
+
+        // 3. Crear lote de registros para hacer upsert masivo
+        const recordsToUpsert = targetDepositos.map(depId => {
+            const item = {
+                articulo_id,
+                deposito_id: depId,
+                stock_minimo: Number(stock_minimo),
+                stock_maximo: Number(stock_maximo)
+            };
+            if (usuario_id) {
+                item.actualizado_por = usuario_id;
+            }
+            return item;
+        });
+
+        // 4. Ejecutar upsert en politicas_reposicion_deposito
+        const { data, error } = await supabaseAdmin
+            .from('politicas_reposicion_deposito')
+            .upsert(recordsToUpsert, { onConflict: 'articulo_id, deposito_id' })
+            .select();
+
+        if (error) {
+            throw new Error(`Error al actualizar políticas: ${error.message}`);
+        }
+
         return data;
     }
 
