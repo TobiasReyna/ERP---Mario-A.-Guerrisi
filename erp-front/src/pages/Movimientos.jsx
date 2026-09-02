@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import Modal from '../components/Modal';
+import Modal2 from '../components/Modal2';
 import { supabase } from '../config/supabaseClient';
 
 function Movimientos() {
@@ -24,17 +24,6 @@ function Movimientos() {
   const [dbFetchUsu, setDbFetchUsu] = useState([]);
   const [dbFetchMot, setDbFetchMot] = useState([]);
 
-  // Formulario modal
-  const [selectedArticleId, setSelectedArticleId] = useState('');
-  const [selectedDepositId, setSelectedDepositId] = useState('');
-  const [selectedReasonId, setSelectedReasonId] = useState('');
-  const [selectedDestinationDepositId, setSelectedDestinationDepositId] = useState('');
-  const [baseStock, setBaseStock] = useState(0);
-
-  const [movementType, setMovementType] = useState('entrada');
-  const [qty, setQty] = useState(5);
-  const [user, setUser] = useState('');
-  const [hasReasonError, setHasReasonError] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
 
@@ -145,22 +134,10 @@ function Movimientos() {
           supabase.from('motivos_ajustes').select('*'),
         ]);
 
-        if (pRes.data && pRes.data.length > 0) {
-          setDbFetchProd(pRes.data);
-          setSelectedArticleId(pRes.data[0].id);
-        }
-        if (dRes.data && dRes.data.length > 0) {
-          setDbFetchDepo(dRes.data);
-          setSelectedDepositId(dRes.data[0].id);
-        }
-        if (uRes.data && uRes.data.length > 0) {
-          setDbFetchUsu(uRes.data);
-          setUser(uRes.data[0].id);
-        }
-        if (mRes.data) {
-          setDbFetchMot(mRes.data);
-          if (mRes.data.length > 0) setSelectedReasonId(mRes.data[0].id);
-        }
+        if (pRes.data) setDbFetchProd(pRes.data);
+        if (dRes.data) setDbFetchDepo(dRes.data);
+        if (uRes.data) setDbFetchUsu(uRes.data);
+        if (mRes.data) setDbFetchMot(mRes.data);
       } catch (err) {
         console.error('Error cargando catálogos:', err);
       }
@@ -170,46 +147,8 @@ function Movimientos() {
     fetchAllMovements();
   }, []);
 
-  // Obtener stock actual de la combinación Artículo-Depósito
-  const fetchCurrentStock = async () => {
-    if (!selectedArticleId || !selectedDepositId) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('existencias')
-        .select('cantidad')
-        .eq('articulo_id', selectedArticleId)
-        .eq('deposito_id', selectedDepositId)
-        .maybeSingle();
-
-      if (error) throw error;
-      setBaseStock(data?.cantidad ?? 0);
-    } catch (err) {
-      console.error('Error obteniendo existencias:', err);
-      setBaseStock(0);
-    }
-  };
-
-  useEffect(() => {
-    fetchCurrentStock();
-  }, [selectedArticleId, selectedDepositId]);
-
   // =========================================================================
-  // 3. CÁLCULO DE STOCK RESULTANTE
-  // =========================================================================
-  const isAdjustment = movementType === 'ajuste-pos' || movementType === 'ajuste-neg';
-
-  const calculatedResultStock = useMemo(() => {
-    const numQty = Number(qty) || 0;
-    if (movementType === 'entrada' || movementType === 'ajuste-pos') return baseStock + numQty;
-    if (['salida', 'ajuste-neg', 'transferencia'].includes(movementType)) return baseStock - numQty;
-    return baseStock;
-  }, [baseStock, qty, movementType]);
-
-  const isNegativeStock = calculatedResultStock < 0;
-
-  // =========================================================================
-  // 4. FILTRADO REACTIVO
+  // 3. FILTRADO REACTIVO
   // =========================================================================
   const filteredMovements = useMemo(() => {
     return allMovements.filter((mov) => {
@@ -242,136 +181,92 @@ function Movimientos() {
   };
 
   const handleOpenModal = () => {
-    if (dbFetchProd.length > 0) setSelectedArticleId(dbFetchProd[0].id);
-    if (dbFetchDepo.length > 0) setSelectedDepositId(dbFetchDepo[0].id);
-    if (dbFetchUsu.length > 0) setUser(dbFetchUsu[0].id);
-    if (dbFetchMot.length > 0) setSelectedReasonId(dbFetchMot[0].id);
-    setSelectedDestinationDepositId('');
-    setMovementType('entrada');
-    setQty(5);
-    setHasReasonError(false);
-    setSubmitError(null);
     setIsModalOpen(true);
   };
 
   // =========================================================================
-  // 5. REGISTRO SEGURO A TRAVÉS DEL BACKEND (Bypasea RLS)
+  // 5. REGISTRO SEGURO MULTIPRODUCTO A TRAVÉS DEL BACKEND (Bypasea RLS)
   // =========================================================================
-  const handleConfirmMovement = async (e) => {
-    e.preventDefault();
-
-    if (isAdjustment && !selectedReasonId) {
-      setHasReasonError(true);
-      return;
-    }
-    if (movementType === 'transferencia' && !selectedDestinationDepositId) {
-      setSubmitError('Debes seleccionar un depósito destino para la transferencia.');
-      return;
-    }
-
-    setHasReasonError(false);
-    setSubmitError(null);
+  const handleConfirmMultiProductMovement = async ({ headerData, productos }) => {
     setIsSubmitting(true);
+    setSubmitError(null);
 
     try {
-      const activeUser = user || (dbFetchUsu.length > 0 ? dbFetchUsu[0].id : null);
+      const { deposito, tipoMovimiento, responsable } = headerData;
 
-      if (movementType === 'transferencia') {
-        // Transferencia Inter-depósito
-        const res = await fetch('http://localhost:3001/api/stock/transfer', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            articulo_id: selectedArticleId,
-            deposito_origen_id: selectedDepositId,
-            deposito_destino_id: selectedDestinationDepositId,
-            cantidad: Number(qty),
-            usuario_id: activeUser,
-          }),
-        });
-
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error || json.message || 'Error en la transferencia');
-
-        // Actualizar existencias en memoria/base de datos
-        await supabase
-          .from('existencias')
-          .update({ cantidad: baseStock - Number(qty) })
-          .eq('articulo_id', selectedArticleId)
-          .eq('deposito_id', selectedDepositId);
-
-        const { data: destData } = await supabase
+      for (const item of productos) {
+        // 1. Obtener existencia actual del artículo en ese depósito
+        const { data: existData } = await supabase
           .from('existencias')
           .select('cantidad')
-          .eq('articulo_id', selectedArticleId)
-          .eq('deposito_id', selectedDestinationDepositId)
+          .eq('articulo_id', item.producto)
+          .eq('deposito_id', deposito)
           .maybeSingle();
 
-        if (destData) {
-          await supabase
-            .from('existencias')
-            .update({ cantidad: (destData.cantidad || 0) + Number(qty) })
-            .eq('articulo_id', selectedArticleId)
-            .eq('deposito_id', selectedDestinationDepositId);
-        } else {
-          await supabase.from('existencias').insert([
-            {
-              articulo_id: selectedArticleId,
-              deposito_id: selectedDestinationDepositId,
-              cantidad: Number(qty),
-            },
-          ]);
+        const currentStock = existData?.cantidad ?? 0;
+        let finalStock = currentStock;
+        const cant = Number(item.cantidad) || 0;
+
+        if (tipoMovimiento === 'entrada') {
+          finalStock = currentStock + cant;
+        } else if (tipoMovimiento === 'salida') {
+          if (currentStock < cant) {
+            const artInfo = dbFetchProd.find((p) => p.id === item.producto);
+            const prodName = artInfo ? artInfo.descripcion : 'seleccionado';
+            throw new Error(`Stock insuficiente para "${prodName}". Stock actual: ${currentStock}, requerido: ${cant}.`);
+          }
+          finalStock = currentStock - cant;
+        } else if (tipoMovimiento === 'ajuste') {
+          finalStock = cant;
         }
-      } else {
-        // Ajuste / Entrada / Salida (Se guarda en ajustes_stock vía Backend)
+
+        // 2. Registrar en backend (ajustes_stock)
         const res = await fetch('http://localhost:3001/api/stock/adjust', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            articulo_id: selectedArticleId,
-            deposito_id: selectedDepositId,
-            cantidad_anterior: Number(baseStock),
-            cantidad_nueva: Number(calculatedResultStock),
-            motivo_id: selectedReasonId || dbFetchMot[0]?.id,
-            usuario_id: activeUser,
+            articulo_id: item.producto,
+            deposito_id: deposito,
+            cantidad_anterior: Number(currentStock),
+            cantidad_nueva: Number(finalStock),
+            motivo_id: item.motivo || (dbFetchMot.length > 0 ? dbFetchMot[0].id : null),
+            usuario_id: responsable,
           }),
         });
 
         const json = await res.json();
-        if (!res.ok) throw new Error(json.error || json.message || 'Error al registrar ajuste');
+        if (!res.ok) {
+          throw new Error(json.error || json.message || 'Error al registrar el ajuste en el backend.');
+        }
 
-        // Actualizar tabla existencias
-        const { data: existRecord } = await supabase
-          .from('existencias')
-          .select('cantidad')
-          .eq('articulo_id', selectedArticleId)
-          .eq('deposito_id', selectedDepositId)
-          .maybeSingle();
-
-        if (existRecord) {
+        // 3. Actualizar tabla existencias en Supabase
+        if (existData) {
           await supabase
             .from('existencias')
-            .update({ cantidad: Number(calculatedResultStock) })
-            .eq('articulo_id', selectedArticleId)
-            .eq('deposito_id', selectedDepositId);
+            .update({ cantidad: Number(finalStock) })
+            .eq('articulo_id', item.producto)
+            .eq('deposito_id', deposito);
         } else {
           await supabase.from('existencias').insert([
             {
-              articulo_id: selectedArticleId,
-              deposito_id: selectedDepositId,
-              cantidad: Number(calculatedResultStock),
+              articulo_id: item.producto,
+              deposito_id: deposito,
+              cantidad: Number(finalStock),
             },
           ]);
         }
       }
 
       await fetchAllMovements();
-      await fetchCurrentStock();
-
       setIsModalOpen(false);
-      showToast('Movimiento registrado y stock actualizado con éxito.');
+      showToast(`Movimiento registrado con éxito para ${productos.length} producto(s).`);
     } catch (err) {
-      setSubmitError(err.message);
+      alert(`Error en la transacción: ${err.message}`);
+      if (err.message && err.message.toLowerCase().includes('failed to fetch')) {
+        alert('❌ Error de conexión: No se pudo contactar con el backend (http://localhost:3001). Asegúrate de que el servidor Express esté iniciado ejecutando "node server.js" en la carpeta erp-backend.');
+      } else {
+        alert(`❌ Error en la transacción: ${err.message}`);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -513,184 +408,17 @@ function Movimientos() {
         </div>
       </div>
 
-      {/* MODAL REGISTRAR MOVIMIENTO */}
-      <Modal
+      {/* MODAL REGISTRAR MOVIMIENTO MULTIPRODUCTO */}
+      <Modal2
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title="Registrar movimiento de stock"
-        footer={
-          <>
-            <button className="btn btn-outline" onClick={() => setIsModalOpen(false)} disabled={isSubmitting}>
-              Cancelar
-            </button>
-            <button className="btn btn-primary" onClick={handleConfirmMovement} disabled={isSubmitting || isNegativeStock}>
-              {isSubmitting ? 'Registrando...' : 'Registrar movimiento'}
-            </button>
-          </>
-        }
-      >
-        <form onSubmit={handleConfirmMovement}>
-          {submitError && (
-            <div style={{ marginBottom: '16px', padding: '12px', background: '#ffebee', color: 'var(--red)', borderRadius: '4px', fontSize: '13px' }}>
-              <strong>Error:</strong> {submitError}
-            </div>
-          )}
-
-          <div className="form-row">
-            <div className="form-field full">
-              <label>Producto<span className="req">*</span></label>
-              <select
-                value={selectedArticleId}
-                onChange={(e) => setSelectedArticleId(e.target.value)}
-              >
-                {dbFetchProd.map((p) => (
-                  <option key={p.id} value={p.id}>{p.descripcion}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="form-row">
-            <div className="form-field">
-              <label>Depósito Origen<span className="req">*</span></label>
-              <select
-                value={selectedDepositId}
-                onChange={(e) => setSelectedDepositId(e.target.value)}
-              >
-                {dbFetchDepo.map((d) => (
-                  <option key={d.id} value={d.id}>{d.nombre}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="form-field">
-              <label>Tipo de movimiento<span className="req">*</span></label>
-              <select
-                value={movementType}
-                onChange={(e) => {
-                  setMovementType(e.target.value);
-                  setHasReasonError(false);
-                }}
-              >
-                <option value="entrada">Entrada (+)</option>
-                <option value="salida">Salida (-)</option>
-                <option value="ajuste-pos">Ajuste positivo (+)</option>
-                <option value="ajuste-neg">Ajuste negativo (-)</option>
-                <option value="transferencia">Transferencia entre depósitos</option>
-              </select>
-            </div>
-          </div>
-
-          {movementType === 'transferencia' && (
-            <div className="form-row">
-              <div className="form-field full">
-                <label>Depósito Destino<span className="req">*</span></label>
-                <select
-                  value={selectedDestinationDepositId}
-                  onChange={(e) => setSelectedDestinationDepositId(e.target.value)}
-                >
-                  <option value="" disabled>Selecciona el depósito destino</option>
-                  {dbFetchDepo
-                    .filter((d) => d.id !== selectedDepositId)
-                    .map((d) => (
-                      <option key={d.id} value={d.id}>{d.nombre}</option>
-                    ))}
-                </select>
-              </div>
-            </div>
-          )}
-
-          <div className="form-row">
-            <div className="form-field">
-              <label>Cantidad<span className="req">*</span></label>
-              <input
-                type="number"
-                min="1"
-                placeholder="Ej: 10"
-                required
-                value={qty}
-                onChange={(e) => setQty(Number(e.target.value))}
-              />
-            </div>
-
-            <div className="form-field">
-              <label>Usuario responsable<span className="req">*</span></label>
-              <select value={user} onChange={(e) => setUser(e.target.value)}>
-                {dbFetchUsu.map((u) => (
-                  <option key={u.id} value={u.id}>{u.nombre}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="form-row">
-            <div className="form-field full">
-              <label>
-                Motivo {isAdjustment && <span className="req">*</span>}
-              </label>
-              <select
-                value={selectedReasonId}
-                onChange={(e) => {
-                  setSelectedReasonId(e.target.value);
-                  setHasReasonError(false);
-                }}
-              >
-                {dbFetchMot.map((r) => (
-                  <option key={r.id} value={r.id}>{r.nombre}</option>
-                ))}
-              </select>
-
-              {!isAdjustment && (
-                <span className="field-hint">Opcional para entradas/transferencias; obligatorio para ajustes.</span>
-              )}
-
-              {hasReasonError && (
-                <span className="field-error">
-                  <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10" />
-                    <path d="M12 8v4M12 16h.01" />
-                  </svg>
-                  Seleccioná un motivo para continuar.
-                </span>
-              )}
-            </div>
-          </div>
-
-          <div className="form-field">
-            <label>Vista previa de existencias</label>
-            <div className="stock-preview">
-              <div className="sp-item">
-                <div className="n">{baseStock}</div>
-                <div className="l">Stock actual</div>
-              </div>
-              <div className="sp-arrow">→</div>
-              <div className="sp-item">
-                <div
-                  className="n"
-                  style={{
-                    color:
-                      movementType.includes('neg') || movementType === 'salida' || movementType === 'transferencia'
-                        ? 'var(--crit)'
-                        : 'var(--green)',
-                  }}
-                >
-                  {calculatedResultStock}
-                </div>
-                <div className="l">Stock resultante</div>
-              </div>
-            </div>
-            {isNegativeStock && (
-              <span className="field-error" style={{ marginTop: '8px', display: 'block' }}>
-                <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '16px', height: '16px', marginRight: '4px', verticalAlign: 'middle', display: 'inline-block' }}>
-                  <circle cx="12" cy="12" r="10" />
-                  <path d="M12 8v4M12 16h.01" />
-                </svg>
-                Stock insuficiente en el depósito de origen.
-              </span>
-            )}
-          </div>
-        </form>
-      </Modal>
+        onConfirm={handleConfirmMultiProductMovement}
+        depositos={dbFetchDepo}
+        usuarios={dbFetchUsu}
+        motivos={dbFetchMot}
+        catalogoProductos={dbFetchProd}
+        isSubmitting={isSubmitting}
+      />
     </div>
   );
 }
