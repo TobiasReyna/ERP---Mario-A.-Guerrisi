@@ -7,6 +7,7 @@ import Inventario from './pages/Inventario';
 import Alertas_de_stock from './pages/Alertas_de_stock';
 import Movimientos from './pages/Movimientos';
 import Detalle_producto from './pages/Detalle_producto';
+import Gestion_de_proveedores from './pages/Gestion_de_proveedores';
 import Perfil from './pages/Perfil';
 
 const ROUTE_INFO = {
@@ -16,6 +17,7 @@ const ROUTE_INFO = {
   '/Movimientos': { title: 'Movimientos', subtitle: 'Entradas, salidas, ajustes y transferencias de stock' },
   '/Alertas_de_stock': { title: 'Alertas y notificaciones', subtitle: 'Reposición de stock y actividad general del sistema' },
   '/Detalle_producto': { title: 'Detalle de producto', subtitle: 'Stock por depósito, historial de precios y movimientos' },
+  '/Gestion_de_proveedores': { title: 'Gestión de Proveedores', subtitle: 'Contactos, condiciones comerciales e historial de compras por proveedor' },
   '/Perfil': { title: 'Mi perfil', subtitle: 'Información de la cuenta y el depósito asignado' },
 };
 
@@ -210,6 +212,23 @@ function App() {
           </NavLink>
         </nav>
 
+        <nav className="nav-group">
+          <div className="nav-group-label">Compras</div>
+
+          <NavLink
+            to="/Gestion_de_proveedores"
+            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+          >
+            <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="1" y="3" width="15" height="13" rx="1.5" />
+              <path d="M16 8h3.5l3.5 3.5V16h-7" />
+              <circle cx="5.5" cy="18.5" r="2.2" />
+              <circle cx="18.5" cy="18.5" r="2.2" />
+            </svg>
+            Proveedores
+          </NavLink>
+        </nav>
+
         <div className="sidebar-footer">
           <div className="sidebar-footer-text">
             Mario A. Guerrisi<br />
@@ -384,6 +403,7 @@ function App() {
               <Route path="/Movimientos" element={<Movimientos />} />
               <Route path="/Alertas_de_stock" element={<Alertas_de_stock />} />
               <Route path="/Detalle_producto" element={<Detalle_producto />} />
+              <Route path="/Gestion_de_proveedores" element={<Gestion_de_proveedores />} />
               <Route path="/Perfil" element={<Perfil />} />
             </Routes>
           </div>
