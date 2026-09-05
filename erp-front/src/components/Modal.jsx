@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 
 function Modal({ isOpen, onClose, title, children, footer }) {
   // Cerrar con Escape y bloquear scroll de fondo cuando esté abierto
@@ -18,7 +19,7 @@ function Modal({ isOpen, onClose, title, children, footer }) {
 
   if (!isOpen) return null;
 
-  return (
+  return createPortal(
     <div className="modal-overlay open" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
@@ -41,7 +42,8 @@ function Modal({ isOpen, onClose, title, children, footer }) {
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

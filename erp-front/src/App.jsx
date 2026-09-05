@@ -4,6 +4,7 @@ import { NavLink, Routes, Route, useLocation, useNavigate, Navigate } from 'reac
 import Dashboard from './pages/Dashboard';
 import Catalogo_de_productos from './pages/Catalogo_de_productos';
 import Inventario from './pages/Inventario';
+import Inventario2 from './pages/Inventario2';
 import Alertas_de_stock from './pages/Alertas_de_stock';
 import Movimientos from './pages/Movimientos';
 import Detalle_producto from './pages/Detalle_producto';
@@ -380,7 +381,8 @@ function App() {
               {/* <Route path="/" element={<Dashboard />} /> */}
               <Route path="/" element={<Navigate to="/Inventario" replace />} />
               <Route path="/Catalogo_de_productos" element={<Catalogo_de_productos />} />
-              <Route path="/Inventario" element={<Inventario />} />
+              <Route path="/Inventario" element={<Inventario2 />} />
+              <Route path="/Inventario2" element={<Inventario2 />} />
               <Route path="/Movimientos" element={<Movimientos />} />
               <Route path="/Alertas_de_stock" element={<Alertas_de_stock />} />
               <Route path="/Detalle_producto" element={<Detalle_producto />} />

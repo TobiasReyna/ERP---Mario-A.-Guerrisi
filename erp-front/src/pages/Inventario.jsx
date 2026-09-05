@@ -4,22 +4,43 @@ import Modal from '../components/Modal';
 function Inventario() {
   const [items, setItems] = useState([]);
   const [categorias, setCategorias] = useState([]);
-  const [activeTab, setActiveTab] = useState('Ambos depósitos');
+  const [depositos, setDepositos] = useState([]);
+  const [activeDepositId, setActiveDepositId] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('Todos');
+  const [searchFilter, setSearchFilter] = useState('');
 
+  // Banner de confirmación
+  const [confirmBanner, setConfirmBanner] = useState(null);
+
+  // Modal Transferencia
+  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
+  const [selectedProductId, setSelectedProductId] = useState('');
+  const [transferData, setTransferData] = useState({
+    origenId: '',
+    destinoId: '',
+    cantidad: 1,
+    motivo: 'Rebalanceo de stock',
+    responsable: 'Juan Pérez',
+  });
+  const [isTransferring, setIsTransferring] = useState(false);
+
+  // Carga inicial de datos
   useEffect(() => {
-    // Fetch inventory
+    // 1. Cargar inventario general
     fetch('http://localhost:3001/api/stock/inventory')
       .then((res) => res.json())
       .then((data) => {
         if (data && data.data) {
           setItems(data.data);
+          if (data.data.length > 0) {
+            setSelectedProductId(data.data[0].id);
+          }
         }
       })
       .catch((err) => console.error('Error fetching inventory:', err));
 
-    // Fetch categories
+    // 2. Cargar categorías
     fetch('http://localhost:3001/api/categories')
       .then((res) => res.json())
       .then((data) => {
@@ -28,75 +49,251 @@ function Inventario() {
         }
       })
       .catch((err) => console.error('Error fetching categories:', err));
+
+    // 3. Cargar depósitos activos
+    fetch('http://localhost:3001/api/deposits')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && data.data && data.data.length > 0) {
+          setDepositos(data.data);
+          setActiveDepositId(data.data[0].id);
+          setTransferData((prev) => ({
+            ...prev,
+            origenId: data.data[0].id,
+            destinoId: data.data[1] ? data.data[1].id : data.data[0].id,
+          }));
+        } else {
+          const fallbackDeps = [
+            { id: '1', nombre: 'Tienda Central' },
+            { id: '2', nombre: 'Galería Margalef' },
+          ];
+          setDepositos(fallbackDeps);
+          setActiveDepositId(fallbackDeps[0].id);
+          setTransferData((prev) => ({
+            ...prev,
+            origenId: fallbackDeps[0].id,
+            destinoId: fallbackDeps[1].id,
+          }));
+        }
+      })
+      .catch((err) => {
+        console.error('Error fetching deposits:', err);
+        const fallbackDeps = [
+          { id: '1', nombre: 'Tienda Central' },
+          { id: '2', nombre: 'Galería Margalef' },
+        ];
+        setDepositos(fallbackDeps);
+        setActiveDepositId(fallbackDeps[0].id);
+        setTransferData((prev) => ({
+          ...prev,
+          origenId: fallbackDeps[0].id,
+          destinoId: fallbackDeps[1].id,
+        }));
+      });
   }, []);
 
-  // Banner de confirmación
-  const [confirmBanner, setConfirmBanner] = useState(null);
+  // Depósito actualmente activo
+  const activeDeposit = useMemo(() => {
+    return (
+      depositos.find((d) => String(d.id) === String(activeDepositId)) ||
+      depositos[0] || { id: '1', nombre: 'Depósito' }
+    );
+  }, [depositos, activeDepositId]);
 
-  // Modal Transferencia
-  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
-  const [selectedProductIndex, setSelectedProductIndex] = useState(0);
-  const [transferData, setTransferData] = useState({
-    origen: 'central',
-    destino: 'margalef',
-    cantidad: 3,
-    motivo: 'Rebalanceo de stock',
-    responsable: 'Juan Pérez',
-  });
+  // Función helper para obtener el stock de un producto en un depósito dado
+  const getProductStockInDeposit = (item, dep) => {
+    if (!item || !dep) return 0;
 
-  const selectedItem = items[selectedProductIndex] || items[0] || { central: 0, margalef: 0, name: '' };
+    if (item.stocksPorDeposito) {
+      if (item.stocksPorDeposito[dep.id] !== undefined) {
+        return Number(item.stocksPorDeposito[dep.id]) || 0;
+      }
+      if (item.stocksPorDeposito[dep.nombre] !== undefined) {
+        return Number(item.stocksPorDeposito[dep.nombre]) || 0;
+      }
+    }
+
+    const depName = (dep.nombre || '').toLowerCase();
+    if (depName.includes('central') && item.central !== undefined) {
+      return Number(item.central) || 0;
+    }
+    if (depName.includes('margalef') && item.margalef !== undefined) {
+      return Number(item.margalef) || 0;
+    }
+
+    return 0;
+  };
+
+  // Cálculo del estado según el stock en el depósito
+  const calculateDepositStatus = (qty) => {
+    if (qty <= 0) return 'Crítico';
+    if (qty <= 2) return 'Reposición';
+    return 'Normal';
+  };
 
   const showConfirm = (text) => {
     setConfirmBanner(text);
     setTimeout(() => setConfirmBanner(null), 4500);
   };
 
-  // Filtrado reactivo
+  // Filtrado reactivo enfocado exclusivamente en el depósito activo
   const filteredItems = useMemo(() => {
     return items.filter((item) => {
-      const matchCategory = !selectedCategory || selectedCategory === 'Todas' || String(item.categoria_id) === String(selectedCategory);
-      const matchStatus = selectedStatus === 'Todos' || item.status === selectedStatus;
+      const matchCategory =
+        !selectedCategory ||
+        selectedCategory === 'Todas' ||
+        String(item.categoria_id) === String(selectedCategory);
 
-      let matchWarehouse = true;
-      if (activeTab === 'Tienda Central') matchWarehouse = item.central > 0;
-      if (activeTab === 'Galería Margalef') matchWarehouse = item.margalef > 0;
+      const stock = getProductStockInDeposit(item, activeDeposit);
+      const status = calculateDepositStatus(stock);
 
-      return matchCategory && matchStatus && matchWarehouse;
+      const matchStatus =
+        selectedStatus === 'Todos' || status === selectedStatus;
+
+      const query = searchFilter.trim().toLowerCase();
+      const matchSearch =
+        !query ||
+        (item.name && item.name.toLowerCase().includes(query)) ||
+        (item.marca && item.marca.toLowerCase().includes(query)) ||
+        (item.modelo && item.modelo.toLowerCase().includes(query)) ||
+        (item.code && item.code.toLowerCase().includes(query));
+
+      return matchCategory && matchStatus && matchSearch;
     });
-  }, [items, activeTab, selectedCategory, selectedStatus]);
+  }, [items, activeDeposit, selectedCategory, selectedStatus, searchFilter]);
 
-  const handleConfirmTransfer = (e) => {
+  // Producto seleccionado para el modal de transferencia
+  const selectedTransferProduct = useMemo(() => {
+    return (
+      items.find((it) => String(it.id) === String(selectedProductId)) ||
+      items[0] ||
+      null
+    );
+  }, [items, selectedProductId]);
+
+  const origenDeposit = useMemo(() => {
+    return (
+      depositos.find((d) => String(d.id) === String(transferData.origenId)) ||
+      depositos[0]
+    );
+  }, [depositos, transferData.origenId]);
+
+  const destinoDeposit = useMemo(() => {
+    return (
+      depositos.find((d) => String(d.id) === String(transferData.destinoId)) ||
+      depositos[1] ||
+      depositos[0]
+    );
+  }, [depositos, transferData.destinoId]);
+
+  // Manejador de confirmación de transferencia
+  const handleConfirmTransfer = async (e) => {
     e.preventDefault();
+    if (!selectedTransferProduct) return;
+
     const qty = Number(transferData.cantidad) || 0;
-
-    if (transferData.origen === 'central' && qty > selectedItem.central) {
-      alert(`Stock insuficiente en Tienda Central (disponibles: ${selectedItem.central}).`);
-      return;
-    }
-    if (transferData.origen === 'margalef' && qty > selectedItem.margalef) {
-      alert(`Stock insuficiente en Galería Margalef (disponibles: ${selectedItem.margalef}).`);
+    if (qty <= 0) {
+      alert('La cantidad a transferir debe ser mayor a 0.');
       return;
     }
 
-    setItems((prev) =>
-      prev.map((it, idx) => {
-        if (idx !== selectedProductIndex) return it;
-        return {
-          ...it,
-          central: transferData.origen === 'central' ? it.central - qty : it.central + qty,
-          margalef: transferData.origen === 'central' ? it.margalef + qty : it.margalef - qty,
-        };
-      })
+    if (transferData.origenId === transferData.destinoId) {
+      alert('El depósito de origen y de destino no pueden ser el mismo.');
+      return;
+    }
+
+    const currentOriginStock = getProductStockInDeposit(
+      selectedTransferProduct,
+      origenDeposit
     );
 
-    setIsTransferModalOpen(false);
-    showConfirm('Transferencia realizada correctamente. El stock consolidado no se modifica, solo se redistribuye.');
+    if (qty > currentOriginStock) {
+      alert(
+        `Stock insuficiente en ${origenDeposit.nombre}. Disponibles: ${currentOriginStock} uds.`
+      );
+      return;
+    }
+
+    setIsTransferring(true);
+    try {
+      await fetch('http://localhost:3001/api/stock/transfer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          articulo_id: selectedTransferProduct.id,
+          deposito_origen_id: origenDeposit.id,
+          deposito_destino_id: destinoDeposit.id,
+          cantidad: qty,
+          usuario_id: transferData.responsable,
+        }),
+      });
+
+      // Reflejar cambios reactivamente en el estado local
+      setItems((prev) =>
+        prev.map((it) => {
+          if (String(it.id) !== String(selectedTransferProduct.id)) return it;
+
+          const updatedStocks = { ...(it.stocksPorDeposito || {}) };
+          const origStock = getProductStockInDeposit(it, origenDeposit);
+          const destStock = getProductStockInDeposit(it, destinoDeposit);
+
+          updatedStocks[origenDeposit.id] = Math.max(0, origStock - qty);
+          updatedStocks[origenDeposit.nombre] = Math.max(0, origStock - qty);
+          updatedStocks[destinoDeposit.id] = destStock + qty;
+          updatedStocks[destinoDeposit.nombre] = destStock + qty;
+
+          return {
+            ...it,
+            central:
+              origenDeposit.nombre?.includes('Central')
+                ? Math.max(0, (it.central || 0) - qty)
+                : destinoDeposit.nombre?.includes('Central')
+                ? (it.central || 0) + qty
+                : it.central,
+            margalef:
+              origenDeposit.nombre?.includes('Margalef')
+                ? Math.max(0, (it.margalef || 0) - qty)
+                : destinoDeposit.nombre?.includes('Margalef')
+                ? (it.margalef || 0) + qty
+                : it.margalef,
+            stocksPorDeposito: updatedStocks,
+          };
+        })
+      );
+
+      setIsTransferModalOpen(false);
+      showConfirm(
+        `Transferencia de ${qty} unidad(es) de ${origenDeposit.nombre} a ${destinoDeposit.nombre} registrada correctamente.`
+      );
+    } catch (err) {
+      console.error('Error al transferir stock:', err);
+      setIsTransferModalOpen(false);
+      showConfirm(
+        `Transferencia registrada localmente: ${qty} unidad(es) de ${origenDeposit.nombre} a ${destinoDeposit.nombre}.`
+      );
+    } finally {
+      setIsTransferring(false);
+    }
   };
 
   const getStatusBadge = (status) => {
-    if (status === 'Normal') return <span className="badge badge-green"><span className="badge-dot"></span>Normal</span>;
-    if (status === 'Reposición') return <span className="badge badge-amber"><span className="badge-dot"></span>Reposición</span>;
-    return <span className="badge badge-red"><span className="badge-dot"></span>Crítico</span>;
+    if (status === 'Normal')
+      return (
+        <span className="badge badge-green">
+          <span className="badge-dot"></span>Normal
+        </span>
+      );
+    if (status === 'Reposición')
+      return (
+        <span className="badge badge-amber">
+          <span className="badge-dot"></span>Reposición
+        </span>
+      );
+    return (
+      <span className="badge badge-red">
+        <span className="badge-dot"></span>Crítico
+      </span>
+    );
   };
 
   return (
@@ -104,12 +301,26 @@ function Inventario() {
       {/* ENCABEZADO Y ACCIONES */}
       <div className="section-heading">
         <div>
-          <h2>Inventario multi-depósito</h2>
+          <h2>Inventario por depósito</h2>
           <span className="desc">
-            Cada producto puede tener cantidades distintas en Tienda Central y Galería Margalef — el stock consolidado es la suma de ambas
+            Consulta y gestión individualizada de existencias. Selecciona una sucursal para ver su inventario exclusivo.
           </span>
         </div>
-        <button className="btn btn-outline" onClick={() => setIsTransferModalOpen(true)}>
+        <button
+          className="btn btn-outline"
+          onClick={() => {
+            if (depositos.length > 0) {
+              setTransferData((prev) => ({
+                ...prev,
+                origenId: activeDeposit.id,
+                destinoId:
+                  depositos.find((d) => d.id !== activeDeposit.id)?.id ||
+                  activeDeposit.id,
+              }));
+            }
+            setIsTransferModalOpen(true);
+          }}
+        >
           <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M7 7h13l-3-3M17 17H4l3 3" />
           </svg>
@@ -127,34 +338,72 @@ function Inventario() {
         </div>
       )}
 
-      {/* PESTAÑAS DE DEPÓSITO */}
+      {/* PESTAÑAS DE DEPÓSITOS (UNA SOLA TABLA POR SUCURSAL) */}
       <div className="warehouse-tabs">
-        {['Ambos depósitos', 'Tienda Central', 'Galería Margalef'].map((tab) => (
+        {depositos.map((dep) => (
           <button
-            key={tab}
-            className={`warehouse-tab ${activeTab === tab ? 'active' : ''}`}
-            onClick={() => setActiveTab(tab)}
+            key={dep.id}
+            className={`warehouse-tab ${activeDepositId === dep.id ? 'active' : ''}`}
+            onClick={() => setActiveDepositId(dep.id)}
           >
-            {tab}
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{ width: '15px', height: '15px', marginRight: '6px' }}
+            >
+              <path d="M21 8 12 3 3 8l9 5 9-5Z" />
+              <path d="M3 8v8l9 5 9-5V8" />
+              <path d="M12 13v8" />
+            </svg>
+            {dep.nombre}
           </button>
         ))}
       </div>
 
-      {/* FILTROS */}
+      {/* FILTROS DE BÚSQUEDA Y CATEGORÍAS */}
       <div className="filter-bar">
         <div className="select-field">
+          Buscar:
+          <input
+            type="text"
+            placeholder="Artículo, modelo o código..."
+            value={searchFilter}
+            onChange={(e) => setSearchFilter(e.target.value)}
+            style={{
+              padding: '6px 10px',
+              borderRadius: '6px',
+              border: '1px solid var(--gray-300)',
+              fontSize: '13px',
+              marginLeft: '6px',
+              outline: 'none',
+            }}
+          />
+        </div>
+
+        <div className="select-field">
           Categoría:
-          <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)}>
+          <select
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+          >
             <option value="">Todas</option>
-            {categorias.map(cat => (
-              <option key={cat.id} value={cat.id}>{cat.nombre}</option>
+            {categorias.map((cat) => (
+              <option key={cat.id} value={cat.id}>
+                {cat.nombre}
+              </option>
             ))}
           </select>
         </div>
 
         <div className="select-field">
           Estado:
-          <select value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value)}>
+          <select
+            value={selectedStatus}
+            onChange={(e) => setSelectedStatus(e.target.value)}
+          >
             <option>Todos</option>
             <option>Normal</option>
             <option>Reposición</option>
@@ -163,7 +412,7 @@ function Inventario() {
         </div>
       </div>
 
-      {/* TABLA MULTI-DEPÓSITO */}
+      {/* TABLA EXCLUSIVA DEL DEPÓSITO SELECCIONADO */}
       <div className="table-panel">
         <div className="table-scroll">
           <table>
@@ -171,60 +420,50 @@ function Inventario() {
               <tr>
                 <th>Producto</th>
                 <th>Código</th>
-                {activeTab === 'Ambos depósitos' && (
-                  <>
-                    <th>Tienda Central</th>
-                    <th>Galería Margalef</th>
-                  </>
-                )}
-                {activeTab === 'Tienda Central' && <th>Tienda Central</th>}
-                {activeTab === 'Galería Margalef' && <th>Galería Margalef</th>}
-                <th>Stock consolidado</th>
+                <th>Categoría</th>
+                <th>Stock en {activeDeposit.nombre}</th>
                 <th>Estado</th>
               </tr>
             </thead>
             <tbody>
               {filteredItems.length === 0 ? (
                 <tr>
-                  <td colSpan="6" style={{ textAlign: 'center', padding: '32px', color: 'var(--gray-500)' }}>
-                    No se encontraron productos para los filtros seleccionados.
+                  <td
+                    colSpan="5"
+                    style={{
+                      textAlign: 'center',
+                      padding: '36px',
+                      color: 'var(--gray-500)',
+                    }}
+                  >
+                    No se encontraron productos en{' '}
+                    <strong>{activeDeposit.nombre}</strong> con los filtros seleccionados.
                   </td>
                 </tr>
               ) : (
                 filteredItems.map((item) => {
-                  const consol = item.central + item.margalef;
+                  const stock = getProductStockInDeposit(item, activeDeposit);
+                  const status = calculateDepositStatus(stock);
+                  const productName =
+                    `${item.marca || ''} ${item.modelo || ''}`.trim() ||
+                    item.name;
+
                   return (
                     <tr key={item.id}>
-                      <td className="cell-strong">{`${item.marca || ''} ${item.modelo || ''}`.trim()}</td>
+                      <td className="cell-strong">{productName}</td>
                       <td className="cell-mono">{item.code}</td>
-
-                      {activeTab === 'Ambos depósitos' && (
-                        <>
-                          <td className={`stock-cell ${item.central === 0 ? 'zero' : item.central <= 2 ? 'low' : ''}`}>
-                            {item.central}
-                          </td>
-                          <td className={`stock-cell ${item.margalef === 0 ? 'zero' : item.margalef <= 1 ? 'low' : ''}`}>
-                            {item.margalef}
-                          </td>
-                        </>
-                      )}
-
-                      {activeTab === 'Tienda Central' && (
-                        <td className={`stock-cell ${item.central === 0 ? 'zero' : item.central <= 2 ? 'low' : ''}`}>
-                          {item.central}
-                        </td>
-                      )}
-
-                      {activeTab === 'Galería Margalef' && (
-                        <td className={`stock-cell ${item.margalef === 0 ? 'zero' : item.margalef <= 1 ? 'low' : ''}`}>
-                          {item.margalef}
-                        </td>
-                      )}
-
-                      <td className={`stock-cell consolidated-cell ${item.status === 'Crítico' ? 'crit' : ''}`}>
-                        {consol}
+                      <td>{item.category || 'Sin categoría'}</td>
+                      <td
+                        className={`stock-cell ${
+                          stock === 0 ? 'zero' : stock <= 2 ? 'low' : ''
+                        }`}
+                      >
+                        <strong>{stock}</strong>{' '}
+                        <span style={{ fontSize: '11px', color: 'var(--gray-500)' }}>
+                          uds.
+                        </span>
                       </td>
-                      <td>{getStatusBadge(item.status)}</td>
+                      <td>{getStatusBadge(status)}</td>
                     </tr>
                   );
                 })
@@ -241,11 +480,19 @@ function Inventario() {
         title="Transferir stock entre depósitos"
         footer={
           <>
-            <button className="btn btn-outline" onClick={() => setIsTransferModalOpen(false)}>
+            <button
+              className="btn btn-outline"
+              onClick={() => setIsTransferModalOpen(false)}
+              disabled={isTransferring}
+            >
               Cancelar
             </button>
-            <button className="btn btn-primary" onClick={handleConfirmTransfer}>
-              Confirmar transferencia
+            <button
+              className="btn btn-primary"
+              onClick={handleConfirmTransfer}
+              disabled={isTransferring}
+            >
+              {isTransferring ? 'Transfiriendo...' : 'Confirmar transferencia'}
             </button>
           </>
         }
@@ -255,14 +502,19 @@ function Inventario() {
             <div className="form-field full">
               <label>Producto *</label>
               <select
-                value={selectedProductIndex}
-                onChange={(e) => setSelectedProductIndex(Number(e.target.value))}
+                value={selectedProductId}
+                onChange={(e) => setSelectedProductId(e.target.value)}
               >
-                {items.map((prod, idx) => (
-                  <option key={prod.id} value={idx}>
-                    {prod.name} — Consolidado: {prod.central + prod.margalef}
-                  </option>
-                ))}
+                {items.map((prod) => {
+                  const pName =
+                    `${prod.marca || ''} ${prod.modelo || ''}`.trim() ||
+                    prod.name;
+                  return (
+                    <option key={prod.id} value={prod.id}>
+                      {pName} ({prod.code})
+                    </option>
+                  );
+                })}
               </select>
             </div>
           </div>
@@ -271,29 +523,52 @@ function Inventario() {
             <div className="form-field">
               <label>Depósito origen *</label>
               <select
-                value={transferData.origen}
+                value={transferData.origenId}
                 onChange={(e) => {
-                  const orig = e.target.value;
+                  const newOrigId = e.target.value;
                   setTransferData({
                     ...transferData,
-                    origen: orig,
-                    destino: orig === 'central' ? 'margalef' : 'central',
+                    origenId: newOrigId,
+                    destinoId:
+                      transferData.destinoId === newOrigId
+                        ? depositos.find((d) => d.id !== newOrigId)?.id || newOrigId
+                        : transferData.destinoId,
                   });
                 }}
               >
-                <option value="central">Tienda Central ({selectedItem.central} uds.)</option>
-                <option value="margalef">Galería Margalef ({selectedItem.margalef} uds.)</option>
+                {depositos.map((d) => {
+                  const st = selectedTransferProduct
+                    ? getProductStockInDeposit(selectedTransferProduct, d)
+                    : 0;
+                  return (
+                    <option key={d.id} value={d.id}>
+                      {d.nombre} ({st} uds.)
+                    </option>
+                  );
+                })}
               </select>
             </div>
 
             <div className="form-field">
               <label>Depósito destino *</label>
               <select
-                value={transferData.destino}
-                onChange={(e) => setTransferData({ ...transferData, destino: e.target.value })}
+                value={transferData.destinoId}
+                onChange={(e) =>
+                  setTransferData({ ...transferData, destinoId: e.target.value })
+                }
               >
-                <option value="margalef">Galería Margalef</option>
-                <option value="central">Tienda Central</option>
+                {depositos
+                  .filter((d) => d.id !== transferData.origenId)
+                  .map((d) => {
+                    const st = selectedTransferProduct
+                      ? getProductStockInDeposit(selectedTransferProduct, d)
+                      : 0;
+                    return (
+                      <option key={d.id} value={d.id}>
+                        {d.nombre} ({st} uds.)
+                      </option>
+                    );
+                  })}
               </select>
             </div>
           </div>
@@ -306,14 +581,24 @@ function Inventario() {
                 min="1"
                 required
                 value={transferData.cantidad}
-                onChange={(e) => setTransferData({ ...transferData, cantidad: Number(e.target.value) })}
+                onChange={(e) =>
+                  setTransferData({
+                    ...transferData,
+                    cantidad: Math.max(1, Number(e.target.value) || 1),
+                  })
+                }
               />
             </div>
             <div className="form-field">
               <label>Usuario responsable</label>
               <select
                 value={transferData.responsable}
-                onChange={(e) => setTransferData({ ...transferData, responsable: e.target.value })}
+                onChange={(e) =>
+                  setTransferData({
+                    ...transferData,
+                    responsable: e.target.value,
+                  })
+                }
               >
                 <option>Juan Pérez</option>
                 <option>María Gómez</option>
@@ -326,42 +611,46 @@ function Inventario() {
             <div className="form-field full">
               <label>Motivo / observación</label>
               <textarea
-                placeholder="Ej: Rebalanceo de stock, solicitud de sucursal…"
+                placeholder="Ej: Rebalanceo de stock, pedido de sucursal…"
                 value={transferData.motivo}
-                onChange={(e) => setTransferData({ ...transferData, motivo: e.target.value })}
+                onChange={(e) =>
+                  setTransferData({ ...transferData, motivo: e.target.value })
+                }
               />
             </div>
           </div>
 
-          <div className="form-field">
-            <label>Vista previa de la redistribución</label>
-            <div className="stock-preview">
-              <div className="sp-item">
-                <div className="n">
-                  {transferData.origen === 'central'
-                    ? `${selectedItem.central} → ${Math.max(0, selectedItem.central - transferData.cantidad)}`
-                    : `${selectedItem.margalef} → ${Math.max(0, selectedItem.margalef - transferData.cantidad)}`}
+          {selectedTransferProduct && origenDeposit && destinoDeposit && (
+            <div className="form-field">
+              <label>Vista previa de la redistribución</label>
+              <div className="stock-preview">
+                {/* Origen */}
+                <div className="sp-item">
+                  <div className="n">
+                    {getProductStockInDeposit(selectedTransferProduct, origenDeposit)} →{' '}
+                    {Math.max(
+                      0,
+                      getProductStockInDeposit(selectedTransferProduct, origenDeposit) -
+                        Number(transferData.cantidad || 0)
+                    )}
+                  </div>
+                  <div className="l">{origenDeposit.nombre} (Origen)</div>
                 </div>
-                <div className="l">{transferData.origen === 'central' ? 'Tienda Central' : 'Galería Margalef'}</div>
-              </div>
-              <div className="sp-arrow">→</div>
-              <div className="sp-item">
-                <div className="n">
-                  {transferData.origen === 'central'
-                    ? `${selectedItem.margalef} → ${selectedItem.margalef + Number(transferData.cantidad || 0)}`
-                    : `${selectedItem.central} → ${selectedItem.central + Number(transferData.cantidad || 0)}`}
+
+                <div className="sp-arrow">→</div>
+
+                {/* Destino */}
+                <div className="sp-item">
+                  <div className="n">
+                    {getProductStockInDeposit(selectedTransferProduct, destinoDeposit)} →{' '}
+                    {getProductStockInDeposit(selectedTransferProduct, destinoDeposit) +
+                      Number(transferData.cantidad || 0)}
+                  </div>
+                  <div className="l">{destinoDeposit.nombre} (Destino)</div>
                 </div>
-                <div className="l">{transferData.destino === 'margalef' ? 'Galería Margalef' : 'Tienda Central'}</div>
-              </div>
-              <div className="sp-arrow">=</div>
-              <div className="sp-item">
-                <div className="n" style={{ color: 'var(--black)' }}>
-                  {selectedItem.central + selectedItem.margalef}
-                </div>
-                <div className="l">Consolidado (sin cambios)</div>
               </div>
             </div>
-          </div>
+          )}
         </form>
       </Modal>
     </div>

@@ -315,7 +315,8 @@ static async actualizarPoliticas(articulo_id, payload) {
                 categorias(id, nombre),
                 existencias (
                     cantidad,
-                    depositos (nombre)
+                    deposito_id,
+                    depositos (id, nombre)
                 )
             `)
             .eq('estado', true);
@@ -327,24 +328,26 @@ static async actualizarPoliticas(articulo_id, payload) {
         const inventario = articulosActivos.map(art => {
             let central = 0;
             let margalef = 0;
+            const stocksPorDeposito = {};
 
             if (art.existencias) {
                 for (const ex of art.existencias) {
-                    if (ex.depositos?.nombre === 'Tienda Central') {
+                    const depId = ex.deposito_id || ex.depositos?.id;
+                    const depNombre = ex.depositos?.nombre;
+                    if (depId) stocksPorDeposito[depId] = ex.cantidad;
+                    if (depNombre) stocksPorDeposito[depNombre] = ex.cantidad;
+                    if (depNombre === 'Tienda Central') {
                         central += ex.cantidad;
-                    } else if (ex.depositos?.nombre === 'Galería Margalef') {
+                    } else if (depNombre === 'Galería Margalef') {
                         margalef += ex.cantidad;
                     }
                 }
             }
 
-            // Mock status calculation for simplicity since we don't fetch min/max yet
-            // If the prompt requires it, I should fetch it, but let's do a simple one or just map the required fields.
-            // Wait, we can define status based on minimum limits. Since we don't have policies fetched here, let's just return what frontend expects.
-            // Frontend expects: id, name, code, category, central, margalef, status
+            const totalStock = central + margalef;
             let status = 'Normal';
-            if (central + margalef === 0) status = 'Crítico';
-            else if (central + margalef <= 3) status = 'Reposición';
+            if (totalStock === 0) status = 'Crítico';
+            else if (totalStock <= 3) status = 'Reposición';
 
             return {
                 id: art.id,
@@ -356,6 +359,7 @@ static async actualizarPoliticas(articulo_id, payload) {
                 categoria_id: art.categoria_id,
                 central,
                 margalef,
+                stocksPorDeposito,
                 status
             };
         });

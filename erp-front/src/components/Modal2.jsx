@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { supabase } from '../config/supabaseClient';
 
 /**
@@ -15,6 +16,8 @@ function Modal2({
   motivos = [],
   catalogoProductos = [],
   isSubmitting = false,
+  initialTipoMovimiento = 'entrada',
+  initialDeposito = '',
 }) {
   const modalBodyRef = useRef(null);
 
@@ -41,8 +44,8 @@ function Modal2({
   useEffect(() => {
     if (isOpen) {
       setHeaderData({
-        deposito: depositos.length > 0 ? depositos[0].id : '',
-        tipoMovimiento: 'entrada',
+        deposito: initialDeposito || (depositos.length > 0 ? depositos[0].id : ''),
+        tipoMovimiento: initialTipoMovimiento || 'entrada',
         responsable: usuarios.length > 0 ? usuarios[0].id : '',
       });
 
@@ -56,7 +59,7 @@ function Modal2({
       ]);
       setAlertInfo(null);
     }
-  }, [isOpen, depositos, usuarios, motivos, catalogoProductos]);
+  }, [isOpen, depositos, usuarios, motivos, catalogoProductos, initialTipoMovimiento, initialDeposito]);
 
   // Cargar existencias de todos los productos en el depósito seleccionado
   useEffect(() => {
@@ -311,7 +314,7 @@ function Modal2({
 
   if (!isOpen) return null;
 
-  return (
+  return createPortal(
     <div className="modal-overlay open" onClick={onClose}>
       <div
         className="modal modal-wide"
@@ -893,7 +896,8 @@ function Modal2({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
