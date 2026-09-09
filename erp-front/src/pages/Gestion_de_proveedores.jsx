@@ -10,12 +10,6 @@ import {
   obtenerHistorialCompras,
 } from '../services/supplierService';
 
-// NOTA: esta página consume `services/supplierService.js`, que ya llama a
-// `/api/suppliers` en erp-backend (Express + Supabase). Las tablas
-// `proveedores`, `ordenes_compra` y `ordenes_compra_detalle` ya existen en la
-// base — ver docs/sprint2/HU-11-proveedores.md y
-// docs/sprint2/migracion_proveedores_campos_adicionales.sql.
-
 const CONDICIONES_PAGO = [
   { value: 'contado', label: 'Contado' },
   { value: '15_dias', label: '15 días' },
@@ -37,7 +31,7 @@ const FORM_INICIAL = {
 };
 
 function getCondicionLabel(value) {
-  return CONDICIONES_PAGO.find((c) => c.value === value)?.label || '—';
+  return CONDICIONES_PAGO.find((c) => c.value === value)?.label || value || '—';
 }
 
 function formatearFecha(iso) {
@@ -55,9 +49,14 @@ function Gestion_de_proveedores() {
   const [loading, setLoading] = useState(true);
   const [confirmToast, setConfirmToast] = useState(null);
 
+  // Filtros
   const [searchTerm, setSearchTerm] = useState('');
   const [filtroEstado, setFiltroEstado] = useState('activos'); // activos | inactivos | todos
   const [filtroCondicion, setFiltroCondicion] = useState('todas');
+
+  // Paginación
+  const [paginaActual, setPaginaActual] = useState(1);
+  const itemsPorPagina = 10;
 
   // Modal alta / edición
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -90,15 +89,20 @@ function Gestion_de_proveedores() {
     fetchProveedores();
   }, []);
 
+  // Reiniciar a la página 1 cada vez que se modifican los filtros
+  useEffect(() => {
+    setPaginaActual(1);
+  }, [searchTerm, filtroEstado, filtroCondicion]);
+
   const showToast = (message) => {
     setConfirmToast(message);
     setTimeout(() => setConfirmToast(null), 4000);
   };
 
-  // Validación de formato de CUIT (criterio de aceptación 1)
+  // Validación de CUIT argentino (módulo 11)
   const cuitValidation = useMemo(() => validarCuit(formData.cuit), [formData.cuit]);
 
-  // Verificación de duplicados contra el CUIT ya registrado (criterio de aceptación 2)
+  // Verificación en vivo de duplicados contra la base de datos
   useEffect(() => {
     if (cuitValidation.estado !== 'valido') {
       setDuplicadoEncontrado(null);
@@ -113,7 +117,7 @@ function Gestion_de_proveedores() {
     const timer = setTimeout(() => {
       buscarProveedorPorCuit(formData.cuit, idActual)
         .then((encontrado) => {
-          if (cuitCheckToken.current !== token) return; // respuesta obsoleta
+          if (cuitCheckToken.current !== token) return;
           setDuplicadoEncontrado(encontrado);
         })
         .catch((err) => console.error('Error verificando CUIT duplicado:', err))
@@ -174,7 +178,6 @@ function Gestion_de_proveedores() {
       fetchProveedores();
     } catch (error) {
       if (error.code === 'CUIT_DUPLICADO') {
-        // El backend (o el mock) rechazó el alta y devolvió el proveedor existente
         setDuplicadoEncontrado(error.proveedorExistente);
       } else {
         alert(error.message || 'Ocurrió un error al guardar el proveedor.');
@@ -225,6 +228,7 @@ function Gestion_de_proveedores() {
     }
   };
 
+  // Filtrado reactivo en cliente
   const proveedoresFiltrados = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
     return proveedores.filter((p) => {
@@ -246,8 +250,64 @@ function Gestion_de_proveedores() {
     });
   }, [proveedores, searchTerm, filtroEstado, filtroCondicion]);
 
+  // Totales para las tarjetas KPI
   const totalActivos = proveedores.filter((p) => p.estado).length;
   const totalInactivos = proveedores.length - totalActivos;
+
+  // Control de paginación
+  const totalPaginas = Math.ceil(proveedoresFiltrados.length / itemsPorPagina) || 1;
+  const indicePrimerItem = (paginaActual - 1) * itemsPorPagina;
+  const indiceUltimoItem = Math.min(indicePrimerItem + itemsPorPagina, proveedoresFiltrados.length);
+  const proveedoresPaginados = proveedoresFiltrados.slice(indicePrimerItem, indiceUltimoItem);
+
+  // Detección de filtros activos
+  const hayFiltrosActivos = searchTerm.trim() !== '' || filtroEstado !== 'activos' || filtroCondicion !== 'todas';
+
+  const handleLimpiarFiltros = () => {
+    setSearchTerm('');
+    setFiltroEstado('activos');
+    setFiltroCondicion('todas');
+  };
+
+  // Exportar listado a archivo CSV con codificación UTF-8 BOM para Excel
+  const handleExportarCSV = () => {
+    if (proveedoresFiltrados.length === 0) return;
+
+    const encabezados = [
+      'Razón Social',
+      'CUIT',
+      'Contacto',
+      'Teléfono',
+      'Email',
+      'Dirección',
+      'Condición de Pago',
+      'Estado',
+      'Fecha Alta'
+    ];
+
+    const filas = proveedoresFiltrados.map((p) => [
+      `"${(p.razonSocial || '').replace(/"/g, '""')}"`,
+      `"${p.cuit || ''}"`,
+      `"${(p.nombreContacto || '').replace(/"/g, '""')}"`,
+      `"${(p.telefono || '').replace(/"/g, '""')}"`,
+      `"${(p.email || '').replace(/"/g, '""')}"`,
+      `"${(p.direccion || '').replace(/"/g, '""')}"`,
+      `"${getCondicionLabel(p.condicionPago)}"`,
+      `"${p.estado ? 'Activo' : 'Dado de baja'}"`,
+      `"${formatearFecha(p.fechaAlta)}"`
+    ]);
+
+    const csvContent = '\uFEFF' + [encabezados.join(';'), ...filas.map((f) => f.join(';'))].join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `proveedores_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   const historialCount = historialOC.length;
   const montoOperadoTotal = historialOC.reduce((acc, oc) => acc + (Number(oc.monto) || 0), 0);
@@ -273,15 +333,30 @@ function Gestion_de_proveedores() {
             {filtroEstado === 'activos' ? 'activos' : filtroEstado === 'inactivos' ? 'dados de baja' : 'totales'})
           </span>
         </div>
-        <button className="btn btn-primary" onClick={handleOpenCreateModal}>
-          <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 5v14M5 12h14" />
-          </svg>
-          Nuevo proveedor
-        </button>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <button
+            className="btn btn-outline"
+            onClick={handleExportarCSV}
+            title="Descargar listado filtrado en formato CSV para Excel"
+            disabled={proveedoresFiltrados.length === 0}
+          >
+            <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            Exportar CSV
+          </button>
+          <button className="btn btn-primary" onClick={handleOpenCreateModal}>
+            <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            Nuevo proveedor
+          </button>
+        </div>
       </div>
 
-      {/* KPIs */}
+      {/* TARJETAS KPI */}
       <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
         <div className="stat-card">
           <div className="stat-card-top">
@@ -322,7 +397,7 @@ function Gestion_de_proveedores() {
         </div>
       </div>
 
-      {/* TOOLBAR */}
+      {/* BARRA DE HERRAMIENTAS Y FILTROS */}
       <div className="catalog-toolbar">
         <div className="search-input">
           <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -357,9 +432,20 @@ function Gestion_de_proveedores() {
             ))}
           </select>
         </div>
+
+        {hayFiltrosActivos && (
+          <button
+            className="btn btn-outline btn-sm"
+            onClick={handleLimpiarFiltros}
+            title="Restablecer todos los filtros"
+            style={{ marginLeft: 'auto' }}
+          >
+            Limpiar filtros
+          </button>
+        )}
       </div>
 
-      {/* TABLA DE PROVEEDORES */}
+      {/* TABLA CON PAGINACIÓN */}
       <div className="table-panel">
         <div className="table-scroll">
           <table>
@@ -380,14 +466,14 @@ function Gestion_de_proveedores() {
                     Cargando proveedores…
                   </td>
                 </tr>
-              ) : proveedoresFiltrados.length === 0 ? (
+              ) : proveedoresPaginados.length === 0 ? (
                 <tr>
                   <td colSpan={6} style={{ textAlign: 'center', padding: '30px', color: 'var(--gray-500)' }}>
                     No se encontraron proveedores para los filtros seleccionados.
                   </td>
                 </tr>
               ) : (
-                proveedoresFiltrados.map((prov) => (
+                proveedoresPaginados.map((prov) => (
                   <tr key={prov.id} style={{ opacity: prov.estado ? 1 : 0.65 }}>
                     <td>
                       <div className="cell-strong">{prov.razonSocial}</div>
@@ -451,6 +537,45 @@ function Gestion_de_proveedores() {
             </tbody>
           </table>
         </div>
+
+        {/* BARRA DE PAGINACIÓN */}
+        {proveedoresFiltrados.length > 0 && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '12px 18px',
+              borderTop: '1px solid var(--gray-200)',
+              fontSize: '13px',
+              color: 'var(--gray-600)',
+            }}
+          >
+            <div>
+              Mostrando <strong>{indicePrimerItem + 1}</strong> a <strong>{indiceUltimoItem}</strong> de{' '}
+              <strong>{proveedoresFiltrados.length}</strong> proveedores
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <button
+                className="btn btn-outline btn-sm"
+                disabled={paginaActual === 1}
+                onClick={() => setPaginaActual((prev) => Math.max(prev - 1, 1))}
+              >
+                Anterior
+              </button>
+              <span style={{ fontWeight: '500', padding: '0 4px' }}>
+                Página {paginaActual} de {totalPaginas}
+              </span>
+              <button
+                className="btn btn-outline btn-sm"
+                disabled={paginaActual === totalPaginas}
+                onClick={() => setPaginaActual((prev) => Math.min(prev + 1, totalPaginas))}
+              >
+                Siguiente
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ============================================================ */}
@@ -655,7 +780,7 @@ function Gestion_de_proveedores() {
               </div>
             )}
 
-            {/* KPIs de historial de compras (criterio de aceptación 3) */}
+            {/* KPIs de historial de compras */}
             <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)', margin: 0 }}>
               <div className="stat-card" style={{ padding: '14px 16px' }}>
                 <div className="stat-value" style={{ fontSize: '20px' }}>{historialCount}</div>
