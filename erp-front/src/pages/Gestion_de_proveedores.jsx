@@ -325,14 +325,7 @@ function Gestion_de_proveedores() {
       )}
 
       {/* ENCABEZADO */}
-      <div className="section-heading">
-        <div>
-          <h2>Gestión de Proveedores</h2>
-          <span className="desc">
-            Listado centralizado de proveedores — {proveedoresFiltrados.length} registros (
-            {filtroEstado === 'activos' ? 'activos' : filtroEstado === 'inactivos' ? 'dados de baja' : 'totales'})
-          </span>
-        </div>
+      <div className="section-heading" style={{ justifyContent: 'flex-end' }}>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           <button
             className="btn btn-outline"

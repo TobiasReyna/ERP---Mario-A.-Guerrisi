@@ -340,21 +340,6 @@ function Inventario2() {
   // =========================================================================
   return (
     <div>
-      <div className="section-heading">
-        <div>
-          <h2>Inventario por depósito</h2>
-          <span className="desc">Consulta y gestión individualizada de existencias. Selecciona una sucursal para ver su inventario exclusivo.</span>
-        </div>
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <button
-            className="btn btn-primary"
-            onClick={() => setIsModalOpen(true)}
-          >
-            Transferir stock
-          </button>
-        </div>
-      </div>
-
       {confirmBanner && (
         <div className="confirm-banner">
           <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -364,12 +349,20 @@ function Inventario2() {
         </div>
       )}
 
-      <div className="warehouse-tabs">
-        {depositos.map((dep) => (
-          <button key={dep.id} className={`warehouse-tab ${activeDepositId === dep.id ? 'active' : ''}`} onClick={() => setActiveDepositId(dep.id)}>
-            {dep.nombre}
-          </button>
-        ))}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', flexWrap: 'wrap', gap: '12px' }}>
+        <div className="warehouse-tabs" style={{ marginBottom: 0 }}>
+          {depositos.map((dep) => (
+            <button key={dep.id} className={`warehouse-tab ${activeDepositId === dep.id ? 'active' : ''}`} onClick={() => setActiveDepositId(dep.id)}>
+              {dep.nombre}
+            </button>
+          ))}
+        </div>
+        <button
+          className="btn btn-primary"
+          onClick={() => setIsModalOpen(true)}
+        >
+          Transferir stock
+        </button>
       </div>
 
       <div className="filter-bar">

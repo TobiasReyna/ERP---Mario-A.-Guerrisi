@@ -167,19 +167,6 @@ function Notas_credito_debito() {
         </div>
       )}
 
-      <div className="section-heading">
-        <div>
-          <h2>Notas de Crédito y Débito</h2>
-          <span className="desc">Devoluciones y ajustes de facturación vinculados a comprobantes de venta</span>
-        </div>
-        <button className="btn btn-primary" onClick={handleOpenNueva} disabled={loading}>
-          <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 5v14M5 12h14" />
-          </svg>
-          Nueva nota
-        </button>
-      </div>
-
       {/* Reporte integrado del período (criterio de aceptación 3) */}
       <div className="catalog-toolbar">
         <div className="select-field">
@@ -198,6 +185,12 @@ function Notas_credito_debito() {
             <option value="Nota de Débito">Notas de Débito</option>
           </select>
         </div>
+        <button className="btn btn-primary" onClick={handleOpenNueva} disabled={loading} style={{ marginLeft: 'auto' }}>
+          <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+          Nueva nota
+        </button>
       </div>
 
       <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>

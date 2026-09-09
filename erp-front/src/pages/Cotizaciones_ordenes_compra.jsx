@@ -353,21 +353,6 @@ function Cotizaciones_ordenes_compra() {
         </div>
       )}
 
-      <div className="section-heading">
-        <div>
-          <h2>Cotizaciones y Órdenes de Compra</h2>
-          <span className="desc">Solicitá cotizaciones a proveedores y formalizá las compras aprobadas</span>
-        </div>
-        {activeTab === 'cotizaciones' && (
-          <button className="btn btn-primary" onClick={handleOpenNuevaCot} disabled={loadingRef}>
-            <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 5v14M5 12h14" />
-            </svg>
-            Nueva cotización
-          </button>
-        )}
-      </div>
-
       <div className="tab-rail">
         <button className={`tab-btn ${activeTab === 'cotizaciones' ? 'active' : ''}`} onClick={() => setActiveTab('cotizaciones')}>
           Cotizaciones
@@ -411,6 +396,12 @@ function Cotizaciones_ordenes_compra() {
                 <option value="Cancelada">Cancelada</option>
               </select>
             </div>
+            <button className="btn btn-primary" onClick={handleOpenNuevaCot} disabled={loadingRef} style={{ marginLeft: 'auto' }}>
+              <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+              Nueva cotización
+            </button>
           </div>
 
           <div className="table-panel">

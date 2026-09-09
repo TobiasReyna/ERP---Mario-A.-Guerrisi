@@ -104,13 +104,6 @@ function Limites_de_credito() {
         </div>
       )}
 
-      <div className="section-heading">
-        <div>
-          <h2>Límites de Crédito</h2>
-          <span className="desc">Cuentas corrientes de clientes mayoristas (B2B) y exposición crediticia</span>
-        </div>
-      </div>
-
       <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
         <div className="stat-card">
           <div className="stat-value">{formatearMonto(kpis.totalExpuesto)}</div>

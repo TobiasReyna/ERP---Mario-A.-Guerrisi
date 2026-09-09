@@ -438,13 +438,7 @@ function Catalogo_de_productos() {
       )}
 
       {/* ENCABEZADO */}
-      <div className="section-heading">
-        <div>
-          <h2>Catálogo centralizado de productos</h2>
-          <span className="desc">
-            Base maestra de productos — {filteredProducts.length} registros ({lifecycleFilter === 'activos' ? 'activos' : lifecycleFilter === 'bajas' ? 'dados de baja' : 'totales'})
-          </span>
-        </div>
+      <div className="section-heading" style={{ justifyContent: 'flex-end' }}>
         <button className="btn btn-primary" onClick={() => setIsNewModalOpen(true)}>
           <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M12 5v14M5 12h14" />

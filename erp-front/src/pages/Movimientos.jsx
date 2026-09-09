@@ -274,22 +274,6 @@ function Movimientos() {
 
   return (
     <div>
-      {/* ENCABEZADO */}
-      <div className="section-heading">
-        <div>
-          <h2>Movimientos y ajustes de stock</h2>
-          <span className="desc">
-            Entradas, salidas, ajustes y transferencias entre Tienda Central y Galería Margalef
-          </span>
-        </div>
-        <button className="btn btn-primary" onClick={handleOpenModal}>
-          <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 5v14M5 12h14" />
-          </svg>
-          Registrar movimiento
-        </button>
-      </div>
-
       {/* CONFIRM BANNER */}
       {confirmToast && (
         <div className="confirm-banner">
@@ -350,6 +334,13 @@ function Movimientos() {
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
+
+        <button className="btn btn-primary" onClick={handleOpenModal} style={{ marginLeft: 'auto' }}>
+          <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+          Registrar movimiento
+        </button>
       </div>
 
       {/* TABLA DE MOVIMIENTOS */}

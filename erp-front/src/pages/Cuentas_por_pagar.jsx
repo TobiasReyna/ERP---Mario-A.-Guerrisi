@@ -131,13 +131,6 @@ function Cuentas_por_pagar() {
         </div>
       )}
 
-      <div className="section-heading">
-        <div>
-          <h2>Cuentas por Pagar</h2>
-          <span className="desc">Obligaciones con proveedores — vencimientos, pagos parciales y mora</span>
-        </div>
-      </div>
-
       <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
         <div className="stat-card">
           <div className="stat-card-top">
