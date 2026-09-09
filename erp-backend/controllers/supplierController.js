@@ -1,9 +1,6 @@
 const SupplierService = require('../services/supplierService');
 
-// Mismo algoritmo que erp-front/src/utils/cuit.js (módulo 11), replicado acá
-// para blindar la API ante clientes que no sean el frontend web (criterio de
-// aceptación 1 de HU-11: "el sistema exige... CUIT con validación de formato
-// argentino").
+// Algoritmo de validación de CUIT (Módulo 11) para blindar la API
 const PREFIJOS_VALIDOS = ['20', '23', '24', '27', '30', '33', '34'];
 const MULTIPLICADORES = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2];
 
@@ -37,6 +34,7 @@ function validarPayload(body) {
     return null;
 }
 
+// POST /api/suppliers — Alta de nuevo proveedor
 const crearProveedor = async (req, res) => {
     try {
         const errorValidacion = validarPayload(req.body);
@@ -65,9 +63,7 @@ const crearProveedor = async (req, res) => {
     }
 };
 
-// GET /api/suppliers/check-cuit?cuit=...&excludeId=... — verificación en vivo
-// de duplicados (criterio de aceptación 2), usada por el frontend mientras el
-// usuario escribe el CUIT en el alta/edición.
+// GET /api/suppliers/check-cuit?cuit=...&excludeId=... — Verificación en vivo
 const buscarPorCuit = async (req, res) => {
     try {
         const { cuit, excludeId } = req.query;
@@ -82,6 +78,7 @@ const buscarPorCuit = async (req, res) => {
     }
 };
 
+// GET /api/suppliers — Solo proveedores activos (ideal para selects/combos en OC)
 const obtenerProveedoresActivos = async (req, res) => {
     try {
         const data = await SupplierService.obtenerProveedoresActivos();
@@ -92,19 +89,61 @@ const obtenerProveedoresActivos = async (req, res) => {
     }
 };
 
+// GET /api/suppliers/todos — Grilla principal con filtros y cálculo de métricas para los 3 cards
 const obtenerTodosProveedores = async (req, res) => {
     try {
-        const data = await SupplierService.obtenerTodosProveedores();
-        return res.status(200).json({ data });
+        const listaCompleta = await SupplierService.obtenerTodosProveedores();
+
+        // 1. Métricas para las tarjetas KPI superiores
+        const metrics = {
+            total: listaCompleta.length,
+            activos: listaCompleta.filter((p) => p.estado === true).length,
+            dados_de_baja: listaCompleta.filter((p) => p.estado === false).length
+        };
+
+        // 2. Filtros dinámicos recibidos por query params
+        let data = [...listaCompleta];
+        const { search, estado, condicion_pago } = req.query;
+
+        // Filtro de Estado: 'Activos', 'Dados de baja', 'Todos'
+        if (estado && estado !== 'Todos') {
+            const estadoBool = estado === 'Activos' || estado === 'true' || estado === true;
+            data = data.filter((p) => p.estado === estadoBool);
+        }
+
+        // Filtro por Condición de Pago
+        if (condicion_pago && condicion_pago !== 'Todas') {
+            data = data.filter((p) => p.condicion_pago === condicion_pago);
+        }
+
+        // Buscador por texto en razón social, CUIT, contacto o email
+        if (search && search.trim() !== '') {
+            const term = search.trim().toLowerCase();
+            data = data.filter((p) =>
+                (p.razon_social && p.razon_social.toLowerCase().includes(term)) ||
+                (p.cuit && p.cuit.toLowerCase().includes(term)) ||
+                (p.nombre_contacto && p.nombre_contacto.toLowerCase().includes(term)) ||
+                (p.email && p.email.toLowerCase().includes(term))
+            );
+        }
+
+        return res.status(200).json({
+            data,
+            metrics
+        });
     } catch (error) {
         console.error('[API] Error GET /api/suppliers/todos:', error);
         return res.status(500).json({ error: error.message });
     }
 };
 
+// GET /api/suppliers/:id — Detalle individual de proveedor
 const obtenerProveedorPorId = async (req, res) => {
     try {
         const data = await SupplierService.obtenerProveedorPorId(req.params.id);
+        if (!data) {
+            return res.status(404).json({ error: 'Proveedor no encontrado.' });
+        }
         return res.status(200).json({ data });
     } catch (error) {
         console.error('[API] Error GET /api/suppliers/:id:', error);
@@ -112,6 +151,7 @@ const obtenerProveedorPorId = async (req, res) => {
     }
 };
 
+// PUT /api/suppliers/:id — Actualización de datos
 const modificarProveedor = async (req, res) => {
     try {
         const errorValidacion = validarPayload(req.body);
@@ -140,6 +180,7 @@ const modificarProveedor = async (req, res) => {
     }
 };
 
+// PATCH /api/suppliers/:id/status — Baja lógica (desactivar)
 const darBajaLogica = async (req, res) => {
     try {
         const data = await SupplierService.cambiarEstado(req.params.id, false);
@@ -150,6 +191,7 @@ const darBajaLogica = async (req, res) => {
     }
 };
 
+// PATCH /api/suppliers/:id/reactivate — Alta lógica (reactivar)
 const darAltaLogica = async (req, res) => {
     try {
         const data = await SupplierService.cambiarEstado(req.params.id, true);
@@ -160,7 +202,7 @@ const darAltaLogica = async (req, res) => {
     }
 };
 
-// Criterio de aceptación 3: historial de órdenes de compra y montos operados.
+// GET /api/suppliers/:id/orders — Historial de compras con total calculado
 const obtenerHistorialCompras = async (req, res) => {
     try {
         const data = await SupplierService.obtenerHistorialCompras(req.params.id);

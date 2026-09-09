@@ -1,15 +1,57 @@
 const { supabaseAdmin } = require('../config/supabase');
 
-// public.proveedores ya existe en Supabase. La tabla real, tal como la creó
-// el equipo de base de datos, solo traía razon_social, cuit, email, telefono,
-// condicion_pago y estado; nombre_contacto, direccion, notas,
-// fecha_hora_registro y fecha_hora_actualizacion se agregaron con
-// docs/sprint2/migracion_proveedores_campos_adicionales.sql (ejecutar esa
-// migración antes de usar este service).
-// ordenes_compra y ordenes_compra_detalle (HU-12/HU-13) también ya existen,
-// así que obtenerHistorialCompras consulta datos reales.
-
 class SupplierService {
+    // 1. Método para la grilla y tarjetas KPI de la pantalla principal
+    static async obtenerProveedoresFiltrados(filtros = {}) {
+        const { search, estado, condicion_pago } = filtros;
+
+        // A. Métricas para los 3 contadores superiores
+        const { data: todos, error: errKpi } = await supabaseAdmin
+            .from('proveedores')
+            .select('id, estado');
+
+        if (errKpi) throw new Error(`Error en base de datos: ${errKpi.message}`);
+
+        const metricas = {
+            total: todos ? todos.length : 0,
+            activos: todos ? todos.filter((p) => p.estado === true).length : 0,
+            dados_de_baja: todos ? todos.filter((p) => p.estado === false).length : 0,
+        };
+
+        // B. Consulta para la tabla con orden y filtros reactivos
+        let query = supabaseAdmin
+            .from('proveedores')
+            .select('*')
+            .order('razon_social', { ascending: true });
+
+        // Filtro por Estado ('Activos', 'Dados de baja', 'Todos')
+        if (estado && estado !== 'Todos') {
+            const estadoBool = estado === 'Activos' || estado === true || estado === 'true';
+            query = query.eq('estado', estadoBool);
+        }
+
+        // Filtro por Condición de Pago ('Contado', '30 días', etc.)
+        if (condicion_pago && condicion_pago !== 'Todas') {
+            query = query.eq('condicion_pago', condicion_pago);
+        }
+
+        // Buscador por razón social, CUIT, nombre de contacto o email
+        if (search && search.trim() !== '') {
+            const clean = search.trim();
+            query = query.or(
+                `razon_social.ilike.%${clean}%,cuit.ilike.%${clean}%,nombre_contacto.ilike.%${clean}%,email.ilike.%${clean}%`
+            );
+        }
+
+        const { data: proveedores, error } = await query;
+        if (error) throw new Error(`Error en base de datos: ${error.message}`);
+
+        return {
+            metricas,
+            proveedores: proveedores || []
+        };
+    }
+
     static async crearProveedor(payload) {
         const {
             razon_social,
@@ -33,14 +75,14 @@ class SupplierService {
                     email,
                     direccion: direccion || '',
                     condicion_pago,
-                    notas: notas || ''
+                    notas: notas || '',
+                    estado: true
                 }
             ])
             .select()
             .single();
 
         if (error) {
-            // 23505 = unique_violation (Postgres) -> CUIT duplicado
             if (error.code === '23505') {
                 const proveedorExistente = await SupplierService.buscarPorCuit(cuit);
                 const duplicadoError = new Error('Ya existe un proveedor registrado con ese CUIT.');
@@ -117,7 +159,8 @@ class SupplierService {
                 email,
                 direccion: direccion || '',
                 condicion_pago,
-                notas: notas || ''
+                notas: notas || '',
+                fecha_hora_actualizacion: new Date().toISOString()
             })
             .eq('id', id)
             .select()
@@ -140,7 +183,10 @@ class SupplierService {
     static async cambiarEstado(id, estado) {
         const { data, error } = await supabaseAdmin
             .from('proveedores')
-            .update({ estado })
+            .update({ 
+                estado, 
+                fecha_hora_actualizacion: new Date().toISOString() 
+            })
             .eq('id', id)
             .select()
             .single();
@@ -149,10 +195,6 @@ class SupplierService {
         return data;
     }
 
-    // Criterio de aceptación 3: historial de OC y montos operados.
-    // Las tablas ordenes_compra / ordenes_compra_detalle ya existen en Supabase
-    // (HU-12/HU-13). ordenes_compra no guarda un monto propio: se calcula sumando
-    // cantidad_solicitada * precio_unitario de cada línea de ordenes_compra_detalle.
     static async obtenerHistorialCompras(proveedorId) {
         const { data, error } = await supabaseAdmin
             .from('ordenes_compra')
