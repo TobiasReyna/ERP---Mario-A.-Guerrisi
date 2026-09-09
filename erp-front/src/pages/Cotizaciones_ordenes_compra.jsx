@@ -2,8 +2,6 @@ import { useState, useEffect, useMemo } from 'react';
 import Modal from '../components/Modal';
 import { formatearFecha, formatearMonto } from '../utils/format';
 import {
-  listarArticulosReferencia,
-  listarProveedoresReferencia,
   listarCotizaciones,
   obtenerCotizacion,
   crearYEnviarCotizacion,
@@ -100,8 +98,23 @@ function Cotizaciones_ordenes_compra() {
 
   const cargarReferencia = () => {
     setLoadingRef(true);
-    Promise.all([listarArticulosReferencia(), listarProveedoresReferencia()])
-      .then(([arts, provs]) => {
+    Promise.all([
+      fetch('http://localhost:3001/api/articles').then((res) => res.json()),
+      fetch('http://localhost:3001/api/suppliers').then((res) => res.json()),
+    ])
+      .then(([artsRes, provsRes]) => {
+        const arts = (artsRes.data || []).map((a) => ({
+          id: a.id,
+          descripcion: a.descripcion,
+          modelo: a.modelo,
+          codigoEan13: a.codigo_ean13,
+        }));
+        const provs = (provsRes.data || []).map((p) => ({
+          id: p.id,
+          razonSocial: p.razon_social,
+          cuit: p.cuit,
+          email: p.email,
+        }));
         setArticulos(arts);
         setProveedores(provs);
       })
@@ -675,7 +688,7 @@ function Cotizaciones_ordenes_compra() {
                     checked={proveedoresSeleccionados.includes(p.id)}
                     onChange={() => toggleProveedorSeleccionado(p.id)}
                   />
-                  {p.razonSocial}
+                  {p.razonSocial} | CUIT: {p.cuit}
                 </label>
               ))
             )}
