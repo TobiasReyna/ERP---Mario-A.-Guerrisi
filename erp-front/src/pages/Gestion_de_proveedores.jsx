@@ -454,7 +454,6 @@ function Gestion_de_proveedores() {
                 <th>Razón Social</th>
                 <th>CUIT</th>
                 <th>Contacto</th>
-                <th>Condición de pago</th>
                 <th>Estado</th>
                 <th>Acciones</th>
               </tr>
@@ -462,13 +461,13 @@ function Gestion_de_proveedores() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={6} style={{ textAlign: 'center', padding: '30px', color: 'var(--gray-500)' }}>
+                  <td colSpan={5} style={{ textAlign: 'center', padding: '30px', color: 'var(--gray-500)' }}>
                     Cargando proveedores…
                   </td>
                 </tr>
               ) : proveedoresPaginados.length === 0 ? (
                 <tr>
-                  <td colSpan={6} style={{ textAlign: 'center', padding: '30px', color: 'var(--gray-500)' }}>
+                  <td colSpan={5} style={{ textAlign: 'center', padding: '30px', color: 'var(--gray-500)' }}>
                     No se encontraron proveedores para los filtros seleccionados.
                   </td>
                 </tr>
@@ -486,7 +485,6 @@ function Gestion_de_proveedores() {
                         {prov.telefono}{prov.telefono && prov.email ? ' · ' : ''}{prov.email}
                       </div>
                     </td>
-                    <td>{getCondicionLabel(prov.condicionPago)}</td>
                     <td>
                       <span className={`badge ${prov.estado ? 'badge-green' : 'badge-amber'}`}>
                         <span className="badge-dot"></span>
