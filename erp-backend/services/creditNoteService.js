@@ -47,7 +47,7 @@ class CreditNoteService {
   }
 
   /**
-   * Resumen y KPIs de notas según período de fechas (Criterio de Aceptación 3)
+   * Resumen y KPIs de notas según período de fechas (HU-23 Criterio 3)
    */
   static async obtenerResumen(desde, hasta) {
     let query = supabaseAdmin
@@ -79,7 +79,7 @@ class CreditNoteService {
   }
 
   /**
-   * Listar facturas de origen de ventas_mock_origen con datos de cliente
+   * Listar facturas de origen de ventas_mock_origen
    */
   static async listarVentasMock() {
     const { data, error } = await supabaseAdmin
@@ -99,7 +99,57 @@ class CreditNoteService {
   }
 
   /**
-   * Generar correlativo único (ej: NC-0001 o ND-0001)
+   * Listar clientes para selectores y gestión crediticia
+   */
+  static async listarClientes() {
+    const { data, error } = await supabaseAdmin
+      .from('clientes')
+      .select('id, razon_social, cuit, limite_credito, saldo_actual, estado')
+      .order('razon_social', { ascending: true });
+
+    if (error) throw new Error(`Error al listar clientes: ${error.message}`);
+
+    return (data || []).map((c) => ({
+      id: c.id,
+      razonSocial: c.razon_social,
+      cuit: c.cuit,
+      limiteCredito: Number(c.limite_credito) || 0,
+      saldoActual: Number(c.saldo_actual) || 0,
+      estado: Boolean(c.estado),
+    }));
+  }
+
+  /**
+   * Actualizar límite de crédito de un cliente (HU-24)
+   */
+  static async actualizarLimiteCredito(clienteId, nuevoLimite) {
+    const limiteNumerico = Number(nuevoLimite);
+    if (isNaN(limiteNumerico) || limiteNumerico < 0) {
+      throw new Error('El límite de crédito debe ser un número mayor o igual a 0.');
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from('clientes')
+      .update({ limite_credito: limiteNumerico })
+      .eq('id', clienteId)
+      .select('id, razon_social, cuit, limite_credito, saldo_actual, estado')
+      .single();
+
+    if (error) throw new Error(`Error al actualizar límite: ${error.message}`);
+    if (!data) throw new Error('Cliente no encontrado.');
+
+    return {
+      id: data.id,
+      razonSocial: data.razon_social,
+      cuit: data.cuit,
+      limiteCredito: Number(data.limite_credito) || 0,
+      saldoActual: Number(data.saldo_actual) || 0,
+      estado: Boolean(data.estado),
+    };
+  }
+
+  /**
+   * Generar correlativo independiente por tipo (NC-0001, ND-0001)
    */
   static async generarNumeroComprobante(tipo) {
     const prefijo = tipo === 'Nota de Crédito' ? 'NC' : 'ND';
@@ -121,7 +171,7 @@ class CreditNoteService {
   }
 
   /**
-   * Alta de Nota de Crédito o Débito con validaciones de negocio completas
+   * Alta transaccional de Nota de Crédito / Débito (HU-23)
    */
   static async crearNota(payload) {
     const { tipo, facturaOrigenId, motivo, lineas, afectaInventario, montoManual } = payload;
@@ -131,7 +181,7 @@ class CreditNoteService {
       throw new Error('Datos incompletos o monto inválido.');
     }
 
-    // 1. Obtener la factura origen
+    // 1. Verificar factura de origen
     const { data: factura, error: errFactura } = await supabaseAdmin
       .from('ventas_mock_origen')
       .select('id, numero_comprobante, cliente_id, monto_total, estado')
@@ -142,12 +192,11 @@ class CreditNoteService {
       throw new Error('La factura de venta seleccionada no existe.');
     }
 
-    // 2. Validación de estado de factura
     if (factura.estado === 'Anulada') {
       throw new Error('La factura seleccionada no admite más notas de crédito.');
     }
 
-    // 3. Validación de tope acumulado de Notas de Crédito
+    // 2. Control de tope acumulado para Notas de Crédito
     if (tipo === 'Nota de Crédito') {
       const { data: notasPrevias } = await supabaseAdmin
         .from('notas_credito_debito')
@@ -169,11 +218,11 @@ class CreditNoteService {
       }
     }
 
-    // 4. Obtener usuario para metadatos de auditoría
+    // 3. Usuario de auditoría
     const { data: usuarios } = await supabaseAdmin.from('usuarios').select('id').limit(1);
     const usuarioId = usuarios && usuarios.length > 0 ? usuarios[0].id : null;
 
-    // 5. Generar correlativo e insertar nota cabecera
+    // 4. Correlativo e inserción de la cabecera
     const numeroComprobante = await this.generarNumeroComprobante(tipo);
 
     const { data: nuevaNota, error: errNota } = await supabaseAdmin
@@ -193,12 +242,11 @@ class CreditNoteService {
       .select()
       .single();
 
-    if (errNota) throw new Error(`Error al persistir la nota: ${errNota.message}`);
+    if (errNota) throw new Error(`Error al registrar la nota: ${errNota.message}`);
 
-    // 6. Si afecta inventario, registrar detalle e incrementar existencias
+    // 5. Devolución a stock si corresponde
     if (tipo === 'Nota de Crédito' && afectaInventario && Array.isArray(lineas) && lineas.length > 0) {
       for (const linea of lineas) {
-        // Insertar en tabla detalle
         await supabaseAdmin.from('notas_credito_debito_detalle').insert([
           {
             nota_id: nuevaNota.id,
@@ -208,7 +256,6 @@ class CreditNoteService {
           },
         ]);
 
-        // Reingresar stock al depósito en existencias
         const { data: stockExistente } = await supabaseAdmin
           .from('existencias')
           .select('id_art_x_dep, cantidad')
@@ -237,7 +284,7 @@ class CreditNoteService {
       }
     }
 
-    // 7. Actualización de saldo del cliente (NC resta deuda, ND suma deuda)
+    // 6. Impacto en cuenta corriente del cliente
     if (factura.cliente_id) {
       const { data: cliente } = await supabaseAdmin
         .from('clientes')
@@ -256,7 +303,7 @@ class CreditNoteService {
       }
     }
 
-    // 8. Si la NC cubre el 100% de la factura original, marcarla como Anulada
+    // 7. Si la NC cubrió la factura al 100%, anular factura de origen
     if (tipo === 'Nota de Crédito') {
       const { data: todasNC } = await supabaseAdmin
         .from('notas_credito_debito')
