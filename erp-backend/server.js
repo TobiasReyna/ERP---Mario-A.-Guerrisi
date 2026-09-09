@@ -7,7 +7,10 @@ const masterRoutes = require('./routes/masterRoutes');
 const supplierRoutes = require('./routes/supplierRoutes');
 const app = express();
 const PORT = process.env.PORT || 3001;
+const creditNoteRoutes = require('./routes/creditNoteRoutes');
 
+// Montar endpoints de notas de crédito y débito
+app.use('/api/credit-notes', creditNoteRoutes);
  // Middlewares
 app.use(cors());
 app.use(express.json());
