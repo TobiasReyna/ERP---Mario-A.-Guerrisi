@@ -31,6 +31,16 @@ const listarVentas = async (req, res) => {
   }
 };
 
+const listarClientes = async (req, res) => {
+  try {
+    const clientes = await CreditNoteService.listarClientes();
+    return res.status(200).json({ success: true, data: clientes });
+  } catch (error) {
+    console.error('[API] Error GET /api/credit-notes/clients:', error);
+    return res.status(500).json({ error: error.message });
+  }
+};
+
 const crearNota = async (req, res) => {
   try {
     const nueva = await CreditNoteService.crearNota(req.body);
@@ -45,9 +55,27 @@ const crearNota = async (req, res) => {
   }
 };
 
+const actualizarLimiteCredito = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { limiteCredito } = req.body;
+    const cliente = await CreditNoteService.actualizarLimiteCredito(id, limiteCredito);
+    return res.status(200).json({
+      success: true,
+      message: 'Límite de crédito actualizado correctamente.',
+      data: cliente,
+    });
+  } catch (error) {
+    console.error('[API] Error PATCH /api/credit-notes/clients/:id/credit-limit:', error);
+    return res.status(400).json({ error: error.message });
+  }
+};
+
 module.exports = {
   listarNotas,
   obtenerResumen,
   listarVentas,
+  listarClientes,
   crearNota,
+  actualizarLimiteCredito,
 };
