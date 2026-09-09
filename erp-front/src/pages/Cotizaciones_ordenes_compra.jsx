@@ -4,7 +4,6 @@ import { formatearFecha, formatearMonto } from '../utils/format';
 import {
   listarCotizaciones,
   obtenerCotizacion,
-  crearYEnviarCotizacion,
   simularRespuestaProveedor,
   cancelarCotizacion,
   aprobarYGenerarOrdenCompra,
@@ -181,7 +180,46 @@ function Cotizaciones_ordenes_compra() {
     if (!isNuevaCotValid || submittingCot) return;
     setSubmittingCot(true);
     try {
-      await crearYEnviarCotizacion({ lineas: lineasForm, proveedorIds: proveedoresSeleccionados });
+      // 1. Crear cotización
+      await fetch('http://localhost:3001/api/quotes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      });
+
+      // 2. Obtener cotizaciones recientes para sacar el ID
+      const resRecientes = await fetch('http://localhost:3001/api/quotes/recientes');
+      const jsonRecientes = await resRecientes.json();
+      if (!jsonRecientes.data || jsonRecientes.data.length === 0) {
+        throw new Error('No se pudo recuperar la cotización recién creada.');
+      }
+      const ultimaCotizacionId = jsonRecientes.data[0].id;
+
+      // 3. Crear detalles (artículos)
+      for (const linea of lineasForm) {
+        await fetch('http://localhost:3001/api/quotes/detalle', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            cotizacion_id: ultimaCotizacionId,
+            articulo_id: linea.articuloId,
+            cantidad_solicitada: linea.cantidadSolicitada
+          })
+        });
+      }
+
+      // 4. Crear proveedores de la cotización
+      for (const proveedorId of proveedoresSeleccionados) {
+        await fetch('http://localhost:3001/api/quotes/proveedor', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            cotizacion_id: ultimaCotizacionId,
+            proveedor_id: proveedorId
+          })
+        });
+      }
+
       showToast(`Cotización enviada por email a ${proveedoresSeleccionados.length} proveedor(es).`);
       setIsNuevaCotOpen(false);
       cargarCotizaciones();

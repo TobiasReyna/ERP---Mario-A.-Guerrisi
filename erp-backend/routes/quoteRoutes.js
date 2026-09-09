@@ -11,4 +11,7 @@ router.post('/detalle', quoteController.crearCotizacion_detalle);
 // POST /api/quotes/proveedor - Asociar un proveedor a una cotización
 router.post('/proveedor', quoteController.crearCotizacion_proveedor);
 
+// GET /api/quotes/recientes - Obtener las cotizaciones recientes (para sacar el último ID)
+router.get('/recientes', quoteController.obtenerCotizaciones_recientes);
+
 module.exports = router;

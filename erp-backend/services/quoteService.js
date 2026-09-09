@@ -54,6 +54,18 @@ class QuoteService {
         }
         return data;
     }
+
+    static async obtenerCotizaciones_recientes() {
+        const { data, error } = await supabaseAdmin
+            .from('cotizaciones')
+            .select('id, fecha_hora_registro')
+            .order('fecha_hora_registro', { ascending: false });
+
+        if (error) {
+            throw new Error(`Error en base de datos al obtener cotizaciones: ${error.message}`);
+        }
+        return data;
+    }
 }
 
 module.exports = QuoteService;

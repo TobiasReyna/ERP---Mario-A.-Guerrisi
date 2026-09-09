@@ -69,8 +69,19 @@ const crearCotizacion_proveedor = async (req, res) => {
     }
 };
 
+const obtenerCotizaciones_recientes = async (req, res) => {
+    try {
+        const recientes = await QuoteService.obtenerCotizaciones_recientes();
+        return res.status(200).json({ data: recientes });
+    } catch (error) {
+        console.error('[API] Error GET /api/quotes/recientes:', error);
+        return res.status(500).json({ error: error.message || 'Error interno obteniendo cotizaciones recientes.' });
+    }
+};
+
 module.exports = {
     crearCotizacion,
     crearCotizacion_detalle,
-    crearCotizacion_proveedor
+    crearCotizacion_proveedor,
+    obtenerCotizaciones_recientes
 };
