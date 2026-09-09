@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 
-function Modal({ isOpen, onClose, title, children, footer }) {
+function Modal({ isOpen, onClose, title, children, footer, wide = false, xwide = false }) {
   // Cerrar con Escape y bloquear scroll de fondo cuando esté abierto
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -21,7 +21,7 @@ function Modal({ isOpen, onClose, title, children, footer }) {
 
   return createPortal(
     <div className="modal-overlay open" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <div className={`modal ${xwide ? 'modal-xwide' : wide ? 'modal-wide' : ''}`} onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h3>{title}</h3>
           <button className="modal-close" onClick={onClose} aria-label="Cerrar ventana">

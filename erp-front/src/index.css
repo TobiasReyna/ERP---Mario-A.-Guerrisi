@@ -583,6 +583,11 @@ tbody tr:hover { background: var(--gray-50); }
   width: 660px; 
 }
 
+.modal.modal-xwide {
+  width: 920px;
+  max-width: 95vw;
+}
+
 /* 3. Cabecera fija */
 .modal-header { 
   display: flex; 
