@@ -9,6 +9,10 @@ import Alertas_de_stock from './pages/Alertas_de_stock';
 import Movimientos from './pages/Movimientos';
 import Detalle_producto from './pages/Detalle_producto';
 import Gestion_de_proveedores from './pages/Gestion_de_proveedores';
+import Cotizaciones_ordenes_compra from './pages/Cotizaciones_ordenes_compra';
+import Cuentas_por_pagar from './pages/Cuentas_por_pagar';
+import Notas_credito_debito from './pages/Notas_credito_debito';
+import Limites_de_credito from './pages/Limites_de_credito';
 import Perfil from './pages/Perfil';
 
 const ROUTE_INFO = {
@@ -19,6 +23,10 @@ const ROUTE_INFO = {
   '/Alertas_de_stock': { title: 'Alertas y notificaciones', subtitle: 'Reposición de stock y actividad general del sistema' },
   '/Detalle_producto': { title: 'Detalle de producto', subtitle: 'Stock por depósito, historial de precios y movimientos' },
   '/Gestion_de_proveedores': { title: 'Gestión de Proveedores', subtitle: 'Contactos, condiciones comerciales e historial de compras por proveedor' },
+  '/Cotizaciones_ordenes_compra': { title: 'Cotizaciones y Órdenes de Compra', subtitle: 'Solicitud de cotizaciones a proveedores y formalización de compras' },
+  '/Cuentas_por_pagar': { title: 'Cuentas por Pagar', subtitle: 'Obligaciones con proveedores, vencimientos y pagos' },
+  '/Notas_credito_debito': { title: 'Notas de Crédito y Débito', subtitle: 'Devoluciones y ajustes de facturación' },
+  '/Limites_de_credito': { title: 'Límites de Crédito', subtitle: 'Cuentas corrientes de clientes mayoristas (B2B)' },
   '/Perfil': { title: 'Mi perfil', subtitle: 'Información de la cuenta y el depósito asignado' },
 };
 
@@ -228,6 +236,56 @@ function App() {
             </svg>
             Proveedores
           </NavLink>
+
+          <NavLink
+            to="/Cotizaciones_ordenes_compra"
+            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+          >
+            <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
+              <path d="M14 2v6h6" />
+              <path d="M9 13h6M9 17h6" />
+            </svg>
+            Cotizaciones y OC
+          </NavLink>
+
+          <NavLink
+            to="/Cuentas_por_pagar"
+            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+          >
+            <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="2" y="5" width="20" height="14" rx="2" />
+              <path d="M2 10h20" />
+            </svg>
+            Cuentas por Pagar
+          </NavLink>
+        </nav>
+
+        <nav className="nav-group">
+          <div className="nav-group-label">Tesorería</div>
+
+          <NavLink
+            to="/Notas_credito_debito"
+            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+          >
+            <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 14 4 9l5-5" />
+              <path d="M4 9h10.5A5.5 5.5 0 0 1 20 14.5v0A5.5 5.5 0 0 1 14.5 20H11" />
+            </svg>
+            Notas de Crédito/Débito
+          </NavLink>
+
+          <NavLink
+            to="/Limites_de_credito"
+            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+          >
+            <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="2" y="4" width="20" height="16" rx="2" />
+              <path d="M2 10h20" />
+              <path d="M6 15h4" />
+            </svg>
+            Límites de Crédito
+          </NavLink>
         </nav>
 
         <div className="sidebar-footer">
@@ -406,6 +464,10 @@ function App() {
               <Route path="/Alertas_de_stock" element={<Alertas_de_stock />} />
               <Route path="/Detalle_producto" element={<Detalle_producto />} />
               <Route path="/Gestion_de_proveedores" element={<Gestion_de_proveedores />} />
+              <Route path="/Cotizaciones_ordenes_compra" element={<Cotizaciones_ordenes_compra />} />
+              <Route path="/Cuentas_por_pagar" element={<Cuentas_por_pagar />} />
+              <Route path="/Notas_credito_debito" element={<Notas_credito_debito />} />
+              <Route path="/Limites_de_credito" element={<Limites_de_credito />} />
               <Route path="/Perfil" element={<Perfil />} />
             </Routes>
           </div>
