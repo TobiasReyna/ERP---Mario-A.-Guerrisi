@@ -1,21 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import Modal from '../components/Modal';
 import { formatearFecha, formatearMonto } from '../utils/format';
-import {
-  listarArticulosReferencia,
-  listarProveedoresReferencia,
-  listarCotizaciones,
-  obtenerCotizacion,
-  crearYEnviarCotizacion,
-  simularRespuestaProveedor,
-  cancelarCotizacion,
-  aprobarYGenerarOrdenCompra,
-  calcularTotalOfertaProveedor,
-  listarOrdenesCompra,
-  obtenerOrdenCompra,
-  registrarRecepcion,
-  cancelarOrdenCompra,
-} from '../services/purchasingService';
+// No purchasingService mock required anymore
 
 // NOTA: página de HU-12 (Solicitud de Cotizaciones y Órdenes de Compra).
 // `services/purchasingService.js` es un MOCK en memoria (se reinicia al
@@ -64,6 +50,7 @@ function Cotizaciones_ordenes_compra() {
   const [cotizaciones, setCotizaciones] = useState([]);
   const [loadingCot, setLoadingCot] = useState(true);
   const [filtroEstadoCot, setFiltroEstadoCot] = useState('todas');
+  const [kpiCot, setKpiCot] = useState({ total: 0, enviadas: 0, aprobadas: 0 });
 
   const [ordenes, setOrdenes] = useState([]);
   const [loadingOC, setLoadingOC] = useState(true);
@@ -81,7 +68,6 @@ function Cotizaciones_ordenes_compra() {
   const [cotizacionDetalle, setCotizacionDetalle] = useState(null);
   const [proveedorGanadorSel, setProveedorGanadorSel] = useState('');
   const [procesandoCot, setProcesandoCot] = useState(false);
-  const [respondiendoId, setRespondiendoId] = useState(null);
 
   // Modal: detalle de OC / recepción
   const [isDetalleOCOpen, setIsDetalleOCOpen] = useState(false);
@@ -100,8 +86,23 @@ function Cotizaciones_ordenes_compra() {
 
   const cargarReferencia = () => {
     setLoadingRef(true);
-    Promise.all([listarArticulosReferencia(), listarProveedoresReferencia()])
-      .then(([arts, provs]) => {
+    Promise.all([
+      fetch('http://localhost:3001/api/articles').then((res) => res.json()),
+      fetch('http://localhost:3001/api/suppliers').then((res) => res.json()),
+    ])
+      .then(([artsRes, provsRes]) => {
+        const arts = (artsRes.data || []).map((a) => ({
+          id: a.id,
+          descripcion: a.descripcion,
+          modelo: a.modelo,
+          codigoEan13: a.codigo_ean13,
+        }));
+        const provs = (provsRes.data || []).map((p) => ({
+          id: p.id,
+          razonSocial: p.razon_social,
+          cuit: p.cuit,
+          email: p.email,
+        }));
         setArticulos(arts);
         setProveedores(provs);
       })
@@ -109,27 +110,138 @@ function Cotizaciones_ordenes_compra() {
       .finally(() => setLoadingRef(false));
   };
 
-  const cargarCotizaciones = () => {
+  const cargarCotizaciones = async () => {
     setLoadingCot(true);
-    listarCotizaciones()
-      .then(setCotizaciones)
-      .catch((err) => console.error('Error al listar cotizaciones:', err))
-      .finally(() => setLoadingCot(false));
+    try {
+      let url = 'http://localhost:3001/api/quotes/todas';
+      if (filtroEstadoCot === 'Enviada') url = 'http://localhost:3001/api/quotes/enviadas';
+      else if (filtroEstadoCot === 'Aprobada') url = 'http://localhost:3001/api/quotes/aprobadas';
+      else if (filtroEstadoCot === 'Cancelada') url = 'http://localhost:3001/api/quotes/canceladas';
+      
+      const res = await fetch(url);
+      const json = await res.json();
+      const quotesRaw = json.data || [];
+
+      // UPDATE KPI: always fetch all quotes to calculate global totals independently of filter
+      const resTodas = await fetch('http://localhost:3001/api/quotes/todas');
+      const jsonTodas = await resTodas.json();
+      const quotesTodas = jsonTodas.data || [];
+      const stats = { total: quotesTodas.length, enviadas: 0, aprobadas: 0 };
+      quotesTodas.forEach(q => {
+        let estadoFinal = q.estado;
+        if (q.estado === 'Pendiente') {
+            if (q.fecha_hora_registro === q.fecha_hora_actualizacion) {
+              estadoFinal = 'Enviada';
+            }
+        }
+        if (estadoFinal === 'Enviada') stats.enviadas++;
+        if (estadoFinal === 'Aprobada') stats.aprobadas++;
+      });
+      setKpiCot(stats);
+
+      const quotesArmadas = await Promise.all(
+        quotesRaw.map(async (q) => {
+          // ARTÍCULOS
+          const resDet = await fetch(`http://localhost:3001/api/quotes/${q.id}/detalle`);
+          const jsonDet = await resDet.json();
+          const cantidadArticulos = (jsonDet.data || []).length;
+
+          // PROVEEDORES INVITADOS
+          const resProv = await fetch(`http://localhost:3001/api/quotes/${q.id}/proveedores`);
+          const jsonProv = await resProv.json();
+          const proveedores = jsonProv.data || [];
+          const cantidadProveedores = proveedores.length;
+
+          // RESPUESTAS
+          let cantidadRespuestas = 0;
+          for (const prov of proveedores) {
+            const resProvDet = await fetch(`http://localhost:3001/api/quotes/proveedores-detalles/${prov.id}`);
+            const jsonProvDet = await resProvDet.json();
+            const provDetalles = jsonProvDet.data || [];
+            
+            if (provDetalles.length === cantidadArticulos && cantidadArticulos > 0) {
+              cantidadRespuestas++;
+            }
+          }
+
+          // ESTADO
+          let estadoFinal = q.estado;
+          if (q.estado === 'Pendiente') {
+            if (q.fecha_hora_registro === q.fecha_hora_actualizacion) {
+              estadoFinal = 'Enviada'; // color azul
+            } else {
+              estadoFinal = 'Pendiente'; // color anaranjado
+            }
+          } else if (q.estado === 'Aprobada') {
+             estadoFinal = 'Aprobada'; // color verde
+          } else if (q.estado === 'Cancelada') {
+             estadoFinal = 'Cancelada'; // color rojo
+          }
+
+          // FECHA: Formato DD/MM/AAAA
+          const d = new Date(q.fecha_hora_registro);
+          const fechaFormateada = `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
+
+          return {
+            id: q.id,
+            fechaRegistro: fechaFormateada,
+            cantidadArticulos,
+            cantidadProveedores,
+            cantidadRespuestas,
+            estado: estadoFinal,
+            _original: q
+          };
+        })
+      );
+      setCotizaciones(quotesArmadas);
+    } catch (error) {
+      console.error('Error al cargar cotizaciones:', error);
+    } finally {
+      setLoadingCot(false);
+    }
   };
 
-  const cargarOrdenes = () => {
+  const cargarOrdenes = async () => {
     setLoadingOC(true);
-    listarOrdenesCompra()
-      .then(setOrdenes)
-      .catch((err) => console.error('Error al listar órdenes de compra:', err))
-      .finally(() => setLoadingOC(false));
+    try {
+      const res = await fetch('http://localhost:3001/api/purchase-orders');
+      const json = await res.json();
+      const ocArmadas = (json.data || []).map(oc => {
+        // Formatear fecha
+        const d = new Date(oc.fecha_emision);
+        const fechaFormateada = `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
+        
+        // Calcular total
+        const detalles = oc.ordenes_compra_detalle || [];
+        const total = detalles.reduce((acc, l) => acc + (l.cantidad_solicitada * Number(l.precio_unitario)), 0);
+
+        return {
+          id: oc.id,
+          numeroOrden: oc.numero_orden,
+          proveedorId: oc.proveedor_id,
+          fechaEmision: fechaFormateada,
+          estado: oc.estado,
+          total,
+          lineas: detalles,
+          _original: oc
+        };
+      });
+      setOrdenes(ocArmadas);
+    } catch (error) {
+      console.error('Error al listar órdenes de compra:', error);
+    } finally {
+      setLoadingOC(false);
+    }
   };
 
   useEffect(() => {
     cargarReferencia();
-    cargarCotizaciones();
     cargarOrdenes();
   }, []);
+
+  useEffect(() => {
+    cargarCotizaciones();
+  }, [filtroEstadoCot]);
 
   // ---------------------------------------------------------------------
   // Nueva cotización
@@ -168,7 +280,46 @@ function Cotizaciones_ordenes_compra() {
     if (!isNuevaCotValid || submittingCot) return;
     setSubmittingCot(true);
     try {
-      await crearYEnviarCotizacion({ lineas: lineasForm, proveedorIds: proveedoresSeleccionados });
+      // 1. Crear cotización
+      await fetch('http://localhost:3001/api/quotes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      });
+
+      // 2. Obtener cotizaciones recientes para sacar el ID
+      const resRecientes = await fetch('http://localhost:3001/api/quotes/recientes');
+      const jsonRecientes = await resRecientes.json();
+      if (!jsonRecientes.data || jsonRecientes.data.length === 0) {
+        throw new Error('No se pudo recuperar la cotización recién creada.');
+      }
+      const ultimaCotizacionId = jsonRecientes.data[0].id;
+
+      // 3. Crear detalles (artículos)
+      for (const linea of lineasForm) {
+        await fetch('http://localhost:3001/api/quotes/detalle', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            cotizacion_id: ultimaCotizacionId,
+            articulo_id: linea.articuloId,
+            cantidad_solicitada: linea.cantidadSolicitada
+          })
+        });
+      }
+
+      // 4. Crear proveedores de la cotización
+      for (const proveedorId of proveedoresSeleccionados) {
+        await fetch('http://localhost:3001/api/quotes/proveedor', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            cotizacion_id: ultimaCotizacionId,
+            proveedor_id: proveedorId
+          })
+        });
+      }
+
       showToast(`Cotización enviada por email a ${proveedoresSeleccionados.length} proveedor(es).`);
       setIsNuevaCotOpen(false);
       cargarCotizaciones();
@@ -179,42 +330,118 @@ function Cotizaciones_ordenes_compra() {
     }
   };
 
+  const [preciosIngresados, setPreciosIngresados] = useState({});
+  const [showInputPrecios, setShowInputPrecios] = useState({});
+
   // ---------------------------------------------------------------------
   // Detalle de cotización
   // ---------------------------------------------------------------------
-  const handleAbrirDetalleCot = (id) => {
+  const handleAbrirDetalleCot = async (c) => {
     setIsDetalleCotOpen(true);
     setCotizacionDetalle(null);
     setProveedorGanadorSel('');
-    obtenerCotizacion(id)
-      .then(setCotizacionDetalle)
-      .catch((err) => console.error('Error al obtener cotización:', err));
-  };
+    setPreciosIngresados({});
+    setShowInputPrecios({});
 
-  const refrescarDetalleCot = async (id) => {
-    const data = await obtenerCotizacion(id);
-    setCotizacionDetalle(data);
-  };
-
-  const handleSimularRespuesta = async (cp) => {
-    if (!cotizacionDetalle) return;
-    setRespondiendoId(cp.id);
     try {
-      await simularRespuestaProveedor(cotizacionDetalle.id, cp.id, articulos);
-      await refrescarDetalleCot(cotizacionDetalle.id);
+      const id = c.id;
+      
+      const resDet = await fetch(`http://localhost:3001/api/quotes/${id}/detalle`);
+      const jsonDet = await resDet.json();
+      const lineas = jsonDet.data || [];
+
+      const resProv = await fetch(`http://localhost:3001/api/quotes/${id}/proveedores`);
+      const jsonProv = await resProv.json();
+      const provs = jsonProv.data || [];
+
+      const proveedoresInvitados = await Promise.all(
+        provs.map(async (p) => {
+          const resProvDet = await fetch(`http://localhost:3001/api/quotes/proveedores-detalles/${p.id}`);
+          const jsonProvDet = await resProvDet.json();
+          const pDetalles = jsonProvDet.data || [];
+          
+          let estadoRespuesta = 'Pendiente';
+          // Si tiene un detalle por cada línea solicitada, está respondido
+          if (pDetalles.length === lineas.length && lineas.length > 0) {
+             estadoRespuesta = 'Respondido';
+          }
+          
+          return {
+            id: p.id,
+            proveedorId: p.proveedor_id,
+            estadoRespuesta,
+            ofertas: pDetalles
+          };
+        })
+      );
+
+      setCotizacionDetalle({
+        ...c,
+        lineas,
+        proveedoresInvitados
+      });
+    } catch (err) {
+      console.error('Error al obtener cotización:', err);
+    }
+  };
+
+  const handleGuardarRespuestas = async () => {
+    const envios = [];
+    for (const cp of cotizacionDetalle.proveedoresInvitados) {
+      if (cp.estadoRespuesta === 'Pendiente') {
+        const preciosProv = [];
+        let missing = false;
+        let algunaCargada = false;
+        
+        for (const l of cotizacionDetalle.lineas) {
+          const key = `${cp.id}_${l.articulo_id}`;
+          const val = Number(preciosIngresados[key]);
+          if (showInputPrecios[key] || val > 0) {
+             if (!val || val <= 0) {
+               missing = true;
+             } else {
+               preciosProv.push({ articulo_id: l.articulo_id, precio_unitario_ofertado: val });
+               algunaCargada = true;
+             }
+          } else {
+             missing = true; // no se ingresaron todos los precios
+          }
+        }
+        
+        if (!missing && algunaCargada) {
+          envios.push({ cp_id: cp.id, precios: preciosProv });
+        }
+      }
+    }
+
+    if (envios.length === 0) {
+      alert("Por favor completá todos los precios para al menos un proveedor antes de guardar.");
+      return;
+    }
+
+    try {
+      for (const e of envios) {
+        await fetch('http://localhost:3001/api/quotes/precios', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cotizacion_proveedor_id: e.cp_id, precios: e.precios })
+        });
+      }
+      showToast("Respuestas guardadas correctamente.");
+      setIsDetalleCotOpen(false);
       cargarCotizaciones();
-      showToast(`Se recibió la respuesta de ${proveedorById.get(cp.proveedorId)?.razonSocial || 'proveedor'}.`);
-    } catch (error) {
-      alert(error.message || 'Error al simular la respuesta.');
-    } finally {
-      setRespondiendoId(null);
+    } catch (err) {
+      alert(error.message || "Error al guardar respuestas.");
     }
   };
 
   const handleCancelarCotizacion = async () => {
     if (!cotizacionDetalle) return;
     try {
-      await cancelarCotizacion(cotizacionDetalle.id);
+      const res = await fetch(`http://localhost:3001/api/quotes/${cotizacionDetalle.id}/cancelar`, {
+        method: 'PUT'
+      });
+      if (!res.ok) throw new Error('Fallo en la comunicación con el servidor');
       showToast('Cotización cancelada.');
       setIsDetalleCotOpen(false);
       cargarCotizaciones();
@@ -223,12 +450,64 @@ function Cotizaciones_ordenes_compra() {
     }
   };
 
+  const handleRestaurarCotizacion = async () => {
+    if (!cotizacionDetalle) return;
+    try {
+      const res = await fetch(`http://localhost:3001/api/quotes/${cotizacionDetalle.id}/pendiente`, {
+        method: 'PUT'
+      });
+      if (!res.ok) throw new Error('Fallo en la comunicación con el servidor');
+      showToast('Cotización restaurada a Pendiente.');
+      setIsDetalleCotOpen(false);
+      cargarCotizaciones();
+    } catch (error) {
+      alert(error.message || 'Error al restaurar la cotización.');
+    }
+  };
+
   const handleAprobarCotizacion = async () => {
     if (!cotizacionDetalle || !proveedorGanadorSel) return;
     setProcesandoCot(true);
     try {
-      const nuevaOC = await aprobarYGenerarOrdenCompra(cotizacionDetalle.id, proveedorGanadorSel);
-      showToast(`Cotización aprobada. Orden de Compra N° ${nuevaOC.numeroOrden} generada en estado Pendiente.`);
+      // 1. Create header
+      await fetch('http://localhost:3001/api/purchase-orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cotizacion_id: cotizacionDetalle.id,
+          proveedor_id: proveedorGanadorSel
+        })
+      });
+
+      // 2. Get recent to get ID and numero_orden
+      const resRecent = await fetch('http://localhost:3001/api/purchase-orders/recent');
+      const jsonRecent = await resRecent.json();
+      if (!jsonRecent.data || jsonRecent.data.length === 0) {
+        throw new Error('No se pudo recuperar la OC generada.');
+      }
+      const nuevaOC = jsonRecent.data[0];
+
+      // 3. Create details
+      const provSeleccionado = cotizacionDetalle.proveedoresInvitados.find(p => p.proveedorId === proveedorGanadorSel);
+      if (!provSeleccionado) throw new Error('Proveedor no encontrado');
+
+      for (const l of cotizacionDetalle.lineas) {
+        const oferta = provSeleccionado.ofertas.find(o => o.articulo_id === l.articulo_id);
+        const precio = oferta ? oferta.precio_unitario_ofertado : 0; 
+        
+        await fetch('http://localhost:3001/api/purchase-orders/detail', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            orden_compra_id: nuevaOC.id,
+            articulo_id: l.articulo_id,
+            cantidad_solicitada: l.cantidad_solicitada,
+            precio_unitario: precio
+          })
+        });
+      }
+
+      showToast(`Cotización aprobada. Orden de Compra N° ${nuevaOC.numero_orden} generada en estado Pendiente.`);
       setIsDetalleCotOpen(false);
       cargarCotizaciones();
       cargarOrdenes();
@@ -243,27 +522,21 @@ function Cotizaciones_ordenes_compra() {
   // ---------------------------------------------------------------------
   // Detalle de OC / recepción
   // ---------------------------------------------------------------------
-  const handleAbrirDetalleOC = (id) => {
+  const handleAbrirDetalleOC = (oc) => {
     setIsDetalleOCOpen(true);
-    setOrdenDetalle(null);
-    setCantidadesRecepcion({});
-    obtenerOrdenCompra(id)
-      .then((oc) => {
-        setOrdenDetalle(oc);
-        const iniciales = {};
-        oc.lineas.forEach((l) => {
-          iniciales[l.id] = '';
-        });
-        setCantidadesRecepcion(iniciales);
-      })
-      .catch((err) => console.error('Error al obtener orden de compra:', err));
+    setOrdenDetalle(oc);
+    const iniciales = {};
+    oc.lineas.forEach((l) => {
+      iniciales[l.id] = '';
+    });
+    setCantidadesRecepcion(iniciales);
   };
 
   const handleConfirmarRecepcion = async () => {
     if (!ordenDetalle) return;
     const recepciones = Object.entries(cantidadesRecepcion)
       .filter(([, valor]) => Number(valor) > 0)
-      .map(([detalleId, valor]) => ({ detalleId, cantidad: Number(valor) }));
+      .map(([id_detalle, valor]) => ({ id_detalle, cant_a_sumar: Number(valor) }));
 
     if (recepciones.length === 0) {
       alert('Ingresá al menos una cantidad a recibir.');
@@ -272,17 +545,16 @@ function Cotizaciones_ordenes_compra() {
 
     setProcesandoRecepcion(true);
     try {
-      const ocActualizada = await registrarRecepcion(ordenDetalle.id, recepciones);
-      setOrdenDetalle({ ...ocActualizada });
-      const reset = {};
-      ocActualizada.lineas.forEach((l) => (reset[l.id] = ''));
-      setCantidadesRecepcion(reset);
+      const res = await fetch(`http://localhost:3001/api/purchase-orders/${ordenDetalle.id}/receive`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ detalles: recepciones })
+      });
+      if (!res.ok) throw new Error('Falló la recepción en el servidor');
+      
+      showToast(`Orden N° ${ordenDetalle.numeroOrden}: recepción confirmada.`);
+      setIsDetalleOCOpen(false); // Close the modal
       cargarOrdenes();
-      showToast(
-        ocActualizada.estado === 'Recibida'
-          ? `Orden N° ${ocActualizada.numeroOrden}: recepción completa.`
-          : `Orden N° ${ocActualizada.numeroOrden} actualizada a estado Parcial.`
-      );
     } catch (error) {
       alert(error.message || 'Error al registrar la recepción.');
     } finally {
@@ -293,7 +565,10 @@ function Cotizaciones_ordenes_compra() {
   const handleConfirmarCancelacionOC = async () => {
     if (!ordenACancelar) return;
     try {
-      await cancelarOrdenCompra(ordenACancelar.id);
+      const res = await fetch(`http://localhost:3001/api/purchase-orders/${ordenACancelar.id}/cancel`, {
+        method: 'PUT'
+      });
+      if (!res.ok) throw new Error('Falló la cancelación en el servidor');
       showToast(`Orden N° ${ordenACancelar.numeroOrden} cancelada.`);
       setOrdenACancelar(null);
       cargarOrdenes();
@@ -306,9 +581,8 @@ function Cotizaciones_ordenes_compra() {
   // Filtros y derivados
   // ---------------------------------------------------------------------
   const cotizacionesFiltradas = useMemo(() => {
-    if (filtroEstadoCot === 'todas') return cotizaciones;
-    return cotizaciones.filter((c) => c.estado === filtroEstadoCot);
-  }, [cotizaciones, filtroEstadoCot]);
+    return cotizaciones;
+  }, [cotizaciones]);
 
   const ordenesFiltradas = useMemo(() => {
     return ordenes.filter((oc) => {
@@ -317,15 +591,6 @@ function Cotizaciones_ordenes_compra() {
       return matchesEstado && matchesProveedor;
     });
   }, [ordenes, filtroEstadoOC, filtroProveedorOC]);
-
-  const kpiCot = useMemo(
-    () => ({
-      total: cotizaciones.length,
-      enviadas: cotizaciones.filter((c) => c.estado === 'Enviada').length,
-      aprobadas: cotizaciones.filter((c) => c.estado === 'Aprobada').length,
-    }),
-    [cotizaciones]
-  );
 
   const kpiOC = useMemo(
     () => ({
@@ -433,7 +698,7 @@ function Cotizaciones_ordenes_compra() {
                   ) : (
                     cotizacionesFiltradas.map((c) => (
                       <tr key={c.id}>
-                        <td>{formatearFecha(c.fechaRegistro)}</td>
+                        <td>{c.fechaRegistro}</td>
                         <td>{c.cantidadArticulos}</td>
                         <td>{c.cantidadProveedores}</td>
                         <td>
@@ -446,7 +711,7 @@ function Cotizaciones_ordenes_compra() {
                           </span>
                         </td>
                         <td>
-                          <button className="btn btn-outline btn-sm" onClick={() => handleAbrirDetalleCot(c.id)}>
+                          <button className="btn btn-outline btn-sm" onClick={() => handleAbrirDetalleCot(c)}>
                             Ver detalle
                           </button>
                         </td>
@@ -549,7 +814,7 @@ function Cotizaciones_ordenes_compra() {
                         <td>{formatearMonto(oc.total)}</td>
                         <td>
                           <div className="row-actions">
-                            <button className="btn btn-outline btn-sm" onClick={() => handleAbrirDetalleOC(oc.id)}>
+                            <button className="btn btn-outline btn-sm" onClick={() => handleAbrirDetalleOC(oc)}>
                               {oc.estado === 'Pendiente' || oc.estado === 'Parcial' ? 'Recepcionar' : 'Ver detalle'}
                             </button>
                             {oc.estado === 'Pendiente' && (
@@ -666,7 +931,7 @@ function Cotizaciones_ordenes_compra() {
                     checked={proveedoresSeleccionados.includes(p.id)}
                     onChange={() => toggleProveedorSeleccionado(p.id)}
                   />
-                  {p.razonSocial}
+                  {p.razonSocial} | CUIT: {p.cuit}
                 </label>
               ))
             )}
@@ -687,12 +952,20 @@ function Cotizaciones_ordenes_compra() {
             <button className="btn btn-outline" onClick={() => setIsDetalleCotOpen(false)}>
               Cerrar
             </button>
-            {cotizacionDetalle?.estado === 'Enviada' && (
+            {cotizacionDetalle?.estado === 'Cancelada' ? (
+              <button className="btn btn-outline" style={{ color: 'var(--amber)', borderColor: 'var(--amber)' }} onClick={handleRestaurarCotizacion}>
+                Cambiar a Pendiente
+              </button>
+            ) : (
               <button className="btn btn-outline" style={{ color: 'var(--red)', borderColor: 'var(--red)' }} onClick={handleCancelarCotizacion}>
                 Cancelar cotización
               </button>
             )}
-            {cotizacionDetalle?.estado === 'Enviada' && (
+            {cotizacionDetalle && cotizacionDetalle.proveedoresInvitados.some(cp => cp.estadoRespuesta === 'Pendiente') ? (
+              <button className="btn btn-primary" onClick={handleGuardarRespuestas}>
+                Guardar Respuestas
+              </button>
+            ) : (
               <button className="btn btn-primary" disabled={!proveedorGanadorSel || procesandoCot} onClick={handleAprobarCotizacion}>
                 {procesandoCot ? 'Generando OC…' : 'Aprobar y generar Orden de Compra'}
               </button>
@@ -706,7 +979,7 @@ function Cotizaciones_ordenes_compra() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: '12.5px', color: 'var(--gray-600)' }}>
-                Generada el {formatearFecha(cotizacionDetalle.fechaRegistro)}
+                Generada el {cotizacionDetalle.fechaRegistro}
               </span>
               <span className={`badge ${badgeClassCotizacion(cotizacionDetalle.estado)}`}>
                 <span className="badge-dot"></span>
@@ -723,15 +996,15 @@ function Cotizaciones_ordenes_compra() {
                   <table>
                     <thead>
                       <tr>
-                        <th>Artículo</th>
-                        <th>Cantidad</th>
+                        <th>ARTÍCULO</th>
+                        <th>CANTIDAD</th>
                       </tr>
                     </thead>
                     <tbody>
                       {cotizacionDetalle.lineas.map((l) => (
-                        <tr key={l.articuloId}>
-                          <td>{articuloById.get(l.articuloId)?.descripcion || '—'}</td>
-                          <td>{l.cantidadSolicitada}</td>
+                        <tr key={l.articulo_id}>
+                          <td>{articuloById.get(l.articulo_id)?.descripcion || '—'}</td>
+                          <td>{l.cantidad_solicitada}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -747,13 +1020,15 @@ function Cotizaciones_ordenes_compra() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 {cotizacionDetalle.proveedoresInvitados.map((cp) => {
                   const prov = proveedorById.get(cp.proveedorId);
-                  const total = calcularTotalOfertaProveedor(cotizacionDetalle, cp.proveedorId);
-                  const puedeElegirGanador = cotizacionDetalle.estado === 'Enviada' && cp.estadoRespuesta === 'Respondida';
+                  
+                  // Calculamos el total de este proveedor basado en las ofertas y en lo que hemos ingresado ahora
+                  let total = 0;
+                  
                   return (
                     <div key={cp.id} style={{ border: '1px solid var(--gray-200)', borderRadius: '8px', padding: '12px 14px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          {puedeElegirGanador && (
+                          {cp.estadoRespuesta === 'Respondido' && (
                             <input
                               type="radio"
                               name="proveedorGanador"
@@ -763,46 +1038,74 @@ function Cotizaciones_ordenes_compra() {
                           )}
                           <strong style={{ fontSize: '13px' }}>{prov?.razonSocial || 'Proveedor'}</strong>
                         </div>
-                        <span className={`badge ${cp.estadoRespuesta === 'Respondida' ? 'badge-green' : 'badge-amber'}`}>
+                        <span className={`badge ${cp.estadoRespuesta === 'Respondido' ? 'badge-blue' : 'badge-amber'}`}>
                           <span className="badge-dot"></span>
                           {cp.estadoRespuesta}
                         </span>
                       </div>
 
-                      {cp.estadoRespuesta === 'Respondida' ? (
-                        <div style={{ marginTop: '10px' }}>
-                          <table style={{ width: '100%', fontSize: '12.5px' }}>
-                            <tbody>
-                              {cp.ofertas.map((o) => (
-                                <tr key={o.articuloId}>
-                                  <td style={{ padding: '3px 0', color: 'var(--gray-700)' }}>
-                                    {articuloById.get(o.articuloId)?.descripcion || '—'}
+                      <div style={{ marginTop: '10px' }}>
+                        <table style={{ width: '100%', fontSize: '12.5px' }}>
+                          <thead>
+                            <tr>
+                              <th style={{ textAlign: 'left', paddingBottom: '8px', color: 'var(--gray-500)', fontWeight: 600 }}>ARTÍCULO</th>
+                              <th style={{ textAlign: 'right', paddingBottom: '8px', color: 'var(--gray-500)', fontWeight: 600 }}>PRECIO UNITARIO</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {cotizacionDetalle.lineas.map((l) => {
+                              const artId = l.articulo_id;
+                              const art = articuloById.get(artId);
+                              const oferta = cp.ofertas.find(o => o.articulo_id === artId);
+                              const key = `${cp.id}_${artId}`;
+                              const isInputActive = showInputPrecios[key];
+                              const val = preciosIngresados[key] || '';
+                              
+                              if (oferta) {
+                                total += Number(oferta.precio_unitario_ofertado) * l.cantidad_solicitada;
+                              } else if (val && !isNaN(val)) {
+                                total += Number(val) * l.cantidad_solicitada;
+                              }
+                              
+                              return (
+                                <tr key={artId}>
+                                  <td style={{ padding: '6px 0', borderTop: '1px solid var(--gray-200)' }}>
+                                    {art?.descripcion || '—'}
                                   </td>
-                                  <td style={{ padding: '3px 0', textAlign: 'right', fontWeight: '600' }}>
-                                    {formatearMonto(o.precioUnitarioOfertado)} / un.
+                                  <td style={{ padding: '6px 0', borderTop: '1px solid var(--gray-200)', textAlign: 'right' }}>
+                                    {oferta ? (
+                                      <strong>{formatearMonto(oferta.precio_unitario_ofertado)}</strong>
+                                    ) : isInputActive ? (
+                                      <input 
+                                        type="number" 
+                                        min="0" 
+                                        step="0.01"
+                                        placeholder="0.00"
+                                        value={val}
+                                        onChange={(e) => setPreciosIngresados(prev => ({...prev, [key]: e.target.value}))}
+                                        style={{ width: '100px', textAlign: 'right', padding: '4px', border: '1px solid var(--gray-300)', borderRadius: '4px' }}
+                                      />
+                                    ) : (
+                                      <button 
+                                        className="btn btn-outline btn-sm" 
+                                        onClick={() => setShowInputPrecios(prev => ({...prev, [key]: true}))}
+                                      >
+                                        Cargar Precio
+                                      </button>
+                                    )}
                                   </td>
                                 </tr>
-                              ))}
-                            </tbody>
-                          </table>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                        
+                        {(cp.estadoRespuesta === 'Respondido' || total > 0) && (
                           <div style={{ textAlign: 'right', fontSize: '13px', fontWeight: '700', marginTop: '6px', color: 'var(--black)' }}>
                             Total: {formatearMonto(total)}
                           </div>
-                        </div>
-                      ) : (
-                        <div style={{ marginTop: '10px' }}>
-                          <button
-                            className="btn btn-outline btn-sm"
-                            disabled={respondiendoId === cp.id}
-                            onClick={() => handleSimularRespuesta(cp)}
-                          >
-                            {respondiendoId === cp.id ? 'Recibiendo…' : 'Simular respuesta recibida'}
-                          </button>
-                          <span style={{ marginLeft: '8px', fontSize: '11px', color: 'var(--gray-500)' }}>
-                            (mientras no exista integración real de email)
-                          </span>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
                   );
                 })}
@@ -888,16 +1191,16 @@ function Cotizaciones_ordenes_compra() {
                   </thead>
                   <tbody>
                     {ordenDetalle.lineas.map((l) => {
-                      const saldo = l.cantidadSolicitada - l.cantidadRecibida;
+                      const saldo = l.cantidad_solicitada - l.cantidad_recibida;
                       return (
                         <tr key={l.id}>
-                          <td>{articuloById.get(l.articuloId)?.descripcion || '—'}</td>
-                          <td>{l.cantidadSolicitada}</td>
-                          <td>{l.cantidadRecibida}</td>
+                          <td>{articuloById.get(l.articulo_id)?.descripcion || '—'}</td>
+                          <td>{l.cantidad_solicitada}</td>
+                          <td>{l.cantidad_recibida}</td>
                           <td>
                             <strong style={{ color: saldo > 0 ? 'var(--amber)' : 'var(--green)' }}>{saldo}</strong>
                           </td>
-                          <td>{formatearMonto(l.precioUnitario)}</td>
+                          <td>{formatearMonto(l.precio_unitario)}</td>
                           {ordenDetalle.estado !== 'Recibida' && ordenDetalle.estado !== 'Cancelada' && (
                             <td>
                               <input
@@ -924,7 +1227,7 @@ function Cotizaciones_ordenes_compra() {
 
             <div style={{ textAlign: 'right', fontSize: '13.5px', fontWeight: '700' }}>
               Total de la orden:{' '}
-              {formatearMonto(ordenDetalle.lineas.reduce((acc, l) => acc + l.cantidadSolicitada * l.precioUnitario, 0))}
+              {formatearMonto(ordenDetalle.lineas.reduce((acc, l) => acc + l.cantidad_solicitada * l.precio_unitario, 0))}
             </div>
           </div>
         )}
