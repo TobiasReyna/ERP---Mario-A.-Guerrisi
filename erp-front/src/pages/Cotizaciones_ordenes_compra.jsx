@@ -1,14 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import Modal from '../components/Modal';
 import { formatearFecha, formatearMonto } from '../utils/format';
-import {
-  aprobarYGenerarOrdenCompra,
-  calcularTotalOfertaProveedor,
-  listarOrdenesCompra,
-  obtenerOrdenCompra,
-  registrarRecepcion,
-  cancelarOrdenCompra,
-} from '../services/purchasingService';
+// No purchasingService mock required anymore
 
 // NOTA: página de HU-12 (Solicitud de Cotizaciones y Órdenes de Compra).
 // `services/purchasingService.js` es un MOCK en memoria (se reinicia al
@@ -208,12 +201,37 @@ function Cotizaciones_ordenes_compra() {
     }
   };
 
-  const cargarOrdenes = () => {
+  const cargarOrdenes = async () => {
     setLoadingOC(true);
-    listarOrdenesCompra()
-      .then(setOrdenes)
-      .catch((err) => console.error('Error al listar órdenes de compra:', err))
-      .finally(() => setLoadingOC(false));
+    try {
+      const res = await fetch('http://localhost:3001/api/purchase-orders');
+      const json = await res.json();
+      const ocArmadas = (json.data || []).map(oc => {
+        // Formatear fecha
+        const d = new Date(oc.fecha_emision);
+        const fechaFormateada = `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
+        
+        // Calcular total
+        const detalles = oc.ordenes_compra_detalle || [];
+        const total = detalles.reduce((acc, l) => acc + (l.cantidad_solicitada * Number(l.precio_unitario)), 0);
+
+        return {
+          id: oc.id,
+          numeroOrden: oc.numero_orden,
+          proveedorId: oc.proveedor_id,
+          fechaEmision: fechaFormateada,
+          estado: oc.estado,
+          total,
+          lineas: detalles,
+          _original: oc
+        };
+      });
+      setOrdenes(ocArmadas);
+    } catch (error) {
+      console.error('Error al listar órdenes de compra:', error);
+    } finally {
+      setLoadingOC(false);
+    }
   };
 
   useEffect(() => {
@@ -451,8 +469,45 @@ function Cotizaciones_ordenes_compra() {
     if (!cotizacionDetalle || !proveedorGanadorSel) return;
     setProcesandoCot(true);
     try {
-      const nuevaOC = await aprobarYGenerarOrdenCompra(cotizacionDetalle.id, proveedorGanadorSel);
-      showToast(`Cotización aprobada. Orden de Compra N° ${nuevaOC.numeroOrden} generada en estado Pendiente.`);
+      // 1. Create header
+      await fetch('http://localhost:3001/api/purchase-orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cotizacion_id: cotizacionDetalle.id,
+          proveedor_id: proveedorGanadorSel
+        })
+      });
+
+      // 2. Get recent to get ID and numero_orden
+      const resRecent = await fetch('http://localhost:3001/api/purchase-orders/recent');
+      const jsonRecent = await resRecent.json();
+      if (!jsonRecent.data || jsonRecent.data.length === 0) {
+        throw new Error('No se pudo recuperar la OC generada.');
+      }
+      const nuevaOC = jsonRecent.data[0];
+
+      // 3. Create details
+      const provSeleccionado = cotizacionDetalle.proveedoresInvitados.find(p => p.proveedorId === proveedorGanadorSel);
+      if (!provSeleccionado) throw new Error('Proveedor no encontrado');
+
+      for (const l of cotizacionDetalle.lineas) {
+        const oferta = provSeleccionado.ofertas.find(o => o.articulo_id === l.articulo_id);
+        const precio = oferta ? oferta.precio_unitario_ofertado : 0; 
+        
+        await fetch('http://localhost:3001/api/purchase-orders/detail', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            orden_compra_id: nuevaOC.id,
+            articulo_id: l.articulo_id,
+            cantidad_solicitada: l.cantidad_solicitada,
+            precio_unitario: precio
+          })
+        });
+      }
+
+      showToast(`Cotización aprobada. Orden de Compra N° ${nuevaOC.numero_orden} generada en estado Pendiente.`);
       setIsDetalleCotOpen(false);
       cargarCotizaciones();
       cargarOrdenes();
@@ -467,27 +522,21 @@ function Cotizaciones_ordenes_compra() {
   // ---------------------------------------------------------------------
   // Detalle de OC / recepción
   // ---------------------------------------------------------------------
-  const handleAbrirDetalleOC = (id) => {
+  const handleAbrirDetalleOC = (oc) => {
     setIsDetalleOCOpen(true);
-    setOrdenDetalle(null);
-    setCantidadesRecepcion({});
-    obtenerOrdenCompra(id)
-      .then((oc) => {
-        setOrdenDetalle(oc);
-        const iniciales = {};
-        oc.lineas.forEach((l) => {
-          iniciales[l.id] = '';
-        });
-        setCantidadesRecepcion(iniciales);
-      })
-      .catch((err) => console.error('Error al obtener orden de compra:', err));
+    setOrdenDetalle(oc);
+    const iniciales = {};
+    oc.lineas.forEach((l) => {
+      iniciales[l.id] = '';
+    });
+    setCantidadesRecepcion(iniciales);
   };
 
   const handleConfirmarRecepcion = async () => {
     if (!ordenDetalle) return;
     const recepciones = Object.entries(cantidadesRecepcion)
       .filter(([, valor]) => Number(valor) > 0)
-      .map(([detalleId, valor]) => ({ detalleId, cantidad: Number(valor) }));
+      .map(([id_detalle, valor]) => ({ id_detalle, cant_a_sumar: Number(valor) }));
 
     if (recepciones.length === 0) {
       alert('Ingresá al menos una cantidad a recibir.');
@@ -496,17 +545,16 @@ function Cotizaciones_ordenes_compra() {
 
     setProcesandoRecepcion(true);
     try {
-      const ocActualizada = await registrarRecepcion(ordenDetalle.id, recepciones);
-      setOrdenDetalle({ ...ocActualizada });
-      const reset = {};
-      ocActualizada.lineas.forEach((l) => (reset[l.id] = ''));
-      setCantidadesRecepcion(reset);
+      const res = await fetch(`http://localhost:3001/api/purchase-orders/${ordenDetalle.id}/receive`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ detalles: recepciones })
+      });
+      if (!res.ok) throw new Error('Falló la recepción en el servidor');
+      
+      showToast(`Orden N° ${ordenDetalle.numeroOrden}: recepción confirmada.`);
+      setIsDetalleOCOpen(false); // Close the modal
       cargarOrdenes();
-      showToast(
-        ocActualizada.estado === 'Recibida'
-          ? `Orden N° ${ocActualizada.numeroOrden}: recepción completa.`
-          : `Orden N° ${ocActualizada.numeroOrden} actualizada a estado Parcial.`
-      );
     } catch (error) {
       alert(error.message || 'Error al registrar la recepción.');
     } finally {
@@ -517,7 +565,10 @@ function Cotizaciones_ordenes_compra() {
   const handleConfirmarCancelacionOC = async () => {
     if (!ordenACancelar) return;
     try {
-      await cancelarOrdenCompra(ordenACancelar.id);
+      const res = await fetch(`http://localhost:3001/api/purchase-orders/${ordenACancelar.id}/cancel`, {
+        method: 'PUT'
+      });
+      if (!res.ok) throw new Error('Falló la cancelación en el servidor');
       showToast(`Orden N° ${ordenACancelar.numeroOrden} cancelada.`);
       setOrdenACancelar(null);
       cargarOrdenes();
@@ -772,7 +823,7 @@ function Cotizaciones_ordenes_compra() {
                         <td>{formatearMonto(oc.total)}</td>
                         <td>
                           <div className="row-actions">
-                            <button className="btn btn-outline btn-sm" onClick={() => handleAbrirDetalleOC(oc.id)}>
+                            <button className="btn btn-outline btn-sm" onClick={() => handleAbrirDetalleOC(oc)}>
                               {oc.estado === 'Pendiente' || oc.estado === 'Parcial' ? 'Recepcionar' : 'Ver detalle'}
                             </button>
                             {oc.estado === 'Pendiente' && (
@@ -1149,16 +1200,16 @@ function Cotizaciones_ordenes_compra() {
                   </thead>
                   <tbody>
                     {ordenDetalle.lineas.map((l) => {
-                      const saldo = l.cantidadSolicitada - l.cantidadRecibida;
+                      const saldo = l.cantidad_solicitada - l.cantidad_recibida;
                       return (
                         <tr key={l.id}>
-                          <td>{articuloById.get(l.articuloId)?.descripcion || '—'}</td>
-                          <td>{l.cantidadSolicitada}</td>
-                          <td>{l.cantidadRecibida}</td>
+                          <td>{articuloById.get(l.articulo_id)?.descripcion || '—'}</td>
+                          <td>{l.cantidad_solicitada}</td>
+                          <td>{l.cantidad_recibida}</td>
                           <td>
                             <strong style={{ color: saldo > 0 ? 'var(--amber)' : 'var(--green)' }}>{saldo}</strong>
                           </td>
-                          <td>{formatearMonto(l.precioUnitario)}</td>
+                          <td>{formatearMonto(l.precio_unitario)}</td>
                           {ordenDetalle.estado !== 'Recibida' && ordenDetalle.estado !== 'Cancelada' && (
                             <td>
                               <input
@@ -1185,7 +1236,7 @@ function Cotizaciones_ordenes_compra() {
 
             <div style={{ textAlign: 'right', fontSize: '13.5px', fontWeight: '700' }}>
               Total de la orden:{' '}
-              {formatearMonto(ordenDetalle.lineas.reduce((acc, l) => acc + l.cantidadSolicitada * l.precioUnitario, 0))}
+              {formatearMonto(ordenDetalle.lineas.reduce((acc, l) => acc + l.cantidad_solicitada * l.precio_unitario, 0))}
             </div>
           </div>
         )}
