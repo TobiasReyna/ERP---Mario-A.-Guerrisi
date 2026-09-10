@@ -2,9 +2,6 @@ import { useState, useEffect, useMemo } from 'react';
 import Modal from '../components/Modal';
 import { formatearFecha, formatearMonto } from '../utils/format';
 import {
-  obtenerCotizacion,
-  simularRespuestaProveedor,
-  cancelarCotizacion,
   aprobarYGenerarOrdenCompra,
   calcularTotalOfertaProveedor,
   listarOrdenesCompra,
@@ -423,12 +420,30 @@ function Cotizaciones_ordenes_compra() {
   const handleCancelarCotizacion = async () => {
     if (!cotizacionDetalle) return;
     try {
-      await cancelarCotizacion(cotizacionDetalle.id);
+      const res = await fetch(`http://localhost:3001/api/quotes/${cotizacionDetalle.id}/cancelar`, {
+        method: 'PUT'
+      });
+      if (!res.ok) throw new Error('Fallo en la comunicación con el servidor');
       showToast('Cotización cancelada.');
       setIsDetalleCotOpen(false);
       cargarCotizaciones();
     } catch (error) {
       alert(error.message || 'Error al cancelar la cotización.');
+    }
+  };
+
+  const handleRestaurarCotizacion = async () => {
+    if (!cotizacionDetalle) return;
+    try {
+      const res = await fetch(`http://localhost:3001/api/quotes/${cotizacionDetalle.id}/pendiente`, {
+        method: 'PUT'
+      });
+      if (!res.ok) throw new Error('Fallo en la comunicación con el servidor');
+      showToast('Cotización restaurada a Pendiente.');
+      setIsDetalleCotOpen(false);
+      cargarCotizaciones();
+    } catch (error) {
+      alert(error.message || 'Error al restaurar la cotización.');
     }
   };
 
@@ -895,9 +910,15 @@ function Cotizaciones_ordenes_compra() {
             <button className="btn btn-outline" onClick={() => setIsDetalleCotOpen(false)}>
               Cerrar
             </button>
-            <button className="btn btn-outline" style={{ color: 'var(--red)', borderColor: 'var(--red)' }} onClick={handleCancelarCotizacion}>
-              Cancelar cotización
-            </button>
+            {cotizacionDetalle?.estado === 'Cancelada' ? (
+              <button className="btn btn-outline" style={{ color: 'var(--amber)', borderColor: 'var(--amber)' }} onClick={handleRestaurarCotizacion}>
+                Cambiar a Pendiente
+              </button>
+            ) : (
+              <button className="btn btn-outline" style={{ color: 'var(--red)', borderColor: 'var(--red)' }} onClick={handleCancelarCotizacion}>
+                Cancelar cotización
+              </button>
+            )}
             {cotizacionDetalle && cotizacionDetalle.proveedoresInvitados.some(cp => cp.estadoRespuesta === 'Pendiente') ? (
               <button className="btn btn-primary" onClick={handleGuardarRespuestas}>
                 Guardar Respuestas

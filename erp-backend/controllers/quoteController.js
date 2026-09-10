@@ -148,7 +148,6 @@ const obtenerCotizaciones_proveedores_detalles = async (req, res) => {
 const guardarPreciosProveedor = async (req, res) => {
     try {
         const { cotizacion_proveedor_id, precios } = req.body;
-        // precios es un array: [{ articulo_id, precio_unitario_ofertado }]
         if (!cotizacion_proveedor_id || !precios || !precios.length) {
             return res.status(400).json({ error: 'Faltan datos obligatorios.' });
         }
@@ -158,6 +157,28 @@ const guardarPreciosProveedor = async (req, res) => {
     } catch (error) {
         console.error('[API] Error POST /api/quotes/precios:', error);
         return res.status(500).json({ error: error.message || 'Error guardando los precios.' });
+    }
+};
+
+const cancelarCotizacion = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await QuoteService.cancelarCotizacion(id);
+        return res.status(200).json({ message: 'Cotización cancelada', data: result });
+    } catch (error) {
+        console.error('[API] Error PUT /api/quotes/:id/cancelar:', error);
+        return res.status(500).json({ error: error.message || 'Error al cancelar la cotización.' });
+    }
+};
+
+const restaurarCotizacionAPendiente = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await QuoteService.restaurarCotizacionAPendiente(id);
+        return res.status(200).json({ message: 'Cotización restaurada a pendiente', data: result });
+    } catch (error) {
+        console.error('[API] Error PUT /api/quotes/:id/pendiente:', error);
+        return res.status(500).json({ error: error.message || 'Error al restaurar la cotización.' });
     }
 };
 
@@ -173,5 +194,7 @@ module.exports = {
     obtenerCotizaciones_detalle,
     obtenerCotizacion_proveedores,
     obtenerCotizaciones_proveedores_detalles,
-    guardarPreciosProveedor
+    guardarPreciosProveedor,
+    cancelarCotizacion,
+    restaurarCotizacionAPendiente
 };

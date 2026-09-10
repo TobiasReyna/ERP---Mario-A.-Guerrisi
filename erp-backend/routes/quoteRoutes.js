@@ -38,4 +38,10 @@ router.get('/proveedores-detalles/:id', quoteController.obtenerCotizaciones_prov
 // POST /api/quotes/precios
 router.post('/precios', quoteController.guardarPreciosProveedor);
 
+// PUT /api/quotes/:id/cancelar
+router.put('/:id/cancelar', quoteController.cancelarCotizacion);
+
+// PUT /api/quotes/:id/pendiente
+router.put('/:id/pendiente', quoteController.restaurarCotizacionAPendiente);
+
 module.exports = router;

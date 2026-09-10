@@ -155,6 +155,36 @@ class QuoteService {
             
         return data;
     }
+
+    static async cancelarCotizacion(id) {
+        const { data, error } = await supabaseAdmin
+            .from('cotizaciones')
+            .update({ 
+                estado: 'Cancelada',
+                fecha_hora_actualizacion: new Date().toISOString()
+            })
+            .eq('id', id)
+            .select();
+            
+        if (error) throw new Error(error.message);
+        return data;
+    }
+
+    static async restaurarCotizacionAPendiente(id) {
+        const { data, error } = await supabaseAdmin
+            .from('cotizaciones')
+            .update({ 
+                estado: 'Pendiente',
+                // Actualizamos la fecha de actualización para que difiera de la de registro
+                // Así el frontend sabrá que no es la "recién creada y enviada".
+                fecha_hora_actualizacion: new Date().toISOString()
+            })
+            .eq('id', id)
+            .select();
+            
+        if (error) throw new Error(error.message);
+        return data;
+    }
 }
 
 module.exports = QuoteService;
