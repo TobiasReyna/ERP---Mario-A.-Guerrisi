@@ -136,16 +136,16 @@ function Notas_credito_debito() {
       if (nota.afectaInventario) {
         const totalUnidades = nota.lineas.reduce((acc, l) => acc + l.cantidad, 0);
         showToast(
-          `${nota.numeroComprobante} emitida. Se revirtieron ${totalUnidades} unidad(es) a depósito de origen (simulado).`
+          `${nota.numeroComprobante} registrada. Se revirtieron ${totalUnidades} unidad(es) a depósito de origen (simulado).`
         );
       } else {
-        showToast(`${nota.numeroComprobante} emitida correctamente.`);
+        showToast(`${nota.numeroComprobante} registrada correctamente.`);
       }
 
       setIsNuevaOpen(false);
       cargarTodo();
     } catch (error) {
-      alert(error.message || 'Error al emitir la nota.');
+      alert(error.message || 'Error al registrar la nota.');
     } finally {
       setSubmitting(false);
     }
@@ -295,7 +295,7 @@ function Notas_credito_debito() {
               Cancelar
             </button>
             <button className="btn btn-primary" disabled={!isFormValid || submitting} onClick={handleSubmit}>
-              {submitting ? 'Emitiendo…' : 'Emitir nota'}
+              {submitting ? 'Registrando…' : 'Registrar nota'}
             </button>
           </>
         }

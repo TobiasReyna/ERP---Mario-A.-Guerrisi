@@ -7,7 +7,7 @@ const masterRoutes = require('./routes/masterRoutes');
 const supplierRoutes = require('./routes/supplierRoutes');
 const app = express();
 const PORT = process.env.PORT || 3001;
-const creditNoteRoutes = require('./routes/creditNoteRoutes');
+
 const creditLimitRoutes = require('./routes/creditLimitRoutes');
 const clientRoutes = require('./routes/clientRoutes');
 const creditNoteRoutes = require('./routes/creditNoteRoutes');
