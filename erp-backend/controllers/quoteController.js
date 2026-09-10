@@ -79,9 +79,82 @@ const obtenerCotizaciones_recientes = async (req, res) => {
     }
 };
 
+const obtenerCotizaciones_todas = async (req, res) => {
+    try {
+        const result = await QuoteService.obtenerCotizaciones_todas();
+        return res.status(200).json({ data: result });
+    } catch (error) {
+        return res.status(500).json({ error: error.message });
+    }
+};
+
+const obtenerCotizaciones_enviadas = async (req, res) => {
+    try {
+        const result = await QuoteService.obtenerCotizaciones_enviadas();
+        return res.status(200).json({ data: result });
+    } catch (error) {
+        return res.status(500).json({ error: error.message });
+    }
+};
+
+const obtenerCotizaciones_aprobadas = async (req, res) => {
+    try {
+        const result = await QuoteService.obtenerCotizaciones_aprobadas();
+        return res.status(200).json({ data: result });
+    } catch (error) {
+        return res.status(500).json({ error: error.message });
+    }
+};
+
+const obtenerCotizaciones_canceladas = async (req, res) => {
+    try {
+        const result = await QuoteService.obtenerCotizaciones_canceladas();
+        return res.status(200).json({ data: result });
+    } catch (error) {
+        return res.status(500).json({ error: error.message });
+    }
+};
+
+const obtenerCotizaciones_detalle = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await QuoteService.obtenerCotizaciones_detalle(id);
+        return res.status(200).json({ data: result });
+    } catch (error) {
+        return res.status(500).json({ error: error.message });
+    }
+};
+
+const obtenerCotizacion_proveedores = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await QuoteService.obtenerCotizacion_proveedores(id);
+        return res.status(200).json({ data: result });
+    } catch (error) {
+        return res.status(500).json({ error: error.message });
+    }
+};
+
+const obtenerCotizaciones_proveedores_detalles = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await QuoteService.obtenerCotizaciones_proveedores_detalles(id);
+        return res.status(200).json({ data: result });
+    } catch (error) {
+        return res.status(500).json({ error: error.message });
+    }
+};
+
 module.exports = {
     crearCotizacion,
     crearCotizacion_detalle,
     crearCotizacion_proveedor,
-    obtenerCotizaciones_recientes
+    obtenerCotizaciones_recientes,
+    obtenerCotizaciones_todas,
+    obtenerCotizaciones_enviadas,
+    obtenerCotizaciones_aprobadas,
+    obtenerCotizaciones_canceladas,
+    obtenerCotizaciones_detalle,
+    obtenerCotizacion_proveedores,
+    obtenerCotizaciones_proveedores_detalles
 };

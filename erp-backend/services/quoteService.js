@@ -66,6 +66,71 @@ class QuoteService {
         }
         return data;
     }
+    static async obtenerCotizaciones_todas() {
+        const { data, error } = await supabaseAdmin
+            .from('cotizaciones')
+            .select('*')
+            .order('fecha_hora_registro', { ascending: false });
+        if (error) throw new Error(error.message);
+        return data;
+    }
+
+    static async obtenerCotizaciones_enviadas() {
+        const { data, error } = await supabaseAdmin
+            .from('cotizaciones')
+            .select('*')
+            .eq('estado', 'Pendiente')
+            .order('fecha_hora_registro', { ascending: false });
+        if (error) throw new Error(error.message);
+        return data;
+    }
+
+    static async obtenerCotizaciones_aprobadas() {
+        const { data, error } = await supabaseAdmin
+            .from('cotizaciones')
+            .select('*')
+            .eq('estado', 'Aprobada')
+            .order('fecha_hora_registro', { ascending: false });
+        if (error) throw new Error(error.message);
+        return data;
+    }
+
+    static async obtenerCotizaciones_canceladas() {
+        const { data, error } = await supabaseAdmin
+            .from('cotizaciones')
+            .select('*')
+            .eq('estado', 'Cancelada')
+            .order('fecha_hora_registro', { ascending: false });
+        if (error) throw new Error(error.message);
+        return data;
+    }
+
+    static async obtenerCotizaciones_detalle(cotizacion_id) {
+        const { data, error } = await supabaseAdmin
+            .from('cotizaciones_detalle')
+            .select('*')
+            .eq('cotizacion_id', cotizacion_id);
+        if (error) throw new Error(error.message);
+        return data;
+    }
+
+    static async obtenerCotizacion_proveedores(cotizacion_id) {
+        const { data, error } = await supabaseAdmin
+            .from('cotizaciones_proveedores')
+            .select('*')
+            .eq('cotizacion_id', cotizacion_id);
+        if (error) throw new Error(error.message);
+        return data;
+    }
+
+    static async obtenerCotizaciones_proveedores_detalles(cotizacion_proveedor_id) {
+        const { data, error } = await supabaseAdmin
+            .from('cotizaciones_proveedores_detalle')
+            .select('*')
+            .eq('cotizacion_proveedor_id', cotizacion_proveedor_id);
+        if (error) throw new Error(error.message);
+        return data;
+    }
 }
 
 module.exports = QuoteService;

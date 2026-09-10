@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo } from 'react';
 import Modal from '../components/Modal';
 import { formatearFecha, formatearMonto } from '../utils/format';
 import {
-  listarCotizaciones,
   obtenerCotizacion,
   simularRespuestaProveedor,
   cancelarCotizacion,
@@ -61,6 +60,7 @@ function Cotizaciones_ordenes_compra() {
   const [cotizaciones, setCotizaciones] = useState([]);
   const [loadingCot, setLoadingCot] = useState(true);
   const [filtroEstadoCot, setFiltroEstadoCot] = useState('todas');
+  const [kpiCot, setKpiCot] = useState({ total: 0, enviadas: 0, aprobadas: 0 });
 
   const [ordenes, setOrdenes] = useState([]);
   const [loadingOC, setLoadingOC] = useState(true);
@@ -121,12 +121,95 @@ function Cotizaciones_ordenes_compra() {
       .finally(() => setLoadingRef(false));
   };
 
-  const cargarCotizaciones = () => {
+  const cargarCotizaciones = async () => {
     setLoadingCot(true);
-    listarCotizaciones()
-      .then(setCotizaciones)
-      .catch((err) => console.error('Error al listar cotizaciones:', err))
-      .finally(() => setLoadingCot(false));
+    try {
+      let url = 'http://localhost:3001/api/quotes/todas';
+      if (filtroEstadoCot === 'Enviada') url = 'http://localhost:3001/api/quotes/enviadas';
+      else if (filtroEstadoCot === 'Aprobada') url = 'http://localhost:3001/api/quotes/aprobadas';
+      else if (filtroEstadoCot === 'Cancelada') url = 'http://localhost:3001/api/quotes/canceladas';
+      
+      const res = await fetch(url);
+      const json = await res.json();
+      const quotesRaw = json.data || [];
+
+      // UPDATE KPI: always fetch all quotes to calculate global totals independently of filter
+      const resTodas = await fetch('http://localhost:3001/api/quotes/todas');
+      const jsonTodas = await resTodas.json();
+      const quotesTodas = jsonTodas.data || [];
+      const stats = { total: quotesTodas.length, enviadas: 0, aprobadas: 0 };
+      quotesTodas.forEach(q => {
+        let estadoFinal = q.estado;
+        if (q.estado === 'Pendiente') {
+            if (q.fecha_hora_registro === q.fecha_hora_actualizacion) {
+              estadoFinal = 'Enviada';
+            }
+        }
+        if (estadoFinal === 'Enviada') stats.enviadas++;
+        if (estadoFinal === 'Aprobada') stats.aprobadas++;
+      });
+      setKpiCot(stats);
+
+      const quotesArmadas = await Promise.all(
+        quotesRaw.map(async (q) => {
+          // ARTÍCULOS
+          const resDet = await fetch(`http://localhost:3001/api/quotes/${q.id}/detalle`);
+          const jsonDet = await resDet.json();
+          const cantidadArticulos = (jsonDet.data || []).length;
+
+          // PROVEEDORES INVITADOS
+          const resProv = await fetch(`http://localhost:3001/api/quotes/${q.id}/proveedores`);
+          const jsonProv = await resProv.json();
+          const proveedores = jsonProv.data || [];
+          const cantidadProveedores = proveedores.length;
+
+          // RESPUESTAS
+          let cantidadRespuestas = 0;
+          for (const prov of proveedores) {
+            const resProvDet = await fetch(`http://localhost:3001/api/quotes/proveedores-detalles/${prov.id}`);
+            const jsonProvDet = await resProvDet.json();
+            const provDetalles = jsonProvDet.data || [];
+            
+            if (provDetalles.length === cantidadArticulos && cantidadArticulos > 0) {
+              cantidadRespuestas++;
+            }
+          }
+
+          // ESTADO
+          let estadoFinal = q.estado;
+          if (q.estado === 'Pendiente') {
+            if (q.fecha_hora_registro === q.fecha_hora_actualizacion) {
+              estadoFinal = 'Enviada'; // color azul
+            } else {
+              estadoFinal = 'Pendiente'; // color anaranjado
+            }
+          } else if (q.estado === 'Aprobada') {
+             estadoFinal = 'Aprobada'; // color verde
+          } else if (q.estado === 'Cancelada') {
+             estadoFinal = 'Cancelada'; // color rojo
+          }
+
+          // FECHA: Formato DD/MM/AAAA
+          const d = new Date(q.fecha_hora_registro);
+          const fechaFormateada = `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
+
+          return {
+            id: q.id,
+            fechaRegistro: fechaFormateada,
+            cantidadArticulos,
+            cantidadProveedores,
+            cantidadRespuestas,
+            estado: estadoFinal,
+            _original: q
+          };
+        })
+      );
+      setCotizaciones(quotesArmadas);
+    } catch (error) {
+      console.error('Error al cargar cotizaciones:', error);
+    } finally {
+      setLoadingCot(false);
+    }
   };
 
   const cargarOrdenes = () => {
@@ -139,9 +222,12 @@ function Cotizaciones_ordenes_compra() {
 
   useEffect(() => {
     cargarReferencia();
-    cargarCotizaciones();
     cargarOrdenes();
   }, []);
+
+  useEffect(() => {
+    cargarCotizaciones();
+  }, [filtroEstadoCot]);
 
   // ---------------------------------------------------------------------
   // Nueva cotización
@@ -357,9 +443,8 @@ function Cotizaciones_ordenes_compra() {
   // Filtros y derivados
   // ---------------------------------------------------------------------
   const cotizacionesFiltradas = useMemo(() => {
-    if (filtroEstadoCot === 'todas') return cotizaciones;
-    return cotizaciones.filter((c) => c.estado === filtroEstadoCot);
-  }, [cotizaciones, filtroEstadoCot]);
+    return cotizaciones;
+  }, [cotizaciones]);
 
   const ordenesFiltradas = useMemo(() => {
     return ordenes.filter((oc) => {
@@ -368,15 +453,6 @@ function Cotizaciones_ordenes_compra() {
       return matchesEstado && matchesProveedor;
     });
   }, [ordenes, filtroEstadoOC, filtroProveedorOC]);
-
-  const kpiCot = useMemo(
-    () => ({
-      total: cotizaciones.length,
-      enviadas: cotizaciones.filter((c) => c.estado === 'Enviada').length,
-      aprobadas: cotizaciones.filter((c) => c.estado === 'Aprobada').length,
-    }),
-    [cotizaciones]
-  );
 
   const kpiOC = useMemo(
     () => ({
@@ -493,7 +569,7 @@ function Cotizaciones_ordenes_compra() {
                   ) : (
                     cotizacionesFiltradas.map((c) => (
                       <tr key={c.id}>
-                        <td>{formatearFecha(c.fechaRegistro)}</td>
+                        <td>{c.fechaRegistro}</td>
                         <td>{c.cantidadArticulos}</td>
                         <td>{c.cantidadProveedores}</td>
                         <td>
