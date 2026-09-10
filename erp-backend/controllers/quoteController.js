@@ -145,6 +145,22 @@ const obtenerCotizaciones_proveedores_detalles = async (req, res) => {
     }
 };
 
+const guardarPreciosProveedor = async (req, res) => {
+    try {
+        const { cotizacion_proveedor_id, precios } = req.body;
+        // precios es un array: [{ articulo_id, precio_unitario_ofertado }]
+        if (!cotizacion_proveedor_id || !precios || !precios.length) {
+            return res.status(400).json({ error: 'Faltan datos obligatorios.' });
+        }
+        
+        const result = await QuoteService.guardarPreciosProveedor(cotizacion_proveedor_id, precios);
+        return res.status(201).json({ message: 'Precios guardados con éxito', data: result });
+    } catch (error) {
+        console.error('[API] Error POST /api/quotes/precios:', error);
+        return res.status(500).json({ error: error.message || 'Error guardando los precios.' });
+    }
+};
+
 module.exports = {
     crearCotizacion,
     crearCotizacion_detalle,
@@ -156,5 +172,6 @@ module.exports = {
     obtenerCotizaciones_canceladas,
     obtenerCotizaciones_detalle,
     obtenerCotizacion_proveedores,
-    obtenerCotizaciones_proveedores_detalles
+    obtenerCotizaciones_proveedores_detalles,
+    guardarPreciosProveedor
 };

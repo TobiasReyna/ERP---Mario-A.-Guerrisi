@@ -78,7 +78,6 @@ function Cotizaciones_ordenes_compra() {
   const [cotizacionDetalle, setCotizacionDetalle] = useState(null);
   const [proveedorGanadorSel, setProveedorGanadorSel] = useState('');
   const [procesandoCot, setProcesandoCot] = useState(false);
-  const [respondiendoId, setRespondiendoId] = useState(null);
 
   // Modal: detalle de OC / recepción
   const [isDetalleOCOpen, setIsDetalleOCOpen] = useState(false);
@@ -316,35 +315,108 @@ function Cotizaciones_ordenes_compra() {
     }
   };
 
+  const [preciosIngresados, setPreciosIngresados] = useState({});
+  const [showInputPrecios, setShowInputPrecios] = useState({});
+
   // ---------------------------------------------------------------------
   // Detalle de cotización
   // ---------------------------------------------------------------------
-  const handleAbrirDetalleCot = (id) => {
+  const handleAbrirDetalleCot = async (c) => {
     setIsDetalleCotOpen(true);
     setCotizacionDetalle(null);
     setProveedorGanadorSel('');
-    obtenerCotizacion(id)
-      .then(setCotizacionDetalle)
-      .catch((err) => console.error('Error al obtener cotización:', err));
-  };
+    setPreciosIngresados({});
+    setShowInputPrecios({});
 
-  const refrescarDetalleCot = async (id) => {
-    const data = await obtenerCotizacion(id);
-    setCotizacionDetalle(data);
-  };
-
-  const handleSimularRespuesta = async (cp) => {
-    if (!cotizacionDetalle) return;
-    setRespondiendoId(cp.id);
     try {
-      await simularRespuestaProveedor(cotizacionDetalle.id, cp.id, articulos);
-      await refrescarDetalleCot(cotizacionDetalle.id);
+      const id = c.id;
+      
+      const resDet = await fetch(`http://localhost:3001/api/quotes/${id}/detalle`);
+      const jsonDet = await resDet.json();
+      const lineas = jsonDet.data || [];
+
+      const resProv = await fetch(`http://localhost:3001/api/quotes/${id}/proveedores`);
+      const jsonProv = await resProv.json();
+      const provs = jsonProv.data || [];
+
+      const proveedoresInvitados = await Promise.all(
+        provs.map(async (p) => {
+          const resProvDet = await fetch(`http://localhost:3001/api/quotes/proveedores-detalles/${p.id}`);
+          const jsonProvDet = await resProvDet.json();
+          const pDetalles = jsonProvDet.data || [];
+          
+          let estadoRespuesta = 'Pendiente';
+          // Si tiene un detalle por cada línea solicitada, está respondido
+          if (pDetalles.length === lineas.length && lineas.length > 0) {
+             estadoRespuesta = 'Respondido';
+          }
+          
+          return {
+            id: p.id,
+            proveedorId: p.proveedor_id,
+            estadoRespuesta,
+            ofertas: pDetalles
+          };
+        })
+      );
+
+      setCotizacionDetalle({
+        ...c,
+        lineas,
+        proveedoresInvitados
+      });
+    } catch (err) {
+      console.error('Error al obtener cotización:', err);
+    }
+  };
+
+  const handleGuardarRespuestas = async () => {
+    const envios = [];
+    for (const cp of cotizacionDetalle.proveedoresInvitados) {
+      if (cp.estadoRespuesta === 'Pendiente') {
+        const preciosProv = [];
+        let missing = false;
+        let algunaCargada = false;
+        
+        for (const l of cotizacionDetalle.lineas) {
+          const key = `${cp.id}_${l.articulo_id}`;
+          const val = Number(preciosIngresados[key]);
+          if (showInputPrecios[key] || val > 0) {
+             if (!val || val <= 0) {
+               missing = true;
+             } else {
+               preciosProv.push({ articulo_id: l.articulo_id, precio_unitario_ofertado: val });
+               algunaCargada = true;
+             }
+          } else {
+             missing = true; // no se ingresaron todos los precios
+          }
+        }
+        
+        if (!missing && algunaCargada) {
+          envios.push({ cp_id: cp.id, precios: preciosProv });
+        }
+      }
+    }
+
+    if (envios.length === 0) {
+      alert("Por favor completá todos los precios para al menos un proveedor antes de guardar.");
+      return;
+    }
+
+    try {
+      for (const e of envios) {
+        await fetch('http://localhost:3001/api/quotes/precios', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cotizacion_proveedor_id: e.cp_id, precios: e.precios })
+        });
+      }
+      showToast("Respuestas guardadas correctamente.");
+      setIsDetalleCotOpen(false);
       cargarCotizaciones();
-      showToast(`Se recibió la respuesta de ${proveedorById.get(cp.proveedorId)?.razonSocial || 'proveedor'}.`);
-    } catch (error) {
-      alert(error.message || 'Error al simular la respuesta.');
-    } finally {
-      setRespondiendoId(null);
+    } catch (err) {
+      alert(error.message || "Error al guardar respuestas.");
     }
   };
 
@@ -582,7 +654,7 @@ function Cotizaciones_ordenes_compra() {
                           </span>
                         </td>
                         <td>
-                          <button className="btn btn-outline btn-sm" onClick={() => handleAbrirDetalleCot(c.id)}>
+                          <button className="btn btn-outline btn-sm" onClick={() => handleAbrirDetalleCot(c)}>
                             Ver detalle
                           </button>
                         </td>
@@ -823,12 +895,14 @@ function Cotizaciones_ordenes_compra() {
             <button className="btn btn-outline" onClick={() => setIsDetalleCotOpen(false)}>
               Cerrar
             </button>
-            {cotizacionDetalle?.estado === 'Enviada' && (
-              <button className="btn btn-outline" style={{ color: 'var(--red)', borderColor: 'var(--red)' }} onClick={handleCancelarCotizacion}>
-                Cancelar cotización
+            <button className="btn btn-outline" style={{ color: 'var(--red)', borderColor: 'var(--red)' }} onClick={handleCancelarCotizacion}>
+              Cancelar cotización
+            </button>
+            {cotizacionDetalle && cotizacionDetalle.proveedoresInvitados.some(cp => cp.estadoRespuesta === 'Pendiente') ? (
+              <button className="btn btn-primary" onClick={handleGuardarRespuestas}>
+                Guardar Respuestas
               </button>
-            )}
-            {cotizacionDetalle?.estado === 'Enviada' && (
+            ) : (
               <button className="btn btn-primary" disabled={!proveedorGanadorSel || procesandoCot} onClick={handleAprobarCotizacion}>
                 {procesandoCot ? 'Generando OC…' : 'Aprobar y generar Orden de Compra'}
               </button>
@@ -842,7 +916,7 @@ function Cotizaciones_ordenes_compra() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: '12.5px', color: 'var(--gray-600)' }}>
-                Generada el {formatearFecha(cotizacionDetalle.fechaRegistro)}
+                Generada el {cotizacionDetalle.fechaRegistro}
               </span>
               <span className={`badge ${badgeClassCotizacion(cotizacionDetalle.estado)}`}>
                 <span className="badge-dot"></span>
@@ -859,15 +933,15 @@ function Cotizaciones_ordenes_compra() {
                   <table>
                     <thead>
                       <tr>
-                        <th>Artículo</th>
-                        <th>Cantidad</th>
+                        <th>ARTÍCULO</th>
+                        <th>CANTIDAD</th>
                       </tr>
                     </thead>
                     <tbody>
                       {cotizacionDetalle.lineas.map((l) => (
-                        <tr key={l.articuloId}>
-                          <td>{articuloById.get(l.articuloId)?.descripcion || '—'}</td>
-                          <td>{l.cantidadSolicitada}</td>
+                        <tr key={l.articulo_id}>
+                          <td>{articuloById.get(l.articulo_id)?.descripcion || '—'}</td>
+                          <td>{l.cantidad_solicitada}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -883,13 +957,15 @@ function Cotizaciones_ordenes_compra() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 {cotizacionDetalle.proveedoresInvitados.map((cp) => {
                   const prov = proveedorById.get(cp.proveedorId);
-                  const total = calcularTotalOfertaProveedor(cotizacionDetalle, cp.proveedorId);
-                  const puedeElegirGanador = cotizacionDetalle.estado === 'Enviada' && cp.estadoRespuesta === 'Respondida';
+                  
+                  // Calculamos el total de este proveedor basado en las ofertas y en lo que hemos ingresado ahora
+                  let total = 0;
+                  
                   return (
                     <div key={cp.id} style={{ border: '1px solid var(--gray-200)', borderRadius: '8px', padding: '12px 14px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          {puedeElegirGanador && (
+                          {cp.estadoRespuesta === 'Respondido' && (
                             <input
                               type="radio"
                               name="proveedorGanador"
@@ -899,46 +975,74 @@ function Cotizaciones_ordenes_compra() {
                           )}
                           <strong style={{ fontSize: '13px' }}>{prov?.razonSocial || 'Proveedor'}</strong>
                         </div>
-                        <span className={`badge ${cp.estadoRespuesta === 'Respondida' ? 'badge-green' : 'badge-amber'}`}>
+                        <span className={`badge ${cp.estadoRespuesta === 'Respondido' ? 'badge-blue' : 'badge-amber'}`}>
                           <span className="badge-dot"></span>
                           {cp.estadoRespuesta}
                         </span>
                       </div>
 
-                      {cp.estadoRespuesta === 'Respondida' ? (
-                        <div style={{ marginTop: '10px' }}>
-                          <table style={{ width: '100%', fontSize: '12.5px' }}>
-                            <tbody>
-                              {cp.ofertas.map((o) => (
-                                <tr key={o.articuloId}>
-                                  <td style={{ padding: '3px 0', color: 'var(--gray-700)' }}>
-                                    {articuloById.get(o.articuloId)?.descripcion || '—'}
+                      <div style={{ marginTop: '10px' }}>
+                        <table style={{ width: '100%', fontSize: '12.5px' }}>
+                          <thead>
+                            <tr>
+                              <th style={{ textAlign: 'left', paddingBottom: '8px', color: 'var(--gray-500)', fontWeight: 600 }}>ARTÍCULO</th>
+                              <th style={{ textAlign: 'right', paddingBottom: '8px', color: 'var(--gray-500)', fontWeight: 600 }}>PRECIO UNITARIO</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {cotizacionDetalle.lineas.map((l) => {
+                              const artId = l.articulo_id;
+                              const art = articuloById.get(artId);
+                              const oferta = cp.ofertas.find(o => o.articulo_id === artId);
+                              const key = `${cp.id}_${artId}`;
+                              const isInputActive = showInputPrecios[key];
+                              const val = preciosIngresados[key] || '';
+                              
+                              if (oferta) {
+                                total += Number(oferta.precio_unitario_ofertado) * l.cantidad_solicitada;
+                              } else if (val && !isNaN(val)) {
+                                total += Number(val) * l.cantidad_solicitada;
+                              }
+                              
+                              return (
+                                <tr key={artId}>
+                                  <td style={{ padding: '6px 0', borderTop: '1px solid var(--gray-200)' }}>
+                                    {art?.descripcion || '—'}
                                   </td>
-                                  <td style={{ padding: '3px 0', textAlign: 'right', fontWeight: '600' }}>
-                                    {formatearMonto(o.precioUnitarioOfertado)} / un.
+                                  <td style={{ padding: '6px 0', borderTop: '1px solid var(--gray-200)', textAlign: 'right' }}>
+                                    {oferta ? (
+                                      <strong>{formatearMonto(oferta.precio_unitario_ofertado)}</strong>
+                                    ) : isInputActive ? (
+                                      <input 
+                                        type="number" 
+                                        min="0" 
+                                        step="0.01"
+                                        placeholder="0.00"
+                                        value={val}
+                                        onChange={(e) => setPreciosIngresados(prev => ({...prev, [key]: e.target.value}))}
+                                        style={{ width: '100px', textAlign: 'right', padding: '4px', border: '1px solid var(--gray-300)', borderRadius: '4px' }}
+                                      />
+                                    ) : (
+                                      <button 
+                                        className="btn btn-outline btn-sm" 
+                                        onClick={() => setShowInputPrecios(prev => ({...prev, [key]: true}))}
+                                      >
+                                        Cargar Precio
+                                      </button>
+                                    )}
                                   </td>
                                 </tr>
-                              ))}
-                            </tbody>
-                          </table>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                        
+                        {(cp.estadoRespuesta === 'Respondido' || total > 0) && (
                           <div style={{ textAlign: 'right', fontSize: '13px', fontWeight: '700', marginTop: '6px', color: 'var(--black)' }}>
                             Total: {formatearMonto(total)}
                           </div>
-                        </div>
-                      ) : (
-                        <div style={{ marginTop: '10px' }}>
-                          <button
-                            className="btn btn-outline btn-sm"
-                            disabled={respondiendoId === cp.id}
-                            onClick={() => handleSimularRespuesta(cp)}
-                          >
-                            {respondiendoId === cp.id ? 'Recibiendo…' : 'Simular respuesta recibida'}
-                          </button>
-                          <span style={{ marginLeft: '8px', fontSize: '11px', color: 'var(--gray-500)' }}>
-                            (mientras no exista integración real de email)
-                          </span>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
                   );
                 })}

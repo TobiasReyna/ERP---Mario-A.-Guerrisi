@@ -35,4 +35,7 @@ router.get('/:id/proveedores', quoteController.obtenerCotizacion_proveedores);
 // GET /api/quotes/proveedores-detalles/:id
 router.get('/proveedores-detalles/:id', quoteController.obtenerCotizaciones_proveedores_detalles);
 
+// POST /api/quotes/precios
+router.post('/precios', quoteController.guardarPreciosProveedor);
+
 module.exports = router;

@@ -131,6 +131,30 @@ class QuoteService {
         if (error) throw new Error(error.message);
         return data;
     }
+
+    static async guardarPreciosProveedor(cotizacion_proveedor_id, precios) {
+        // precios = [{ articulo_id, precio_unitario_ofertado }]
+        const inserts = precios.map(p => ({
+            cotizacion_proveedor_id,
+            articulo_id: p.articulo_id,
+            precio_unitario_ofertado: p.precio_unitario_ofertado
+        }));
+        
+        const { data, error } = await supabaseAdmin
+            .from('cotizaciones_proveedores_detalle')
+            .insert(inserts)
+            .select();
+            
+        if (error) throw new Error(error.message);
+        
+        // Al guardar precios, actualizamos el estado de la cabecera cotizaciones_proveedores
+        await supabaseAdmin
+            .from('cotizaciones_proveedores')
+            .update({ estado_respuesta: 'Respondida' })
+            .eq('id', cotizacion_proveedor_id);
+            
+        return data;
+    }
 }
 
 module.exports = QuoteService;
