@@ -214,7 +214,7 @@ function Cuentas_por_pagar() {
             <option value="todos">Todos</option>
             {proveedores.map((p) => (
               <option key={p.id} value={p.id}>
-                {p.razonSocial}
+                {p.razon_social}
               </option>
             ))}
           </select>
@@ -278,7 +278,7 @@ function Cuentas_por_pagar() {
               ) : (
                 cuentasFiltradas.map((c) => (
                   <tr key={c.id} style={{ background: c.estado === 'Mora' ? 'var(--crit-soft)' : 'transparent' }}>
-                    <td className="cell-strong">{proveedorById.get(c.proveedorId)?.razonSocial || '—'}</td>
+                    <td className="cell-strong">{proveedorById.get(c.proveedorId)?.razon_social || '—'}</td>
                     <td className="cell-mono">#{c.numeroOrdenCompra}</td>
                     <td>{formatearMonto(c.montoTotal)}</td>
                     <td>
@@ -310,7 +310,7 @@ function Cuentas_por_pagar() {
       <Modal
         isOpen={isDetalleOpen}
         onClose={() => setIsDetalleOpen(false)}
-        title={cuentaSeleccionada ? `CxP · ${proveedorById.get(cuentaSeleccionada.proveedorId)?.razonSocial || ''}` : 'Cuenta por pagar'}
+        title={cuentaSeleccionada ? `Cuenta por pagar - ${proveedorById.get(cuentaSeleccionada.proveedorId)?.razon_social || ''}` : 'Cuenta por pagar'}
         wide
         footer={
           <button className="btn btn-outline" onClick={() => setIsDetalleOpen(false)}>
