@@ -64,7 +64,7 @@ class AccountPayableService {
                         proveedor_id: oc.proveedor_id,
                         orden_compra_id: oc.id,
                         monto_total: monto_total,
-                        saldo_pendiente: 0,
+                        saldo_pendiente: monto_total,
                         fecha_vencimiento: fecha_vencimiento,
                         estado: 'Pendiente'
                     });
