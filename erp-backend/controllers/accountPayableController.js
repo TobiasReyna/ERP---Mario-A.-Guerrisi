@@ -10,6 +10,16 @@ const getAllAccountsPayable = async (req, res) => {
     }
 };
 
+const syncAccountsPayable = async (req, res) => {
+    try {
+        const result = await AccountPayableService.syncAccountsPayable();
+        return res.status(200).json({ data: result });
+    } catch (error) {
+        console.error('[API] Error POST /api/accounts-payable/sync:', error);
+        return res.status(500).json({ error: error.message });
+    }
+};
+
 const registerPayment = async (req, res) => {
     try {
         const { id } = req.params;
@@ -31,5 +41,6 @@ const registerPayment = async (req, res) => {
 
 module.exports = {
     getAllAccountsPayable,
+    syncAccountsPayable,
     registerPayment
 };

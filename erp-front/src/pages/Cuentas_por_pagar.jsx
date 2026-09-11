@@ -41,6 +41,9 @@ function Cuentas_por_pagar() {
   const cargarTodo = async () => {
     setLoading(true);
     try {
+      // Primero sincronizamos las cuentas a pagar con las ordenes de compra recibidas/parciales
+      await fetch('http://localhost:3001/api/accounts-payable/sync', { method: 'POST' });
+
       const [provsRes, cxpRes] = await Promise.all([
         fetch('http://localhost:3001/api/suppliers'),
         fetch('http://localhost:3001/api/accounts-payable')
@@ -51,7 +54,14 @@ function Cuentas_por_pagar() {
       setProveedores(provsJson.data || []);
 
       const nowStr = new Date().toISOString().split('T')[0];
-      const cxpMapped = (cxpJson.data || []).map(c => {
+      const uniqueCxpMap = new Map();
+      (cxpJson.data || []).forEach(c => {
+        if (!uniqueCxpMap.has(c.orden_compra_id)) {
+          uniqueCxpMap.set(c.orden_compra_id, c);
+        }
+      });
+
+      const cxpMapped = Array.from(uniqueCxpMap.values()).map(c => {
         let estado = c.estado;
         if (estado === 'Pendiente' && c.fecha_vencimiento < nowStr) {
           estado = 'Mora';
@@ -60,6 +70,7 @@ function Cuentas_por_pagar() {
           id: c.id,
           proveedorId: c.proveedor_id,
           numeroOrdenCompra: c.ordenes_compra?.numero_orden,
+          ordenCompraId: c.orden_compra_id, // guardamos el ID para usarlo luego
           montoTotal: Number(c.monto_total),
           saldoPendiente: Number(c.saldo_pendiente),
           fechaVencimiento: c.fecha_vencimiento,
@@ -129,7 +140,7 @@ function Cuentas_por_pagar() {
   }, [cuentas, filtroProveedor, filtroEstado, vencimientoDesde, vencimientoHasta]);
 
   const kpis = useMemo(() => {
-    const totalAdeudado = cuentas.filter((c) => c.estado !== 'Pagada').reduce((acc, c) => acc + c.saldoPendiente, 0);
+    const totalAdeudado = cuentas.filter((c) => c.estado !== 'Pagada').reduce((acc, c) => acc + c.montoTotal, 0);
     const enMora = cuentas.filter((c) => c.estado === 'Mora').length;
     const pendientes = cuentas.filter((c) => c.estado === 'Pendiente').length;
     const pagadas = cuentas.filter((c) => c.estado === 'Pagada').length;

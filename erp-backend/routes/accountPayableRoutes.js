@@ -5,6 +5,9 @@ const accountPayableController = require('../controllers/accountPayableControlle
 // GET /api/accounts-payable
 router.get('/', accountPayableController.getAllAccountsPayable);
 
+// POST /api/accounts-payable/sync
+router.post('/sync', accountPayableController.syncAccountsPayable);
+
 // POST /api/accounts-payable/:id/pay
 router.post('/:id/pay', accountPayableController.registerPayment);
 
