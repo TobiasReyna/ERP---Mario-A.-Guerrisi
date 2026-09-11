@@ -39,7 +39,7 @@ function Notas_credito_debito() {
   const [tipo, setTipo] = useState('Nota de Crédito');
   const [facturaOrigenId, setFacturaOrigenId] = useState('');
   const [motivo, setMotivo] = useState('');
-  const [afectaInventario, setAfectaInventario] = useState(true);
+  const [afectaInventario, setAfectaInventario] = useState(false);
   const [lineasForm, setLineasForm] = useState([LINEA_VACIA()]);
   const [montoManual, setMontoManual] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -82,7 +82,7 @@ function Notas_credito_debito() {
     setTipo('Nota de Crédito');
     setFacturaOrigenId('');
     setMotivo('');
-    setAfectaInventario(true);
+    setAfectaInventario(false);
     setLineasForm([LINEA_VACIA()]);
     setMontoManual('');
     setIsNuevaOpen(true);
@@ -128,8 +128,8 @@ function Notas_credito_debito() {
         tipo,
         facturaOrigenId,
         motivo,
-        lineas: requiereLineas ? lineasValidas : [],
-        afectaInventario: requiereLineas,
+        lineas: [],
+        afectaInventario: false,
         montoManual,
       });
 
@@ -228,7 +228,6 @@ function Notas_credito_debito() {
                 <th>Monto</th>
                 <th>Motivo</th>
                 <th>Fecha</th>
-                <th>Stock revertido</th>
               </tr>
             </thead>
             <tbody>
@@ -262,16 +261,7 @@ function Notas_credito_debito() {
                       <td>{formatearMonto(n.monto)}</td>
                       <td style={{ maxWidth: '220px' }}>{n.motivo}</td>
                       <td>{formatearFechaHora(n.fechaRegistro)}</td>
-                      <td>
-                        {n.afectaInventario ? (
-                          <span className="badge badge-blue">
-                            <span className="badge-dot"></span>
-                            {n.lineas.reduce((acc, l) => acc + l.cantidad, 0)} un.
-                          </span>
-                        ) : (
-                          <span style={{ color: 'var(--gray-400)' }}>—</span>
-                        )}
-                      </td>
+                      
                     </tr>
                   );
                 })
@@ -350,73 +340,9 @@ function Notas_credito_debito() {
             </div>
           </div>
 
-          {tipo === 'Nota de Crédito' && (
-            <div className="form-row">
-              <div className="form-field full">
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                  <input type="checkbox" checked={afectaInventario} onChange={(e) => setAfectaInventario(e.target.checked)} />
-                  Revertir stock de los artículos devueltos al depósito de origen
-                </label>
-              </div>
-            </div>
-          )}
+         
 
-          {requiereLineas && (
-            <div style={{ marginBottom: '14px' }}>
-              <div style={{ marginBottom: '8px', fontSize: '12.5px', fontWeight: '600', color: 'var(--gray-800)' }}>
-                Artículos devueltos
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {lineasForm.map((linea, idx) => (
-                  <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 90px 36px', gap: '10px', alignItems: 'end' }}>
-                    <div className="form-field" style={{ margin: 0 }}>
-                      <label style={{ fontSize: '11px' }}>Artículo</label>
-                      <select value={linea.articuloId} onChange={(e) => handleChangeLinea(idx, 'articuloId', e.target.value)}>
-                        <option value="" disabled>
-                          Seleccionar…
-                        </option>
-                        {articulos.map((a) => (
-                          <option key={a.id} value={a.id}>
-                            {a.descripcion}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="form-field" style={{ margin: 0 }}>
-                      <label style={{ fontSize: '11px' }}>Depósito destino</label>
-                      <select value={linea.depositoId} onChange={(e) => handleChangeLinea(idx, 'depositoId', e.target.value)}>
-                        <option value="" disabled>
-                          Seleccionar…
-                        </option>
-                        {depositos.map((d) => (
-                          <option key={d.id} value={d.id}>
-                            {d.nombre}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="form-field" style={{ margin: 0 }}>
-                      <label style={{ fontSize: '11px' }}>Cant.</label>
-                      <input type="number" min="1" value={linea.cantidad} onChange={(e) => handleChangeLinea(idx, 'cantidad', e.target.value)} />
-                    </div>
-                    <button
-                      type="button"
-                      className="icon-btn"
-                      disabled={lineasForm.length === 1}
-                      onClick={() => handleRemoveLinea(idx)}
-                    >
-                      <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                      </svg>
-                    </button>
-                  </div>
-                ))}
-                <button type="button" className="btn btn-outline btn-sm" onClick={handleAddLinea} style={{ alignSelf: 'flex-start' }}>
-                  + Agregar artículo
-                </button>
-              </div>
-            </div>
-          )}
+          
 
           <div className="form-row">
             <div className="form-field">

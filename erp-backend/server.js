@@ -7,22 +7,24 @@ const masterRoutes = require('./routes/masterRoutes');
 const supplierRoutes = require('./routes/supplierRoutes');
 const quoteRoutes = require('./routes/quoteRoutes');
 const purchaseOrderRoutes = require('./routes/purchaseOrderRoutes');
-const app = express();
-const PORT = process.env.PORT || 3001;
-
 const creditLimitRoutes = require('./routes/creditLimitRoutes');
 const clientRoutes = require('./routes/clientRoutes');
 const creditNoteRoutes = require('./routes/creditNoteRoutes');
+
+
+const app = express();
+const PORT = process.env.PORT || 3001;
+
+ // Middlewares
+app.use(cors());
+app.use(express.json());
 
 app.use('/api/clients', clientRoutes);
 app.use('/api/credit-notes', creditNoteRoutes);
 // Montar endpoints de Límites de Crédito
 app.use('/api/credit-limits', creditLimitRoutes);
-// Montar endpoints de notas de crédito y débito
-app.use('/api/credit-notes', creditNoteRoutes);
- // Middlewares
-app.use(cors());
-app.use(express.json());
+
+
 
 // Registro de Rutas
 app.use('/api/stock', stockRoutes);

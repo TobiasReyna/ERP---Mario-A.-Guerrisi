@@ -66,6 +66,11 @@ function Gestion_de_proveedores() {
   const [duplicadoEncontrado, setDuplicadoEncontrado] = useState(null);
   const [verificandoCuit, setVerificandoCuit] = useState(false);
   const cuitCheckToken = useRef(0);
+  
+  // Estado para los errores individuales de cada campo
+  const [formErrors, setFormErrors] = useState({});
+  // Estado para el mensaje de error general
+  const [generalError, setGeneralError] = useState("");
 
   // Modal ficha (detalle + historial de compras)
   const [isFichaOpen, setIsFichaOpen] = useState(false);
@@ -163,9 +168,52 @@ function Gestion_de_proveedores() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!isFormValid || submitting) return;
+    if (submitting) return;
 
+    // --- 1. VALIDACIÓN EXPLÍCITA AL HACER CLIC ---
+    let errores = {};
+    let esValido = true;
+
+    // Asegurate de que 'razonSocial' coincida exactamente con la propiedad de tu formData
+    if (!formData.razonSocial || formData.razonSocial.trim() === "") {
+      errores.razonSocial = "La Razón Social es obligatoria.";
+      esValido = false;
+    }
+
+    if (!formData.cuit || formData.cuit.replace(/\D/g, '').length !== 11) {
+      errores.cuit = "Debe ingresar un CUIT válido de 11 números.";
+      esValido = false;
+    }
+
+    // Adaptá 'condicionPago' según cómo lo hayas nombrado en tu estado
+    if (!formData.condicionPago) { 
+      errores.condicionPago = "Debe seleccionar una condición de pago.";
+      esValido = false;
+    }
+
+    if (!formData.telefono || formData.telefono.length < 14) {
+      errores.telefono = "Debe ingresar un teléfono válido completo.";
+      esValido = false;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!formData.email || !emailRegex.test(formData.email)) {
+      errores.email = "Debe ingresar un email válido.";
+      esValido = false;
+    }
+
+    // --- 2. MOSTRAR ERRORES VISUALES SI FALLA ---
+    setFormErrors(errores);
+
+    if (!esValido) {
+      setGeneralError("Por favor, revisá los campos marcados en rojo para poder continuar.");
+      return; // Cortamos la ejecución acá, ya mostramos los errores
+    }
+
+    // --- 3. SI TODO ESTÁ BIEN, ENVIAMOS AL BACKEND ---
+    setGeneralError(""); // Limpiamos alertas previas
     setSubmitting(true);
+    
     try {
       if (editingProveedor) {
         await actualizarProveedor(editingProveedor.id, formData);
@@ -186,7 +234,6 @@ function Gestion_de_proveedores() {
       setSubmitting(false);
     }
   };
-
   const handleVerFichaDuplicado = () => {
     if (!duplicadoEncontrado) return;
     setIsFormOpen(false);
@@ -311,6 +358,45 @@ function Gestion_de_proveedores() {
 
   const historialCount = historialOC.length;
   const montoOperadoTotal = historialOC.reduce((acc, oc) => acc + (Number(oc.monto) || 0), 0);
+
+  const handlePhoneChange = (e) => {
+  // 1. Extraemos SOLO los números, eliminando letras y símbolos
+  let numeros = e.target.value.replace(/\D/g, '');
+
+  // Si el campo queda vacío, limpiamos el estado
+  if (numeros.length === 0) {
+    setFormData({ ...formData, telefono: '' });
+    return;
+  }
+
+  // 2. Normalizamos: si el usuario tipea el "54", el "0" inicial o el "9", los quitamos temporalmente
+  if (numeros.startsWith('54')) numeros = numeros.slice(2);
+  if (numeros.startsWith('0')) numeros = numeros.slice(1);
+  if (numeros.startsWith('9')) numeros = numeros.slice(1);
+
+  // 3. Limitamos a un máximo de 10 dígitos (Código de área + Número)
+  numeros = numeros.slice(0, 10);
+
+  // 4. Forzamos el formato estándar: +54 9 XXX XXX-XXXX
+  let formateado = '+54 9 ';
+  
+  if (numeros.length > 0) {
+    formateado += numeros.substring(0, 3); // Código de área (Ej: 387)
+  }
+  if (numeros.length > 3) {
+    formateado += ' ' + numeros.substring(3, 7); // Primera parte (Ej: 455)
+  }
+  if (numeros.length > 7) {
+    formateado += '-' + numeros.substring(7, 10); // Segunda parte (Ej: 1234)
+  }
+
+  // 5. Guardamos el número ya formateado en el estado
+  setFormData({ ...formData, telefono: formateado });
+};
+
+
+
+
 
   return (
     <div>
@@ -578,10 +664,19 @@ function Gestion_de_proveedores() {
         title={editingProveedor ? `Editar: ${editingProveedor.razonSocial}` : 'Nuevo proveedor'}
         footer={
           <>
+            {/* Mensaje de error general opcional al lado de los botones */}
+            {generalError && (
+              <span style={{ color: '#dc2626', fontSize: '13px', marginRight: 'auto', alignSelf: 'center', fontWeight: '500' }}>
+                ⚠️ {generalError}
+              </span>
+            )}
+            
             <button className="btn btn-outline" onClick={() => setIsFormOpen(false)}>
               Cancelar
             </button>
-            <button className="btn btn-primary" disabled={!isFormValid || submitting} onClick={handleSubmit}>
+            
+            {/* ACÁ ESTÁ EL CAMBIO: Quitamos el !isFormValid */}
+            <button className="btn btn-primary" disabled={submitting} onClick={handleSubmit}>
               {submitting ? 'Guardando…' : editingProveedor ? 'Guardar cambios' : 'Dar de alta'}
             </button>
           </>
@@ -669,11 +764,11 @@ function Gestion_de_proveedores() {
             <div className="form-field">
               <label>Teléfono<span className="req">*</span></label>
               <input
-                type="text"
-                placeholder="Ej: 387-4551234"
+                type="tel"
+                placeholder="Ej: +54 9 387 455-1234"
                 required
                 value={formData.telefono}
-                onChange={(e) => setFormData({ ...formData, telefono: e.target.value })}
+                onChange={handlePhoneChange}
               />
             </div>
           </div>

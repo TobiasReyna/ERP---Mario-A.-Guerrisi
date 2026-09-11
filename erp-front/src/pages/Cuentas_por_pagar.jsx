@@ -42,6 +42,7 @@ function Cuentas_por_pagar() {
   const [loadingHistorial, setLoadingHistorial] = useState(false);
   const [montoPago, setMontoPago] = useState('');
   const [registrando, setRegistrando] = useState(false);
+  const [errorPago, setErrorPago] = useState("");
 
   const proveedorById = useMemo(() => new Map(proveedores.map((p) => [p.id, p])), [proveedores]);
 
@@ -79,9 +80,25 @@ function Cuentas_por_pagar() {
   const handleRegistrarPago = async (e) => {
     e.preventDefault();
     if (!cuentaSeleccionada || registrando) return;
+    
     const monto = Number(montoPago);
-    if (!(monto > 0)) return;
+    const maximoPermitido = Number(cuentaSeleccionada.saldoPendiente); // Ajustá saldoPendiente si en tu objeto original usa guión bajo (saldo_pendiente)
 
+    // --- 1. VALIDACIONES VISUALES ---
+    if (monto <= 0) {
+      setErrorPago("El monto a pagar debe ser mayor a $0.");
+      return;
+    }
+
+    if (monto > maximoPermitido) {
+      setErrorPago(`El monto no puede superar el saldo pendiente.`);
+      return;
+    }
+
+    // Si pasa las validaciones, limpiamos cualquier error previo
+    setErrorPago("");
+    
+    // --- 2. LÓGICA DE ENVÍO ORIGINAL ---
     setRegistrando(true);
     try {
       const actualizada = await registrarPago(cuentaSeleccionada.id, monto);
@@ -319,23 +336,35 @@ function Cuentas_por_pagar() {
             </div>
 
             {cuentaSeleccionada.estado !== 'Pagada' && (
-              <form onSubmit={handleRegistrarPago} style={{ display: 'flex', gap: '10px', alignItems: 'flex-end' }}>
-                <div className="form-field" style={{ margin: 0, flex: 1 }}>
+              <form onSubmit={handleRegistrarPago} style={{ display: 'flex', gap: '10px', alignItems: 'flex-end', marginBottom: '20px' }}>
+                <div className="form-field" style={{ margin: 0, flex: 1, position: 'relative' }}>
                   <label>Registrar nuevo pago</label>
                   <input
                     type="number"
                     min="0.01"
                     step="0.01"
                     max={cuentaSeleccionada.saldoPendiente}
+                    className={errorPago ? 'input-error' : ''}
                     placeholder={`Máximo ${formatearMonto(cuentaSeleccionada.saldoPendiente)}`}
                     value={montoPago}
-                    onChange={(e) => setMontoPago(e.target.value)}
+                    onChange={(e) => {
+                      setMontoPago(e.target.value);
+                      if (errorPago) setErrorPago(""); // Limpia el error al tipear
+                    }}
                   />
+                  {/* Mensaje de error flotante para no desarmar el flex-end */}
+                  {errorPago && (
+                    <span style={{ color: '#dc2626', fontSize: '12px', position: 'absolute', bottom: '-20px', left: '0', fontWeight: '500' }}>
+                      {errorPago}
+                    </span>
+                  )}
                 </div>
+                
                 <button
                   type="submit"
                   className="btn btn-primary"
-                  disabled={!(Number(montoPago) > 0) || Number(montoPago) > cuentaSeleccionada.saldoPendiente || registrando}
+                  // Le sacamos todas las validaciones previas, solo dejamos registrando
+                  disabled={registrando} 
                 >
                   {registrando ? 'Registrando…' : 'Registrar pago'}
                 </button>
