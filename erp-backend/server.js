@@ -7,6 +7,10 @@ const masterRoutes = require('./routes/masterRoutes');
 const supplierRoutes = require('./routes/supplierRoutes');
 const quoteRoutes = require('./routes/quoteRoutes');
 const purchaseOrderRoutes = require('./routes/purchaseOrderRoutes');
+const accountPayableRoutes = require('./routes/accountPayableRoutes');
+const app = express();
+const PORT = process.env.PORT || 3001;
+
 const creditLimitRoutes = require('./routes/creditLimitRoutes');
 const clientRoutes = require('./routes/clientRoutes');
 const creditNoteRoutes = require('./routes/creditNoteRoutes');
@@ -32,6 +36,7 @@ app.use('/api/articles', articleRoutes);
 app.use('/api/suppliers', supplierRoutes);
 app.use('/api/quotes', quoteRoutes);
 app.use('/api/purchase-orders', purchaseOrderRoutes);
+app.use('/api/accounts-payable', accountPayableRoutes);
 app.use('/api', masterRoutes);
 
 app.listen(PORT, () => {
