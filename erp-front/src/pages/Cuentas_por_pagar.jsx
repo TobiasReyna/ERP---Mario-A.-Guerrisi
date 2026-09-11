@@ -1,18 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import Modal from '../components/Modal';
 import { formatearFecha, formatearFechaHora, formatearMonto } from '../utils/format';
-import {
-  listarProveedoresReferencia,
-  listarCuentasPorPagar,
-  obtenerHistorialPagos,
-  registrarPago,
-} from '../services/cxpService';
-
-// NOTA: página de HU-14 (Gestión de Cuentas por Pagar). `services/cxpService.js`
-// es un MOCK en memoria: en el sistema real estas cuentas las genera HU-13
-// (recepción de mercadería) automáticamente al confirmar cada recepción. Acá
-// se seedean directamente para poder mostrar el flujo de Tesorería de forma
-// aislada. El listado de proveedores es real (GET /api/suppliers/todos).
 
 function badgeClassEstado(estado) {
   switch (estado) {
@@ -50,15 +38,41 @@ function Cuentas_por_pagar() {
     setTimeout(() => setToast(null), 4500);
   };
 
-  const cargarTodo = () => {
+  const cargarTodo = async () => {
     setLoading(true);
-    Promise.all([listarProveedoresReferencia(), listarCuentasPorPagar()])
-      .then(([provs, ctas]) => {
-        setProveedores(provs);
-        setCuentas(ctas);
-      })
-      .catch((err) => console.error('Error al cargar cuentas por pagar:', err))
-      .finally(() => setLoading(false));
+    try {
+      const [provsRes, cxpRes] = await Promise.all([
+        fetch('http://localhost:3001/api/suppliers'),
+        fetch('http://localhost:3001/api/accounts-payable')
+      ]);
+      const provsJson = await provsRes.json();
+      const cxpJson = await cxpRes.json();
+
+      setProveedores(provsJson.data || []);
+
+      const nowStr = new Date().toISOString().split('T')[0];
+      const cxpMapped = (cxpJson.data || []).map(c => {
+        let estado = c.estado;
+        if (estado === 'Pendiente' && c.fecha_vencimiento < nowStr) {
+          estado = 'Mora';
+        }
+        return {
+          id: c.id,
+          proveedorId: c.proveedor_id,
+          numeroOrdenCompra: c.ordenes_compra?.numero_orden,
+          montoTotal: Number(c.monto_total),
+          saldoPendiente: Number(c.saldo_pendiente),
+          fechaVencimiento: c.fecha_vencimiento,
+          estado: estado,
+          pagos_cxp: c.pagos_cxp || []
+        };
+      });
+      setCuentas(cxpMapped);
+    } catch (err) {
+      console.error('Error al cargar cuentas por pagar:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -69,11 +83,7 @@ function Cuentas_por_pagar() {
     setCuentaSeleccionada(cuenta);
     setIsDetalleOpen(true);
     setMontoPago('');
-    setLoadingHistorial(true);
-    obtenerHistorialPagos(cuenta.id)
-      .then(setHistorialPagos)
-      .catch((err) => console.error('Error al obtener historial de pagos:', err))
-      .finally(() => setLoadingHistorial(false));
+    setHistorialPagos(cuenta.pagos_cxp || []);
   };
 
   const handleRegistrarPago = async (e) => {
@@ -84,16 +94,22 @@ function Cuentas_por_pagar() {
 
     setRegistrando(true);
     try {
-      const actualizada = await registrarPago(cuentaSeleccionada.id, monto);
+      const res = await fetch(`http://localhost:3001/api/accounts-payable/${cuentaSeleccionada.id}/pay`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ monto_pagado: monto })
+      });
+      if (!res.ok) throw new Error('Falló el registro del pago en el servidor');
+      const json = await res.json();
+      const actualizada = json.data;
+
       showToast(
         actualizada.estado === 'Pagada'
           ? `Cuenta cancelada en su totalidad.`
-          : `Pago de ${formatearMonto(monto)} registrado. Saldo pendiente: ${formatearMonto(actualizada.saldoPendiente)}.`
+          : `Pago de ${formatearMonto(monto)} registrado. Saldo pendiente: ${formatearMonto(actualizada.saldo_pendiente)}.`
       );
-      setCuentaSeleccionada({ ...actualizada });
-      setMontoPago('');
-      const nuevoHistorial = await obtenerHistorialPagos(cuentaSeleccionada.id);
-      setHistorialPagos(nuevoHistorial);
+      
+      setIsDetalleOpen(false);
       cargarTodo();
     } catch (error) {
       alert(error.message || 'Error al registrar el pago.');
@@ -371,8 +387,8 @@ function Cuentas_por_pagar() {
                       ) : (
                         historialPagos.map((p) => (
                           <tr key={p.id}>
-                            <td>{formatearFechaHora(p.fechaPago)}</td>
-                            <td>{formatearMonto(p.montoPagado)}</td>
+                            <td>{formatearFechaHora(p.fecha_pago)}</td>
+                            <td>{formatearMonto(p.monto_pagado)}</td>
                           </tr>
                         ))
                       )}
