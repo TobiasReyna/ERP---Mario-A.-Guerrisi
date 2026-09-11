@@ -8,8 +8,6 @@ const supplierRoutes = require('./routes/supplierRoutes');
 const quoteRoutes = require('./routes/quoteRoutes');
 const purchaseOrderRoutes = require('./routes/purchaseOrderRoutes');
 const accountPayableRoutes = require('./routes/accountPayableRoutes');
-const app = express();
-const PORT = process.env.PORT || 3001;
 
 const creditLimitRoutes = require('./routes/creditLimitRoutes');
 const clientRoutes = require('./routes/clientRoutes');
