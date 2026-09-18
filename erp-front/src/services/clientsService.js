@@ -18,6 +18,20 @@ export async function buscarClientes(query) {
   }
 }
 
+// Alta rápida de cliente desde el POS (HU-20)
+export async function crearCliente(payload) {
+  const res = await fetch('http://localhost:3001/api/clients', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const json = await res.json();
+  if (!res.ok) {
+    throw new Error(json.error || 'No se pudo crear el cliente.');
+  }
+  return json.data;
+}
+
 export async function listarClientes() {
   try {
     const res = await fetch(`${API_URL}/clients`);

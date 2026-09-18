@@ -10,7 +10,7 @@ import {
   confirmarVenta,
   cancelarVenta,
 } from '../services/ventaService';
-import { buscarClientes } from '../services/clientsService';
+import { buscarClientes, crearCliente } from '../services/clientsService';
 
 // Mismo hardcodeo que ya usa Detalle_producto.jsx mientras no exista
 // una historia de usuario de login/roles de sesión.
@@ -40,6 +40,11 @@ function Punto_de_Venta() {
   const [clientQuery, setClientQuery] = useState('');
   const [clientResults, setClientResults] = useState([]);
   const [clientSearchLoading, setClientSearchLoading] = useState(false);
+  const [mostrarAltaCliente, setMostrarAltaCliente] = useState(false);
+  const [nuevoClienteForm, setNuevoClienteForm] = useState({
+    razonSocial: '', dni: '', cuit: '', telefono: '', direccion: '',
+  });
+  const [creandoCliente, setCreandoCliente] = useState(false);
 
   const [venta, setVenta] = useState(null); // null = todavía armando el carrito
   const [procesando, setProcesando] = useState(false);
@@ -152,6 +157,54 @@ function Punto_de_Venta() {
     setIsClientModalOpen(false);
     setClientQuery('');
     setClientResults([]);
+    setMostrarAltaCliente(false);
+    setNuevoClienteForm({ razonSocial: '', dni: '', cuit: '', telefono: '', direccion: '' });
+  };
+
+  const handleAbrirAltaCliente = () => {
+    const texto = clientQuery.trim();
+    setNuevoClienteForm({
+      razonSocial: /^\d+$/.test(texto) ? '' : texto,
+      dni: /^\d+$/.test(texto) ? texto : '',
+      cuit: '',
+      telefono: '',
+      direccion: '',
+    });
+    setMostrarAltaCliente(true);
+  };
+
+  const handleCrearCliente = async (e) => {
+    e.preventDefault();
+    if (!nuevoClienteForm.razonSocial.trim()) {
+      alert('El nombre es obligatorio.');
+      return;
+    }
+    if (!nuevoClienteForm.dni.trim() && !nuevoClienteForm.cuit.trim()) {
+      alert('Cargá al menos un DNI o un CUIT.');
+      return;
+    }
+    setCreandoCliente(true);
+    try {
+      const nuevoCliente = await crearCliente({
+        razonSocial: nuevoClienteForm.razonSocial.trim(),
+        dni: nuevoClienteForm.dni.trim() || null,
+        cuit: nuevoClienteForm.cuit.trim() || null,
+        telefono: nuevoClienteForm.telefono.trim(),
+        direccion: nuevoClienteForm.direccion.trim(),
+      });
+      handleSeleccionarCliente(nuevoCliente);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setCreandoCliente(false);
+    }
+  };
+
+  const handleCerrarModalCliente = () => {
+    setIsClientModalOpen(false);
+    setClientQuery('');
+    setClientResults([]);
+    setMostrarAltaCliente(false);
   };
 
   // --- Flujo de venta ---
@@ -190,8 +243,8 @@ function Punto_de_Venta() {
     }
     setProcesando(true);
     try {
-      await agregarPago(venta.id, { metodo: pagoForm.metodo, monto });
-      const ventaActualizada = await obtenerVenta(venta.id);
+      await agregarPago(venta.ventaId, { metodo: pagoForm.metodo, monto });
+      const ventaActualizada = await obtenerVenta(venta.ventaId);
       setVenta(ventaActualizada);
       setPagoForm({ metodo: 'efectivo', monto: '' });
     } catch (err) {
@@ -204,7 +257,7 @@ function Punto_de_Venta() {
   const handleConfirmarVenta = async () => {
     setProcesando(true);
     try {
-      const ventaConfirmada = await confirmarVenta(venta.id);
+      const ventaConfirmada = await confirmarVenta(venta.ventaId);
       setVenta(ventaConfirmada);
       setToast(`Venta confirmada — comprobante ${ventaConfirmada.numeroComprobante}`);
     } catch (err) {
@@ -218,7 +271,7 @@ function Punto_de_Venta() {
     if (!window.confirm('¿Cancelar esta venta? Se libera el stock reservado.')) return;
     setProcesando(true);
     try {
-      await cancelarVenta(venta.id);
+      await cancelarVenta(venta.ventaId);
       setVenta(null);
       setCarrito([]);
       setCliente(null);
@@ -536,42 +589,104 @@ function Punto_de_Venta() {
       {/* Modal de búsqueda de cliente (HU-20) */}
       <Modal
         isOpen={isClientModalOpen}
-        onClose={() => setIsClientModalOpen(false)}
-        title="Buscar cliente"
+        onClose={handleCerrarModalCliente}
+        title={mostrarAltaCliente ? 'Nuevo cliente' : 'Buscar cliente'}
       >
-        <div className="search-input" style={{ marginBottom: '14px' }}>
-          <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" />
-          </svg>
-          <input
-            type="text"
-            placeholder="Nombre, DNI o CUIT…"
-            value={clientQuery}
-            onChange={(e) => setClientQuery(e.target.value)}
-            autoFocus
-          />
-        </div>
-        {clientSearchLoading ? (
-          <div style={{ textAlign: 'center', padding: '20px', color: 'var(--gray-500)' }}>Buscando…</div>
-        ) : clientResults.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '20px', color: 'var(--gray-500)' }}>
-            {clientQuery.trim().length < 2 ? 'Escribí al menos 2 caracteres.' : 'Sin resultados.'}
-          </div>
-        ) : (
-          <div className="table-panel">
-            <div className="table-scroll">
-              <table>
-                <tbody>
-                  {clientResults.map((c) => (
-                    <tr key={c.id} style={{ cursor: 'pointer' }} onClick={() => handleSeleccionarCliente(c)}>
-                      <td className="cell-strong">{c.razonSocial}</td>
-                      <td className="cell-mono">{c.dni || c.cuit}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+        {mostrarAltaCliente ? (
+          <form onSubmit={handleCrearCliente} className="form-row">
+            <div className="form-field full">
+              <label>Nombre <span className="req">*</span></label>
+              <input
+                type="text"
+                value={nuevoClienteForm.razonSocial}
+                onChange={(e) => setNuevoClienteForm({ ...nuevoClienteForm, razonSocial: e.target.value })}
+                autoFocus
+              />
             </div>
-          </div>
+            <div className="form-field">
+              <label>DNI</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={nuevoClienteForm.dni}
+                onChange={(e) => setNuevoClienteForm({ ...nuevoClienteForm, dni: e.target.value })}
+              />
+            </div>
+            <div className="form-field">
+              <label>CUIT</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                placeholder="11 dígitos, sin guiones"
+                value={nuevoClienteForm.cuit}
+                onChange={(e) => setNuevoClienteForm({ ...nuevoClienteForm, cuit: e.target.value })}
+              />
+            </div>
+            <div className="form-field">
+              <label>Teléfono</label>
+              <input
+                type="text"
+                value={nuevoClienteForm.telefono}
+                onChange={(e) => setNuevoClienteForm({ ...nuevoClienteForm, telefono: e.target.value })}
+              />
+            </div>
+            <div className="form-field">
+              <label>Dirección</label>
+              <input
+                type="text"
+                value={nuevoClienteForm.direccion}
+                onChange={(e) => setNuevoClienteForm({ ...nuevoClienteForm, direccion: e.target.value })}
+              />
+            </div>
+            <div className="form-field full" style={{ display: 'flex', gap: '10px' }}>
+              <button type="button" className="btn btn-outline" onClick={() => setMostrarAltaCliente(false)}>
+                Volver a buscar
+              </button>
+              <button type="submit" className="btn btn-primary" style={{ flex: 1 }} disabled={creandoCliente}>
+                {creandoCliente ? 'Creando…' : 'Crear y seleccionar'}
+              </button>
+            </div>
+          </form>
+        ) : (
+          <>
+            <div className="search-input" style={{ marginBottom: '14px' }}>
+              <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" />
+              </svg>
+              <input
+                type="text"
+                placeholder="Nombre, DNI o CUIT…"
+                value={clientQuery}
+                onChange={(e) => setClientQuery(e.target.value)}
+                autoFocus
+              />
+            </div>
+            {clientSearchLoading ? (
+              <div style={{ textAlign: 'center', padding: '20px', color: 'var(--gray-500)' }}>Buscando…</div>
+            ) : clientResults.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '20px', color: 'var(--gray-500)' }}>
+                {clientQuery.trim().length < 2 ? 'Escribí al menos 2 caracteres.' : 'Sin resultados.'}
+              </div>
+            ) : (
+              <div className="table-panel" style={{ marginBottom: '14px' }}>
+                <div className="table-scroll">
+                  <table>
+                    <tbody>
+                      {clientResults.map((c) => (
+                        <tr key={c.id} style={{ cursor: 'pointer' }} onClick={() => handleSeleccionarCliente(c)}>
+                          <td className="cell-strong">{c.razonSocial}</td>
+                          <td className="cell-mono">{c.dni || c.cuit}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+            <button className="btn btn-outline" style={{ width: '100%' }} onClick={handleAbrirAltaCliente}>
+              + Crear cliente nuevo
+            </button>
+          </>
         )}
       </Modal>
 

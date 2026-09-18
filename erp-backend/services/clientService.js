@@ -1,6 +1,57 @@
 const { supabaseAdmin } = require('../config/supabase');
 
 class ClientService {
+  /**
+   * Alta rápida de cliente desde el POS (HU-20). Requiere al menos
+   * uno de dni/cuit — igual que exige el CHECK de la base.
+   */
+  static async crearCliente(payload) {
+    const { razonSocial, dni, cuit, telefono, direccion } = payload;
+
+    if (!razonSocial || !razonSocial.trim()) {
+      throw new Error('El nombre del cliente es obligatorio.');
+    }
+    if (!dni && !cuit) {
+      throw new Error('Necesitás cargar al menos un DNI o un CUIT.');
+    }
+    if (cuit && !/^\d{11}$/.test(String(cuit))) {
+      throw new Error('El CUIT debe tener 11 dígitos, sin guiones.');
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from('clientes')
+      .insert([
+        {
+          razon_social: razonSocial.trim(),
+          dni: dni || null,
+          cuit: cuit || null,
+          telefono: telefono || '',
+          direccion: direccion || '',
+        },
+      ])
+      .select()
+      .single();
+
+    if (error) {
+      if (error.code === '23505') {
+        throw new Error('Ya existe un cliente registrado con ese DNI o CUIT.');
+      }
+      throw new Error(`Error al crear el cliente: ${error.message}`);
+    }
+
+    return {
+      id: data.id,
+      razonSocial: data.razon_social,
+      dni: data.dni,
+      cuit: data.cuit,
+      telefono: data.telefono,
+      direccion: data.direccion,
+      limiteCredito: Number(data.limite_credito) || 0,
+      saldoActual: Number(data.saldo_actual) || 0,
+      estado: Boolean(data.estado),
+    };
+  }
+
   static async listarClientes() {
     const { data, error } = await supabaseAdmin
       .from('clientes')
