@@ -185,6 +185,20 @@ const obtenerInventarioGeneral = async (req, res) => {
     }
 };
 
+const obtenerCatalogoPOS = async (req, res) => {
+    try {
+        const { depositoId } = req.query;
+        if (!depositoId) {
+            return res.status(400).json({ error: 'El parámetro depositoId es obligatorio.' });
+        }
+        const catalogo = await StockService.obtenerCatalogoPOS(depositoId);
+        return res.status(200).json({ success: true, data: catalogo });
+    } catch (error) {
+        console.error('[API] Error GET /api/stock/pos-catalog:', error);
+        return res.status(500).json({ error: error.message || 'Error obteniendo catálogo del POS.' });
+    }
+};
+
 module.exports = {
   transferir,
   ajustar,
@@ -192,5 +206,6 @@ module.exports = {
   obtenerHistorial,
   actualizarPoliticas,
   obtenerAlertas,
-  obtenerInventarioGeneral
+  obtenerInventarioGeneral,
+  obtenerCatalogoPOS
 };

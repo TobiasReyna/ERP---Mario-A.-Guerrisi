@@ -12,6 +12,7 @@ const accountPayableRoutes = require('./routes/accountPayableRoutes');
 const creditLimitRoutes = require('./routes/creditLimitRoutes');
 const clientRoutes = require('./routes/clientRoutes');
 const creditNoteRoutes = require('./routes/creditNoteRoutes');
+const ventaRoutes = require('./routes/ventaRoutes');
 
 
 const app = express();
@@ -23,6 +24,7 @@ app.use(express.json());
 
 app.use('/api/clients', clientRoutes);
 app.use('/api/credit-notes', creditNoteRoutes);
+app.use('/api/ventas', ventaRoutes);
 // Montar endpoints de Límites de Crédito
 app.use('/api/credit-limits', creditLimitRoutes);
 

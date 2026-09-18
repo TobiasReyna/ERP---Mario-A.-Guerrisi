@@ -19,6 +19,41 @@ class ClientService {
     }));
   }
 
+  /**
+   * HU-20: búsqueda de clientes por razón social, DNI o CUIT para el POS.
+   * Trae solo clientes activos, máximo 10 resultados.
+   */
+  static async buscarClientes(query) {
+    const texto = (query || '').trim();
+    if (texto.length < 2) return [];
+
+    let builder = supabaseAdmin
+      .from('clientes')
+      .select('id, razon_social, dni, cuit, limite_credito, saldo_actual, estado')
+      .eq('estado', true)
+      .limit(10);
+
+    if (/^\d+$/.test(texto)) {
+      // Numérico: puede ser DNI o CUIT -> se busca en ambos
+      builder = builder.or(`dni.eq.${texto},cuit.eq.${texto}`);
+    } else {
+      builder = builder.ilike('razon_social', `%${texto}%`);
+    }
+
+    const { data, error } = await builder;
+    if (error) throw new Error(`Error al buscar clientes: ${error.message}`);
+
+    return (data || []).map((c) => ({
+      id: c.id,
+      razonSocial: c.razon_social,
+      dni: c.dni,
+      cuit: c.cuit,
+      limiteCredito: Number(c.limite_credito) || 0,
+      saldoActual: Number(c.saldo_actual) || 0,
+      estado: Boolean(c.estado),
+    }));
+  }
+
   static async actualizarLimiteCredito(clienteId, nuevoLimite) {
     const limiteNumerico = Number(nuevoLimite);
     if (isNaN(limiteNumerico) || limiteNumerico < 0) {

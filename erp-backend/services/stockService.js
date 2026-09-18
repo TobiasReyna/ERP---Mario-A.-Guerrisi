@@ -302,6 +302,54 @@ static async actualizarPoliticas(articulo_id, payload) {
         return alertas;
     }
 
+    /**
+     * HU-15: catálogo para el buscador del POS. Devuelve artículos activos
+     * con precio, EAN y el disponible real (cantidad - cantidad_reservada)
+     * de un único depósito, para no mezclar stock entre tiendas.
+     */
+    static async obtenerCatalogoPOS(depositoId) {
+        if (!depositoId) {
+            throw new Error('depositoId es obligatorio para consultar el catálogo del POS.');
+        }
+
+        const { data, error } = await supabaseAdmin
+            .from('articulos')
+            .select(`
+                id,
+                descripcion,
+                codigo_ean13,
+                precio_actual,
+                categoria_id,
+                categorias (id, nombre),
+                existencias!inner (
+                    cantidad,
+                    cantidad_reservada,
+                    deposito_id
+                )
+            `)
+            .eq('estado', true)
+            .eq('existencias.deposito_id', depositoId);
+
+        if (error) {
+            throw new Error(`Error consultando catálogo POS: ${error.message}`);
+        }
+
+        return (data || []).map((art) => {
+            const ex = art.existencias?.[0];
+            const disponible = ex ? ex.cantidad - (ex.cantidad_reservada || 0) : 0;
+
+            return {
+                id: art.id,
+                descripcion: art.descripcion,
+                codigoEan13: art.codigo_ean13,
+                precioActual: Number(art.precio_actual),
+                categoriaId: art.categoria_id,
+                categoria: art.categorias?.nombre || 'Sin categoría',
+                disponible,
+            };
+        });
+    }
+
     static async obtenerInventarioGeneral() {
         const { data: articulosActivos, error: errArticulos } = await supabaseAdmin
             .from('articulos')

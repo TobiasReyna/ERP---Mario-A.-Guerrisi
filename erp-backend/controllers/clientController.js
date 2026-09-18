@@ -10,6 +10,17 @@ const listarClientes = async (req, res) => {
   }
 };
 
+const buscarClientes = async (req, res) => {
+  try {
+    const { q } = req.query;
+    const data = await ClientService.buscarClientes(q);
+    return res.status(200).json({ success: true, data });
+  } catch (error) {
+    console.error('[API] Error GET /api/clients/search:', error);
+    return res.status(500).json({ error: error.message });
+  }
+};
+
 const actualizarLimiteCredito = async (req, res) => {
   try {
     const { id } = req.params;
@@ -24,5 +35,6 @@ const actualizarLimiteCredito = async (req, res) => {
 
 module.exports = {
   listarClientes,
+  buscarClientes,
   actualizarLimiteCredito,
 };
