@@ -78,20 +78,23 @@ class ClientService {
     const texto = (query || '').trim();
     if (texto.length < 2) return [];
 
-    let builder = supabaseAdmin
-      .from('clientes')
-      .select('id, razon_social, dni, cuit, limite_credito, saldo_actual, estado')
-      .eq('estado', true)
-      .limit(10);
+    // El cajero puede tipear el CUIT/DNI con puntos o guiones
+    // (20-12345678-6, 12.345.678); comparamos por los dígitos limpios.
+    const soloDigitos = texto.replace(/\D/g, '');
 
-    if (/^\d+$/.test(texto)) {
-      // Numérico: puede ser DNI o CUIT -> se busca en ambos
-      builder = builder.or(`dni.eq.${texto},cuit.eq.${texto}`);
-    } else {
-      builder = builder.ilike('razon_social', `%${texto}%`);
+    const condiciones = [`razon_social.ilike.%${texto}%`];
+    if (soloDigitos.length >= 6) {
+      condiciones.push(`dni.eq.${soloDigitos}`);
+      condiciones.push(`cuit.eq.${soloDigitos}`);
     }
 
-    const { data, error } = await builder;
+    const { data, error } = await supabaseAdmin
+      .from('clientes')
+      .select('id, razon_social, dni, cuit, telefono, direccion, limite_credito, saldo_actual, estado')
+      .eq('estado', true)
+      .or(condiciones.join(','))
+      .limit(10);
+
     if (error) throw new Error(`Error al buscar clientes: ${error.message}`);
 
     return (data || []).map((c) => ({
@@ -99,6 +102,8 @@ class ClientService {
       razonSocial: c.razon_social,
       dni: c.dni,
       cuit: c.cuit,
+      telefono: c.telefono,
+      direccion: c.direccion,
       limiteCredito: Number(c.limite_credito) || 0,
       saldoActual: Number(c.saldo_actual) || 0,
       estado: Boolean(c.estado),

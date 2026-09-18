@@ -9,8 +9,11 @@ export async function buscarClientes(query) {
 
   try {
     const res = await fetch(`http://localhost:3001/api/clients/search?q=${encodeURIComponent(texto)}`);
-    if (!res.ok) return [];
     const json = await res.json();
+    if (!res.ok) {
+      console.error('Error al buscar clientes:', json.error || res.statusText);
+      return [];
+    }
     return json.data || [];
   } catch (err) {
     console.error('Error al buscar clientes:', err);

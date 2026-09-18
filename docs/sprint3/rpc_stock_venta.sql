@@ -51,12 +51,15 @@ $$ LANGUAGE plpgsql;
 
 -- Confirma: descuenta stock real y libera la reserva, para todas
 -- las líneas de la venta en un solo UPDATE.
+-- Nota: "cantidad" existe tanto en existencias como en ventas_detalle,
+-- así que hay que calificar con el alias (e.cantidad) o Postgres tira
+-- "column reference is ambiguous" y la venta nunca se confirma.
 CREATE OR REPLACE FUNCTION confirmar_stock_venta(p_venta_id uuid)
 RETURNS void AS $$
 BEGIN
   UPDATE existencias e
-  SET cantidad = cantidad - d.cantidad,
-      cantidad_reservada = cantidad_reservada - d.cantidad,
+  SET cantidad = e.cantidad - d.cantidad,
+      cantidad_reservada = e.cantidad_reservada - d.cantidad,
       fecha_hora_actualizacion = now()
   FROM ventas_detalle d
   JOIN ventas v ON v.id = d.venta_id
@@ -77,7 +80,7 @@ BEGIN
   SELECT deposito_id INTO v_deposito_id FROM ventas WHERE id = p_venta_id;
 
   UPDATE existencias e
-  SET cantidad_reservada = cantidad_reservada - d.cantidad
+  SET cantidad_reservada = e.cantidad_reservada - d.cantidad
   FROM ventas_detalle d
   WHERE d.venta_id = p_venta_id
     AND e.articulo_id = d.articulo_id
