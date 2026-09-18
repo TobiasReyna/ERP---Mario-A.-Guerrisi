@@ -13,6 +13,7 @@ import Cotizaciones_ordenes_compra from './pages/Cotizaciones_ordenes_compra';
 import Cuentas_por_pagar from './pages/Cuentas_por_pagar';
 import Notas_credito_debito from './pages/Notas_credito_debito';
 import Limites_de_credito from './pages/Limites_de_credito';
+import Punto_de_Venta from './pages/Punto_de_Venta';
 import Perfil from './pages/Perfil';
 import RegistroComprobanteProveedor from './pages/RegistroComprobanteProveedor';
 
@@ -28,6 +29,7 @@ const ROUTE_INFO = {
   '/Cuentas_por_pagar': { title: 'Cuentas por Pagar', subtitle: 'Obligaciones con proveedores, vencimientos y pagos' },
   '/Notas_credito_debito': { title: 'Notas de Crédito y Débito', subtitle: 'Devoluciones y ajustes de facturación' },
   '/Limites_de_credito': { title: 'Límites de Crédito', subtitle: 'Cuentas corrientes de clientes mayoristas (B2B)' },
+  '/Punto_de_Venta': { title: 'Punto de Venta', subtitle: 'Caja única — venta, cobro mixto y comprobante' },
   '/Perfil': { title: 'Mi perfil', subtitle: 'Información de la cuenta y el depósito asignado' },
   '/registro-comprobantes': { title: 'Registro de Comprobantes', subtitle: 'Facturas, Notas de Crédito y Notas de Débito de proveedores' },
 };
@@ -220,6 +222,21 @@ function App() {
             </svg>
             Alertas y notificaciones
             {unreadCount > 0 && <span className="nav-item-badge">{unreadCount}</span>}
+          </NavLink>
+        </nav>
+
+        <nav className="nav-group">
+          <div className="nav-group-label">Ventas</div>
+
+          <NavLink
+            to="/Punto_de_Venta"
+            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+          >
+            <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="2" y="7" width="20" height="14" rx="2" />
+              <path d="M16 3v4M8 3v4M2 11h20" />
+            </svg>
+            Punto de Venta
           </NavLink>
         </nav>
 
@@ -484,7 +501,8 @@ function App() {
               <Route path="/Cuentas_por_pagar" element={<Cuentas_por_pagar />} />
               
               <Route path="/Notas_credito_debito" element={<Notas_credito_debito />} />
-              <Route path="/Limites_de_credito" element={<Limites_de_credito />} /> 
+              <Route path="/Limites_de_credito" element={<Limites_de_credito />} />
+              <Route path="/Punto_de_Venta" element={<Punto_de_Venta />} />
               <Route path="/Perfil" element={<Perfil />} />
               <Route path="/registro-comprobantes" element={<RegistroComprobanteProveedor />} />
             </Routes>

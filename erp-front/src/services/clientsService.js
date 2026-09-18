@@ -1,5 +1,40 @@
 const API_URL = 'http://localhost:3001/api/credit-notes';
 
+// buscarClientes usa la ruta REST real de clientes (/api/clients/search, HU-20),
+// a diferencia del resto de este archivo que quedó anidado bajo /credit-notes
+// por historia del proyecto — no lo migro acá para no romper esas otras pantallas.
+export async function buscarClientes(query) {
+  const texto = (query || '').trim();
+  if (texto.length < 2) return [];
+
+  try {
+    const res = await fetch(`http://localhost:3001/api/clients/search?q=${encodeURIComponent(texto)}`);
+    const json = await res.json();
+    if (!res.ok) {
+      console.error('Error al buscar clientes:', json.error || res.statusText);
+      return [];
+    }
+    return json.data || [];
+  } catch (err) {
+    console.error('Error al buscar clientes:', err);
+    return [];
+  }
+}
+
+// Alta rápida de cliente desde el POS (HU-20)
+export async function crearCliente(payload) {
+  const res = await fetch('http://localhost:3001/api/clients', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const json = await res.json();
+  if (!res.ok) {
+    throw new Error(json.error || 'No se pudo crear el cliente.');
+  }
+  return json.data;
+}
+
 export async function listarClientes() {
   try {
     const res = await fetch(`${API_URL}/clients`);

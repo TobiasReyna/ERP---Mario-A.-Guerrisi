@@ -14,6 +14,9 @@ router.get('/alerts', stockController.obtenerAlertas);
 // GET /api/stock/inventory
 router.get('/inventory', stockController.obtenerInventarioGeneral);
 
+// GET /api/stock/pos-catalog?depositoId= (HU-15: buscador de productos del POS)
+router.get('/pos-catalog', stockController.obtenerCatalogoPOS);
+
 // PUT /api/stock/policies/:articulo_id
 router.put('/policies/:articulo_id', stockController.actualizarPoliticas);
 
