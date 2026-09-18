@@ -81,11 +81,28 @@ const cancelPurchaseOrder = async (req, res) => {
     }
 };
 
+const getPurchaseOrderDetails = async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        if (!id) {
+            return res.status(400).json({ error: 'Falta el id de la orden de compra.' });
+        }
+        
+        const result = await PurchaseOrderService.getPurchaseOrderDetails(id);
+        return res.status(200).json({ data: result });
+    } catch (error) {
+        console.error(`[API] Error GET /api/purchase-orders/${req.params.id}/details:`, error);
+        return res.status(500).json({ error: error.message });
+    }
+};
+
 module.exports = {
     createPurchaseOrder,
     getRecentPurchaseOrder,
     createPurchaseOrderDetail,
     getAllPurchaseOrders,
     receivePurchaseOrder,
-    cancelPurchaseOrder
+    cancelPurchaseOrder,
+    getPurchaseOrderDetails
 };

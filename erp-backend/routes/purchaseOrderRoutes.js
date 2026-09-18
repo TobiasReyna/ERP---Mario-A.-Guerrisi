@@ -20,4 +20,7 @@ router.put('/:id/receive', purchaseOrderController.receivePurchaseOrder);
 // PUT /api/purchase-orders/:id/cancel
 router.put('/:id/cancel', purchaseOrderController.cancelPurchaseOrder);
 
+// GET /api/purchase-orders/:id/details
+router.get('/:id/details', purchaseOrderController.getPurchaseOrderDetails);
+
 module.exports = router;

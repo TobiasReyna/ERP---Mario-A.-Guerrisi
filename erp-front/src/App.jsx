@@ -15,6 +15,7 @@ import Notas_credito_debito from './pages/Notas_credito_debito';
 import Limites_de_credito from './pages/Limites_de_credito';
 import Punto_de_Venta from './pages/Punto_de_Venta';
 import Perfil from './pages/Perfil';
+import RegistroComprobanteProveedor from './pages/RegistroComprobanteProveedor';
 
 const ROUTE_INFO = {
   '/': { title: 'Dashboard', subtitle: 'Resumen general del inventario y el catálogo' },
@@ -30,6 +31,7 @@ const ROUTE_INFO = {
   '/Limites_de_credito': { title: 'Límites de Crédito', subtitle: 'Cuentas corrientes de clientes mayoristas (B2B)' },
   '/Punto_de_Venta': { title: 'Punto de Venta', subtitle: 'Caja única — venta, cobro mixto y comprobante' },
   '/Perfil': { title: 'Mi perfil', subtitle: 'Información de la cuenta y el depósito asignado' },
+  '/registro-comprobantes': { title: 'Registro de Comprobantes', subtitle: 'Facturas, Notas de Crédito y Notas de Débito de proveedores' },
 };
 
 function App() {
@@ -276,10 +278,24 @@ function App() {
             </svg>
             Cuentas por Pagar
           </NavLink>
+
+          <NavLink
+            to="/registro-comprobantes"
+            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+          >
+            <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
+              <path d="M14 2v6h6" />
+              <path d="M9 13h6M9 17h3" />
+              <circle cx="17" cy="17" r="3" />
+              <path d="M17 15v2l1 1" />
+            </svg>
+            Comprobantes
+          </NavLink>
         </nav>
 
-        <nav className="nav-group">
-          <div className="nav-group-label">Tesorería</div>
+    {/*      <nav className="nav-group">
+        <div className="nav-group-label">Tesorería</div>  
 
           <NavLink
             to="/Notas_credito_debito"
@@ -304,7 +320,7 @@ function App() {
             Límites de Crédito
           </NavLink>
         </nav>
-
+*/}
         <div className="sidebar-footer">
           <div className="sidebar-footer-text">
             Mario A. Guerrisi<br />
@@ -483,10 +499,12 @@ function App() {
               <Route path="/Gestion_de_proveedores" element={<Gestion_de_proveedores />} />
               <Route path="/Cotizaciones_ordenes_compra" element={<Cotizaciones_ordenes_compra />} />
               <Route path="/Cuentas_por_pagar" element={<Cuentas_por_pagar />} />
+              
               <Route path="/Notas_credito_debito" element={<Notas_credito_debito />} />
               <Route path="/Limites_de_credito" element={<Limites_de_credito />} />
               <Route path="/Punto_de_Venta" element={<Punto_de_Venta />} />
               <Route path="/Perfil" element={<Perfil />} />
+              <Route path="/registro-comprobantes" element={<RegistroComprobanteProveedor />} />
             </Routes>
           </div>
         </main>
