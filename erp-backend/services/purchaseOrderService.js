@@ -88,6 +88,17 @@ class PurchaseOrderService {
         // "la propia base de datos se encargará de actualizar el estado de la orden de compra principal."
         return { success: true };
     }
+    
+    static async getPurchaseOrderDetails(ordenCompraId) {
+    const { data, error } = await supabaseAdmin
+        .from('ordenes_compra_detalle')
+        .select('*, articulo:articulo_id(*)')
+        .eq('orden_compra_id', ordenCompraId);
+
+    if (error) throw new Error(error.message);
+    return data;
+}
+
 
     static async cancelPurchaseOrder(id) {
         const { data, error } = await supabaseAdmin
