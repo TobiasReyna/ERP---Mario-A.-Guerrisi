@@ -16,10 +16,12 @@
 // =============================================================================
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import Modal from '../components/Modal';
-import { formatearMonto, formatearFecha, hoyISO } from '../utils/format';
+import { formatearMonto, formatearFecha, formatearFechaHora, hoyISO } from '../utils/format';
 import { listarComprobantes, listarCxpPendientes, registrarComprobante } from '../services/comprobantesService';
 import { listarProveedoresReferencia } from '../services/purchasingService';
+import { listarVentasConfirmadas } from '../services/ventaService';
 
 // ---------------------------------------------------------------------------
 // Constantes
@@ -66,7 +68,10 @@ function isValidNumeroComprobante(val) {
 // ---------------------------------------------------------------------------
 function RegistroComprobanteProveedor() {
     // ── Estado principal ────────────────────────────────────────────────────
+    const [vista, setVista] = useState('compras'); // 'compras' | 'ventas'
     const [comprobantes, setComprobantes] = useState([]);
+    const [ventas, setVentas] = useState([]);
+    const [loadingVentas, setLoadingVentas] = useState(true);
     const [proveedores, setProveedores] = useState([]);
     const [ordenesCompra, setOrdenesCompra] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -106,6 +111,15 @@ function RegistroComprobanteProveedor() {
     }, []);
 
     useEffect(() => { cargarDatos(); }, [cargarDatos]);
+
+    // ── Carga de comprobantes de venta (pestaña "Ventas") ──────────────────
+    useEffect(() => {
+        setLoadingVentas(true);
+        listarVentasConfirmadas()
+            .then(setVentas)
+            .catch((err) => console.error('[POS] Error al cargar comprobantes de venta:', err))
+            .finally(() => setLoadingVentas(false));
+    }, []);
 
     // ── Cuando cambia proveedor + tipo=NC, carga CxP pendientes ────────────
     useEffect(() => {
@@ -439,6 +453,13 @@ const eliminarDetalle = (indexToRemove) => {
             totalFacturado 
         };
         }, [comprobantes]);
+
+    const kpisVentas = useMemo(() => {
+        const totalVendido = ventas.reduce((a, v) => a + v.total, 0);
+        const metodosUsados = new Set(ventas.flatMap((v) => v.metodosPago));
+        return { cantidad: ventas.length, totalVendido, metodosUsados: metodosUsados.size };
+    }, [ventas]);
+
    
     // ── Render ──────────────────────────────────────────────────────────────
     return (
@@ -463,96 +484,194 @@ const eliminarDetalle = (indexToRemove) => {
             {/* Toolbar */}
             <div className="catalog-toolbar">
                 <span style={{ fontSize: '13px', color: 'var(--gray-500)' }}>
-                    {comprobantes.length} comprobante{comprobantes.length !== 1 ? 's' : ''} registrado{comprobantes.length !== 1 ? 's' : ''}
+                    {vista === 'compras'
+                        ? `${comprobantes.length} comprobante${comprobantes.length !== 1 ? 's' : ''} de compra registrado${comprobantes.length !== 1 ? 's' : ''}`
+                        : `${ventas.length} comprobante${ventas.length !== 1 ? 's' : ''} de venta confirmado${ventas.length !== 1 ? 's' : ''}`}
                 </span>
-                <button
-                    className="btn btn-primary"
-                    onClick={handleOpenModal}
-                    disabled={loading}
-                    style={{ marginLeft: 'auto' }}
-                >
-                    <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M12 5v14M5 12h14" />
-                    </svg>
-                    Registrar comprobante
-                </button>
+
+                <div className="view-toggle" style={{ marginLeft: 'auto' }}>
+                    <button className={vista === 'compras' ? 'active' : ''} onClick={() => setVista('compras')}>
+                        <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M3 3h2l2.4 12.4a2 2 0 0 0 2 1.6h9.2a2 2 0 0 0 2-1.6L22 8H6" />
+                        </svg>
+                        Compras
+                    </button>
+                    <button className={vista === 'ventas' ? 'active' : ''} onClick={() => setVista('ventas')}>
+                        <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <rect x="2" y="7" width="20" height="14" rx="2" /><path d="M16 3v4M8 3v4M2 11h20" />
+                        </svg>
+                        Ventas
+                    </button>
+                </div>
+
+                {vista === 'compras' ? (
+                    <button
+                        className="btn btn-primary"
+                        onClick={handleOpenModal}
+                        disabled={loading}
+                    >
+                        <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M12 5v14M5 12h14" />
+                        </svg>
+                        Registrar comprobante
+                    </button>
+                ) : (
+                    <Link to="/Punto_de_Venta" className="btn btn-primary">
+                        <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M12 5v14M5 12h14" />
+                        </svg>
+                        Ir al Punto de Venta
+                    </Link>
+                )}
             </div>
 
-            {/* KPIs */}
-            <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(5, 1fr)' }}>
-                <div className="stat-card">
-                    <div className="stat-value">{kpis.facturas}</div>
-                    <div className="stat-label">Facturas</div>
-                </div>
-                <div className="stat-card">
-                    <div className="stat-value" style={{ color: 'var(--crit)' }}>{kpis.nc}</div>
-                    <div className="stat-label">Notas de Crédito</div>
-                </div>
-                <div className="stat-card">
-                    <div className="stat-value" style={{ color: 'var(--green)' }}>{kpis.nd}</div>
-                    <div className="stat-label">Notas de Débito</div>
-                </div>
-                <div className="stat-card">
-                    <div className="stat-value" style={{ color: 'var(--info, #3b82f6)' }}>{kpis.remitos}</div>
-                    <div className="stat-label">Remitos</div>
-                </div>
-                <div className="stat-card">
-                    <div className="stat-value">{formatearMonto(kpis.totalFacturado)}</div>
-                    <div className="stat-label">Total facturado</div>
-                </div>
-            </div>
+            {vista === 'compras' ? (
+                <>
+                    {/* KPIs — Compras */}
+                    <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(5, 1fr)' }}>
+                        <div className="stat-card">
+                            <div className="stat-value">{kpis.facturas}</div>
+                            <div className="stat-label">Facturas</div>
+                        </div>
+                        <div className="stat-card">
+                            <div className="stat-value" style={{ color: 'var(--crit)' }}>{kpis.nc}</div>
+                            <div className="stat-label">Notas de Crédito</div>
+                        </div>
+                        <div className="stat-card">
+                            <div className="stat-value" style={{ color: 'var(--green)' }}>{kpis.nd}</div>
+                            <div className="stat-label">Notas de Débito</div>
+                        </div>
+                        <div className="stat-card">
+                            <div className="stat-value" style={{ color: 'var(--info, #3b82f6)' }}>{kpis.remitos}</div>
+                            <div className="stat-label">Remitos</div>
+                        </div>
+                        <div className="stat-card">
+                            <div className="stat-value">{formatearMonto(kpis.totalFacturado)}</div>
+                            <div className="stat-label">Total facturado</div>
+                        </div>
+                    </div>
 
-            {/* Tabla */}
-            <div className="table-panel">
-                <div className="table-scroll">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Tipo</th>
-                                <th>Número</th>
-                                <th>Proveedor</th>
-                                <th>Monto</th>
-                                <th>Emisión</th>
-                                <th>Vencimiento</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {loading ? (
-                                <tr>
-                                    <td colSpan={6} style={{ textAlign: 'center', padding: '30px', color: 'var(--gray-500)' }}>
-                                        Cargando…
-                                    </td>
-                                </tr>
-                            ) : comprobantes.length === 0 ? (
-                                <tr>
-                                    <td colSpan={6} style={{ textAlign: 'center', padding: '30px', color: 'var(--gray-500)' }}>
-                                        No hay comprobantes registrados todavía.
-                                    </td>
-                                </tr>
-                            ) : (
-                                comprobantes.map((c) => {
-                                    const badge = BADGE_MAP[c.tipo_comprobante] ?? { label: c.tipo_comprobante, cls: '' };
-                                    return (
-                                        <tr key={c.id}>
-                                            <td>
-                                                <span className={`badge ${badge.cls}`}>
-                                                    <span className="badge-dot" />
-                                                    {badge.label}
-                                                </span>
+                    {/* Tabla — Compras */}
+                    <div className="table-panel">
+                        <div className="table-scroll">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Tipo</th>
+                                        <th>Número</th>
+                                        <th>Proveedor</th>
+                                        <th>Monto</th>
+                                        <th>Emisión</th>
+                                        <th>Vencimiento</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {loading ? (
+                                        <tr>
+                                            <td colSpan={6} style={{ textAlign: 'center', padding: '30px', color: 'var(--gray-500)' }}>
+                                                Cargando…
                                             </td>
-                                            <td className="cell-mono">{c.numero_comprobante}</td>
-                                            <td>{c.proveedores?.razon_social ?? '—'}</td>
-                                            <td>{formatearMonto(c.monto_total)}</td>
-                                            <td>{formatearFecha(c.fecha_emision)}</td>
-                                            <td>{c.fecha_vencimiento ? formatearFecha(c.fecha_vencimiento) : <span style={{ color: 'var(--gray-400)' }}>—</span>}</td>
                                         </tr>
-                                    );
-                                })
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+                                    ) : comprobantes.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={6} style={{ textAlign: 'center', padding: '30px', color: 'var(--gray-500)' }}>
+                                                No hay comprobantes registrados todavía.
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        comprobantes.map((c) => {
+                                            const badge = BADGE_MAP[c.tipo_comprobante] ?? { label: c.tipo_comprobante, cls: '' };
+                                            return (
+                                                <tr key={c.id}>
+                                                    <td>
+                                                        <span className={`badge ${badge.cls}`}>
+                                                            <span className="badge-dot" />
+                                                            {badge.label}
+                                                        </span>
+                                                    </td>
+                                                    <td className="cell-mono">{c.numero_comprobante}</td>
+                                                    <td>{c.proveedores?.razon_social ?? '—'}</td>
+                                                    <td>{formatearMonto(c.monto_total)}</td>
+                                                    <td>{formatearFecha(c.fecha_emision)}</td>
+                                                    <td>{c.fecha_vencimiento ? formatearFecha(c.fecha_vencimiento) : <span style={{ color: 'var(--gray-400)' }}>—</span>}</td>
+                                                </tr>
+                                            );
+                                        })
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </>
+            ) : (
+                <>
+                    {/* KPIs — Ventas */}
+                    <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+                        <div className="stat-card">
+                            <div className="stat-value">{kpisVentas.cantidad}</div>
+                            <div className="stat-label">Ventas confirmadas</div>
+                        </div>
+                        <div className="stat-card">
+                            <div className="stat-value" style={{ color: 'var(--green)' }}>{formatearMonto(kpisVentas.totalVendido)}</div>
+                            <div className="stat-label">Total vendido</div>
+                        </div>
+                        <div className="stat-card">
+                            <div className="stat-value">{kpisVentas.metodosUsados}</div>
+                            <div className="stat-label">Métodos de pago distintos usados</div>
+                        </div>
+                    </div>
+
+                    {/* Tabla — Ventas */}
+                    <div className="table-panel">
+                        <div className="table-scroll">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Número</th>
+                                        <th>Cliente</th>
+                                        <th>Tienda</th>
+                                        <th>Total</th>
+                                        <th>Fecha</th>
+                                        <th>Pago</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {loadingVentas ? (
+                                        <tr>
+                                            <td colSpan={6} style={{ textAlign: 'center', padding: '30px', color: 'var(--gray-500)' }}>
+                                                Cargando…
+                                            </td>
+                                        </tr>
+                                    ) : ventas.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={6} style={{ textAlign: 'center', padding: '30px', color: 'var(--gray-500)' }}>
+                                                Todavía no se confirmó ninguna venta desde el Punto de Venta.
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        ventas.map((v) => (
+                                            <tr key={v.ventaId}>
+                                                <td>
+                                                    <span className="badge badge-green">
+                                                        <span className="badge-dot" />
+                                                        VTA
+                                                    </span>{' '}
+                                                    <span className="cell-mono">{v.numeroComprobante}</span>
+                                                </td>
+                                                <td>{v.cliente}</td>
+                                                <td>{v.deposito}</td>
+                                                <td>{formatearMonto(v.total)}</td>
+                                                <td>{formatearFechaHora(v.fechaHoraRegistro)}</td>
+                                                <td>{v.metodosPago.join(', ') || '—'}</td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </>
+            )}
 
             {/* ================================================================ */}
             {/* MODAL: REGISTRAR COMPROBANTE                                     */}

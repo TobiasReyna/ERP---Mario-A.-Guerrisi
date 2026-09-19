@@ -1,5 +1,17 @@
 const VentaService = require('../services/ventaService');
 
+// GET /api/ventas — comprobantes de venta confirmados (apartado de Comprobantes)
+// IMPORTANTE: debe ir antes que /:id en las rutas para que Express no confunda "ventas" con un id
+const listarVentas = async (req, res) => {
+  try {
+    const data = await VentaService.listarVentasConfirmadas();
+    return res.status(200).json({ success: true, data });
+  } catch (error) {
+    console.error('[API] Error GET /api/ventas:', error);
+    return res.status(500).json({ error: error.message });
+  }
+};
+
 // POST /api/ventas — Parte 1 del contrato: captura ítems y reserva stock
 const crearVentaPendiente = async (req, res) => {
   try {
@@ -61,6 +73,7 @@ const obtenerVenta = async (req, res) => {
 };
 
 module.exports = {
+  listarVentas,
   crearVentaPendiente,
   agregarPago,
   confirmarVenta,

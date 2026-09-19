@@ -4,6 +4,16 @@ const API_URL = 'http://localhost:3001/api';
 // (ver services/ventaService.js del backend), así que acá no hace
 // falta mapFromApi/mapToApi como en supplierService.js.
 
+// Comprobantes de venta confirmados (apartado unificado de Comprobantes)
+export async function listarVentasConfirmadas() {
+  const res = await fetch(`${API_URL}/ventas`);
+  const json = await res.json();
+  if (!res.ok) {
+    throw new Error(json.error || 'Error al listar los comprobantes de venta.');
+  }
+  return json.data || [];
+}
+
 export async function listarDepositos() {
   try {
     const res = await fetch(`${API_URL}/deposits`);

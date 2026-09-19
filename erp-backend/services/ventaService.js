@@ -2,6 +2,35 @@ const { supabaseAdmin } = require('../config/supabase');
 
 class VentaService {
   /**
+   * Listado de comprobantes de venta (solo Confirmada) para el
+   * apartado unificado de Comprobantes — HU-15/23.
+   */
+  static async listarVentasConfirmadas() {
+    const { data, error } = await supabaseAdmin
+      .from('ventas')
+      .select(`
+        id, numero_comprobante, total, fecha_hora_registro,
+        depositos ( nombre ),
+        clientes ( razon_social, dni, cuit ),
+        pagos_venta ( metodo )
+      `)
+      .eq('estado', 'Confirmada')
+      .order('fecha_hora_registro', { ascending: false });
+
+    if (error) throw new Error(`Error al listar ventas: ${error.message}`);
+
+    return (data || []).map((v) => ({
+      ventaId: v.id,
+      numeroComprobante: v.numero_comprobante,
+      total: Number(v.total),
+      fechaHoraRegistro: v.fecha_hora_registro,
+      deposito: v.depositos?.nombre || '—',
+      cliente: v.clientes?.razon_social || 'Consumidor final',
+      metodosPago: [...new Set((v.pagos_venta || []).map((p) => p.metodo))],
+    }));
+  }
+
+  /**
    * Correlativo único global: último numero_comprobante + 1 (HU-15)
    */
   static async generarNumeroComprobante() {
