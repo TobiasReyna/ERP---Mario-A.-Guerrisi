@@ -46,8 +46,6 @@ class ClientService {
       cuit: data.cuit,
       telefono: data.telefono,
       direccion: data.direccion,
-      limiteCredito: Number(data.limite_credito) || 0,
-      saldoActual: Number(data.saldo_actual) || 0,
       estado: Boolean(data.estado),
     };
   }
@@ -55,7 +53,7 @@ class ClientService {
   static async listarClientes() {
     const { data, error } = await supabaseAdmin
       .from('clientes')
-      .select('id, razon_social, cuit, limite_credito, saldo_actual, estado')
+      .select('id, razon_social, cuit, estado')
       .order('razon_social', { ascending: true });
 
     if (error) throw new Error(`Error al listar clientes: ${error.message}`);
@@ -64,8 +62,6 @@ class ClientService {
       id: c.id,
       razonSocial: c.razon_social,
       cuit: c.cuit,
-      limiteCredito: Number(c.limite_credito) || 0,
-      saldoActual: Number(c.saldo_actual) || 0,
       estado: Boolean(c.estado),
     }));
   }
@@ -90,7 +86,7 @@ class ClientService {
 
     const { data, error } = await supabaseAdmin
       .from('clientes')
-      .select('id, razon_social, dni, cuit, telefono, direccion, limite_credito, saldo_actual, estado')
+      .select('id, razon_social, dni, cuit, telefono, direccion, estado')
       .eq('estado', true)
       .or(condiciones.join(','))
       .limit(10);
@@ -104,8 +100,6 @@ class ClientService {
       cuit: c.cuit,
       telefono: c.telefono,
       direccion: c.direccion,
-      limiteCredito: Number(c.limite_credito) || 0,
-      saldoActual: Number(c.saldo_actual) || 0,
       estado: Boolean(c.estado),
     }));
   }
@@ -120,7 +114,7 @@ class ClientService {
       .from('clientes')
       .update({ limite_credito: limiteNumerico })
       .eq('id', clienteId)
-      .select('id, razon_social, cuit, limite_credito, saldo_actual, estado')
+      .select('id, razon_social, cuit, estado')
       .single();
 
     if (error) throw new Error(`Error al actualizar límite: ${error.message}`);
@@ -130,8 +124,6 @@ class ClientService {
       id: data.id,
       razonSocial: data.razon_social,
       cuit: data.cuit,
-      limiteCredito: Number(data.limite_credito) || 0,
-      saldoActual: Number(data.saldo_actual) || 0,
       estado: Boolean(data.estado),
     };
   }
