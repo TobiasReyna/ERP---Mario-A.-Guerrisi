@@ -61,6 +61,15 @@ export async function obtenerVenta(ventaId) {
   return json.data;
 }
 
+export async function buscarVentaPorComprobante(numero) {
+  const res = await fetch(`${API_URL}/ventas/buscar/${encodeURIComponent(numero)}`);
+  const json = await res.json();
+  if (!res.ok) {
+    throw new Error(json.error || 'No se pudo encontrar la venta.');
+  }
+  return json.data;
+}
+
 /**
  * Parte 2 del contrato: agrega un método de pago a la vez.
  * pago: { metodo, monto }

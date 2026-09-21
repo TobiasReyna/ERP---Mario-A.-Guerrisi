@@ -72,6 +72,18 @@ const obtenerVenta = async (req, res) => {
   }
 };
 
+// GET /api/ventas/buscar/:numero — buscar por número de comprobante
+const buscarVentaPorComprobante = async (req, res) => {
+  try {
+    const { numero } = req.params;
+    const venta = await VentaService.buscarVentaPorComprobante(numero);
+    return res.status(200).json({ success: true, data: venta });
+  } catch (error) {
+    console.error('[API] Error GET /api/ventas/buscar/:numero:', error);
+    return res.status(404).json({ error: error.message });
+  }
+};
+
 module.exports = {
   listarVentas,
   crearVentaPendiente,
@@ -79,4 +91,5 @@ module.exports = {
   confirmarVenta,
   cancelarVenta,
   obtenerVenta,
+  buscarVentaPorComprobante,
 };

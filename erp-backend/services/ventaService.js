@@ -38,7 +38,7 @@ class VentaService {
       .from('ventas')
       .select('numero_comprobante')
       .not('numero_comprobante', 'is', null)
-      .order('fecha_hora_registro', { ascending: false })
+      .order('numero_comprobante', { ascending: false })
       .limit(1);
 
     if (error) throw new Error(`Error generando comprobante: ${error.message}`);
@@ -133,6 +133,9 @@ class VentaService {
     });
     if (errReserva) throw new Error(`No se pudo reservar el stock: ${errReserva.message}`);
 
+    // 1.5. Generar número de comprobante temprano
+    const numeroComprobante = await this.generarNumeroComprobante();
+
     // 2. Insertar cabecera en estado Pendiente
     const total = items.reduce((acc, it) => acc + it.cantidad * it.precioUnitario, 0);
 
@@ -146,6 +149,7 @@ class VentaService {
           estado: 'Pendiente',
           total,
           ip_origen: ipOrigen || '127.0.0.1',
+          numero_comprobante: numeroComprobante,
         },
       ])
       .select()
@@ -157,9 +161,8 @@ class VentaService {
         .rpc('liberar_stock_items', {
           p_deposito_id: depositoId,
           p_items: items.map((it) => ({ articuloId: it.articuloId, cantidad: it.cantidad })),
-        })
-        .catch(() => {});
-      throw new Error(`Error al registrar la venta: ${errVenta.message}`);
+        });
+      throw new Error(`Error al registrar la cabecera de la venta: ${errVenta.message}`);
     }
 
     // 3. Insertar detalle
@@ -251,17 +254,11 @@ class VentaService {
       throw new Error(`El total pagado ($${totalPagado.toFixed(2)}) no coincide con el total de la venta ($${Number(venta.total).toFixed(2)}).`);
     }
 
-    // Descuenta stock real y libera la reserva, atómico vía RPC
-    const { error: errConfirmarStock } = await supabaseAdmin.rpc('confirmar_stock_venta', { p_venta_id: ventaId });
-    if (errConfirmarStock) throw new Error(`Error al confirmar stock: ${errConfirmarStock.message}`);
-
-    const numeroComprobante = await this.generarNumeroComprobante();
-
+    // El trigger en la base de datos se encarga de confirmar el stock al pasar a 'Confirmada'
     const { error: errUpdate } = await supabaseAdmin
       .from('ventas')
       .update({
         estado: 'Confirmada',
-        numero_comprobante: numeroComprobante,
         fecha_hora_registro: new Date().toISOString(),
       })
       .eq('id', ventaId);
@@ -287,8 +284,7 @@ class VentaService {
       throw new Error('Solo se puede cancelar una venta en estado Pendiente.');
     }
 
-    const { error: errLiberar } = await supabaseAdmin.rpc('liberar_stock_venta', { p_venta_id: ventaId });
-    if (errLiberar) throw new Error(`Error al liberar el stock: ${errLiberar.message}`);
+    // El trigger en la BD se encarga de liberar la reserva de stock al pasar a 'Cancelada'
 
     const { error: errUpdate } = await supabaseAdmin
       .from('ventas')
@@ -298,6 +294,19 @@ class VentaService {
     if (errUpdate) throw new Error(`Error al cancelar la venta: ${errUpdate.message}`);
 
     return { ventaId, estado: 'Cancelada' };
+  }
+
+  static async buscarVentaPorComprobante(numeroComprobante) {
+    const { data: venta, error } = await supabaseAdmin
+      .from('ventas')
+      .select('id, estado')
+      .eq('numero_comprobante', numeroComprobante)
+      .single();
+
+    if (error || !venta) throw new Error('No se encontró una venta asociada con el número de comprobante ingresado');
+    if (venta.estado !== 'Pendiente') throw new Error(`La venta se encuentra en estado ${venta.estado} y no puede ser cobrada.`);
+    
+    return this.obtenerVentaCompleta(venta.id);
   }
 }
 
