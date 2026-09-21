@@ -62,7 +62,7 @@ class VentaService {
       .select(`
         id, numero_comprobante, estado, total,
         fecha_hora_reserva, fecha_hora_expiracion, fecha_hora_registro,
-        cliente_id,
+        cliente_id, deposito_id,
         ventas_detalle ( id, articulo_id, cantidad, precio_unitario, importe_linea, articulos ( descripcion ) ),
         pagos_venta ( id, metodo, monto )
       `)
@@ -75,16 +75,17 @@ class VentaService {
     if (venta.cliente_id) {
       const { data: c } = await supabaseAdmin
         .from('clientes')
-        .select('id, razon_social, dni, cuit')
+        .select('id, razon_social, dni, cuit, direccion')
         .eq('id', venta.cliente_id)
         .maybeSingle();
       if (c) {
-        cliente = { id: c.id, razonSocial: c.razon_social, dni: c.dni, cuit: c.cuit };
+        cliente = { id: c.id, razonSocial: c.razon_social, dni: c.dni, cuit: c.cuit, direccion: c.direccion };
       }
     }
 
     return {
       ventaId: venta.id,
+      depositoId: venta.deposito_id,
       numeroComprobante: venta.numero_comprobante,
       estado: venta.estado,
       fechaHoraReserva: venta.fecha_hora_reserva,

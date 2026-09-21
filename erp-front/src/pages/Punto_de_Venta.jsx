@@ -323,6 +323,159 @@ function Punto_de_Venta() {
     setIsVentaBuscada(false);
   };
 
+  const handleImprimirFactura = () => {
+    if (!venta) return;
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('Por favor, permite las ventanas emergentes (pop-ups) para imprimir la factura.');
+      return;
+    }
+
+    const ptoVenta = venta.depositoId === 'bf975c47-946f-406c-bb0e-a41dbe656df4' ? '01' : '02';
+    const numComprobante = venta.numeroComprobante;
+    
+    // Formatear fecha DD/MM/AAAA
+    const fechaObj = new Date(venta.fechaHoraReserva);
+    const fechaEmision = `${String(fechaObj.getDate()).padStart(2, '0')}/${String(fechaObj.getMonth() + 1).padStart(2, '0')}/${fechaObj.getFullYear()}`;
+
+    // Datos del cliente
+    const razonSocial = venta.cliente ? venta.cliente.razonSocial : 'Consumidor final';
+    let docFormat = '';
+    if (venta.cliente) {
+      if (venta.cliente.cuit && venta.cliente.cuit.length === 11) {
+        const c = venta.cliente.cuit;
+        docFormat = `${c.slice(0, 2)}-${c.slice(2, 10)}-${c.slice(10)}`;
+      } else if (venta.cliente.dni) {
+        docFormat = venta.cliente.dni;
+      }
+    }
+    const domicilio = venta.cliente?.direccion || '—';
+
+    // Condición de Venta
+    const metodos = [...new Set((venta.pagos || []).map(p => METODOS_PAGO.find(m => m.value === p.metodo)?.label || p.metodo))];
+    const condicionVenta = metodos.length > 0 ? metodos.join(' / ') : 'Contado';
+
+    const htmlContent = `
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Factura ${numComprobante}</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 20px; color: #333; font-size: 12px; }
+    .header { display: flex; justify-content: space-between; border-bottom: 2px solid #1a365d; padding-bottom: 20px; margin-bottom: 20px; position: relative; }
+    .header-left { width: 45%; }
+    .header-left h1 { margin: 0 0 10px 0; color: #1a365d; font-size: 24px; }
+    .header-left p { margin: 3px 0; color: #555; }
+    .header-center { position: absolute; left: 50%; transform: translateX(-50%); text-align: center; }
+    .box-b { border: 2px solid #1a365d; color: #1a365d; font-size: 32px; font-weight: bold; width: 50px; height: 50px; line-height: 50px; text-align: center; margin: 0 auto; background: white; }
+    .header-right { width: 45%; text-align: right; }
+    .header-right h2 { margin: 0 0 10px 0; font-size: 24px; color: #333; }
+    .header-right p { margin: 3px 0; color: #555; }
+    .info-box { background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; margin-bottom: 20px; border-radius: 4px; display: flex; justify-content: space-between; }
+    .info-col { width: 48%; }
+    .info-col p { margin: 6px 0; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+    th { background-color: #1a365d; color: white; text-align: left; padding: 10px; font-size: 11px; }
+    th.right, td.right { text-align: right; }
+    th.center, td.center { text-align: center; }
+    td { padding: 10px; border-bottom: 1px solid #e2e8f0; }
+    .total-box { display: flex; justify-content: flex-end; margin-bottom: 30px; }
+    .total-inner { background-color: #f1f5f9; padding: 15px 20px; font-weight: bold; font-size: 14px; border-radius: 4px; }
+    .footer-notes { border-left: 4px solid #1a365d; padding-left: 15px; background-color: #f8fafc; padding-top: 10px; padding-bottom: 10px; margin-bottom: 30px; }
+    .footer-notes h4 { margin: 0 0 5px 0; color: #1a365d; }
+    .footer-notes p { margin: 3px 0; color: #555; }
+    .footer-bottom { display: flex; justify-content: space-between; color: #888; font-size: 10px; border-top: 1px solid #eee; padding-top: 10px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="header-left">
+      <h1>Mario A. Guerrisi</h1>
+      <p><strong>Dirección:</strong> San Juan 956, Salta Capital</p>
+      <p><strong>Teléfono:</strong> 387 573-0925</p>
+      <p><strong>Email:</strong> atencion@marioaguerrisi.com</p>
+    </div>
+    <div class="header-center">
+      <div class="box-b">B</div>
+    </div>
+    <div class="header-right">
+      <h2>FACTURA</h2>
+      <p><strong>Punto de Venta:</strong> ${ptoVenta} - <strong>Comp. Nro:</strong> ${numComprobante}</p>
+      <p><strong>Fecha de Emisión:</strong> ${fechaEmision}</p>
+      <p><strong>CUIT:</strong> 30-76543210-9</p>
+      <p><strong>Ingresos Brutos:</strong> 917-30765432109-1</p>
+      <p><strong>Inicio de Actividades:</strong> 15/09/1959</p>
+    </div>
+  </div>
+
+  <div class="info-box">
+    <div class="info-col">
+      <p><strong>Señor(es):</strong> ${razonSocial}</p>
+      <p><strong>Domicilio:</strong> ${domicilio}</p>
+      <p><strong>Condición de Venta:</strong> ${condicionVenta}</p>
+    </div>
+    <div class="info-col">
+      <p><strong>DNI / CUIT:</strong> ${docFormat}</p>
+      <p><strong>Condición:</strong> Consumidor Final</p>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th class="center" style="width: 10%;">CANT.</th>
+        <th style="width: 50%;">DESCRIPCIÓN DEL PRODUCTO O SERVICIO</th>
+        <th class="right" style="width: 20%;">PRECIO UNIT.</th>
+        <th class="right" style="width: 20%;">SUBTOTAL</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${venta.items.map(it => `
+        <tr>
+          <td class="center">${it.cantidad}</td>
+          <td>${it.descripcion}</td>
+          <td class="right">${formatearMonto(it.precioUnitario)}</td>
+          <td class="right">${formatearMonto(it.importeLinea)}</td>
+        </tr>
+      `).join('')}
+    </tbody>
+  </table>
+
+  <div class="total-box">
+    <div class="total-inner">
+      TOTAL A PAGAR &nbsp;&nbsp;&nbsp;&nbsp; ${formatearMonto(venta.total)}
+    </div>
+  </div>
+
+  <div class="footer-notes">
+    <h4>Notas Adicionales:</h4>
+    <p>Gracias por su compra.</p>
+    <p>La presente factura es un documento válido como comprobante de compra para Consumidor Final.</p>
+  </div>
+
+  <div class="footer-bottom">
+    <div>Mario A. Guerrisi - Documento no válido como factura electrónica (Modelo)</div>
+    <div>Página 1</div>
+  </div>
+
+  <script>
+    window.onload = function() {
+      setTimeout(function() {
+        window.print();
+        window.onafterprint = function() { window.close(); };
+      }, 500);
+    }
+  </script>
+</body>
+</html>
+    `;
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+  };
+
   const enCobro = venta && venta.estado === 'Pendiente';
   const confirmada = venta && venta.estado === 'Confirmada';
 
@@ -800,7 +953,7 @@ function Punto_de_Venta() {
         title={`Comprobante ${confirmada ? venta.numeroComprobante : ''}`}
         footer={
           <>
-            <button className="btn btn-outline" onClick={() => window.print()}>Imprimir</button>
+            <button className="btn btn-outline" onClick={handleImprimirFactura}>Imprimir</button>
             <button className="btn btn-primary" onClick={handleNuevaVenta}>Nueva venta</button>
           </>
         }
