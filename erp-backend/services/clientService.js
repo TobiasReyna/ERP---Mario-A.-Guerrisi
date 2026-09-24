@@ -6,7 +6,7 @@ class ClientService {
    * uno de dni/cuit — igual que exige el CHECK de la base.
    */
   static async crearCliente(payload) {
-    const { razonSocial, dni, cuit, telefono, direccion } = payload;
+    const { razonSocial, dni, cuit, email, telefono, direccion } = payload;
 
     if (!razonSocial || !razonSocial.trim()) {
       throw new Error('El nombre del cliente es obligatorio.');
@@ -25,6 +25,7 @@ class ClientService {
           razon_social: razonSocial.trim(),
           dni: dni || null,
           cuit: cuit || null,
+          email: email || null,
           telefono: telefono || '',
           direccion: direccion || '',
         },
@@ -44,6 +45,7 @@ class ClientService {
       razonSocial: data.razon_social,
       dni: data.dni,
       cuit: data.cuit,
+      email: data.email,
       telefono: data.telefono,
       direccion: data.direccion,
       estado: Boolean(data.estado),
@@ -68,36 +70,43 @@ class ClientService {
 
   /**
    * HU-20: búsqueda de clientes por razón social, DNI o CUIT para el POS.
-   * Trae solo clientes activos, máximo 10 resultados.
+   * Filtra en memoria para evitar errores de operadores entre enteros y texto en Postgres.
    */
   static async buscarClientes(query) {
     const texto = (query || '').trim();
     if (texto.length < 2) return [];
 
-    // El cajero puede tipear el CUIT/DNI con puntos o guiones
-    // (20-12345678-6, 12.345.678); comparamos por los dígitos limpios.
     const soloDigitos = texto.replace(/\D/g, '');
+    const termino = texto.toLowerCase();
 
-    const condiciones = [`razon_social.ilike.%${texto}%`];
-    if (soloDigitos.length >= 6) {
-      condiciones.push(`dni.eq.${soloDigitos}`);
-      condiciones.push(`cuit.eq.${soloDigitos}`);
-    }
-
+    // Trae los clientes activos
     const { data, error } = await supabaseAdmin
       .from('clientes')
-      .select('id, razon_social, dni, cuit, telefono, direccion, estado')
-      .eq('estado', true)
-      .or(condiciones.join(','))
-      .limit(10);
+      .select('id, razon_social, dni, cuit, email, telefono, direccion, estado')
+      .eq('estado', true);
 
     if (error) throw new Error(`Error al buscar clientes: ${error.message}`);
 
-    return (data || []).map((c) => ({
+    // Filtro seguro convirtiendo DNI y CUIT a string
+    const filtrados = (data || []).filter((c) => {
+      const razonSocial = (c.razon_social || '').toLowerCase();
+      const dniStr = String(c.dni || '');
+      const cuitStr = String(c.cuit || '');
+
+      const coincideNombre = razonSocial.includes(termino);
+      const coincideDni = soloDigitos.length >= 2 && dniStr.includes(soloDigitos);
+      const coincideCuit = soloDigitos.length >= 2 && cuitStr.includes(soloDigitos);
+
+      return coincideNombre || coincideDni || coincideCuit;
+    });
+
+    // Retorna hasta 10 resultados formateados
+    return filtrados.slice(0, 10).map((c) => ({
       id: c.id,
       razonSocial: c.razon_social,
       dni: c.dni,
       cuit: c.cuit,
+      email: c.email,
       telefono: c.telefono,
       direccion: c.direccion,
       estado: Boolean(c.estado),

@@ -3,17 +3,6 @@
 // Módulo: Compras / Tesorería
 // Ruta: /registro-comprobantes
 // =============================================================================
-// Criterios de aceptación implementados:
-//   CA-1: campos obligatorios con validación en tiempo real
-//   CA-2: HTTP 409 → toast rojo "Comprobante duplicado para este proveedor"
-//   CA-3: Factura / ND → genera CxP nueva (lo hace el backend)
-//   CA-4: NC → aplica descuento sobre la CxP seleccionada (backend)
-// Reglas arquitectónicas:
-//   R2: NC muestra select de facturas pendientes, limita monto y oculta vto.
-//   R3: validación de fechas (vto >= emisión) en frontend + backend
-//   R5: ruta kebab-case /registro-comprobantes
-//   R6: botón disabled hasta forma válida + spinner durante submit
-// =============================================================================
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
@@ -34,14 +23,21 @@ const TIPOS = [
     'Nota de Débito',
     'Remito'
 ];
+
 const BADGE_MAP = {
     'Factura A': { label: 'FAC A', cls: 'badge-blue' },
     'Factura B': { label: 'FAC B', cls: 'badge-blue' },
     'Factura C': { label: 'FAC C', cls: 'badge-blue' },
-    'Factura': { label: 'FAC', cls: 'badge-blue' }, // Por si queda algún registro viejo
+    'Factura':   { label: 'FAC', cls: 'badge-blue' },
     'Nota de Crédito': { label: 'NC', cls: 'badge-red' },
-    'Nota de Débito': { label: 'ND', cls: 'badge-green' },
-    'Remito': { label: 'REM', cls: 'badge-gray' }
+    'Nota de Débito':  { label: 'ND', cls: 'badge-green' },
+    'Remito':          { label: 'REM', cls: 'badge-gray' }
+};
+
+const BADGE_VENTAS = {
+    'Confirmada': { label: 'VTA', cls: 'badge-green' },
+    'Pendiente':  { label: 'PEND', cls: 'badge-amber' },
+    'Cancelada':  { label: 'CANC', cls: 'badge-red' }
 };
 
 const FORM_INICIAL = {
@@ -55,11 +51,7 @@ const FORM_INICIAL = {
     orden_compra_id: '',
 };
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 function isValidNumeroComprobante(val) {
-    // Acepta formatos: 0001-00001234 o texto libre (mínimo 4 chars)
     return val.trim().length >= 4;
 }
 
@@ -67,7 +59,7 @@ function isValidNumeroComprobante(val) {
 // Componente principal
 // ---------------------------------------------------------------------------
 function RegistroComprobanteProveedor() {
-    // ── Estado principal ────────────────────────────────────────────────────
+    // ── Estados principales ──────────────────────────────────────────────────
     const [vista, setVista] = useState('compras'); // 'compras' | 'ventas'
     const [comprobantes, setComprobantes] = useState([]);
     const [ventas, setVentas] = useState([]);
@@ -75,15 +67,22 @@ function RegistroComprobanteProveedor() {
     const [proveedores, setProveedores] = useState([]);
     const [ordenesCompra, setOrdenesCompra] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [articulos, setArticulos] = useState([]); // Deberás cargar esto desde tu backend igual que los proveedores
-    const [detalles, setDetalles] = useState([]); // Aquí se guardará el array final
+    const [articulos, setArticulos] = useState([]);
+    const [detalles, setDetalles] = useState([]);
     const [detalleActual, setDetalleActual] = useState({
         articulo_id: '',
         cantidad: '',
         precio_unitario: ''
     });
 
-    // ── Estado del modal / formulario ───────────────────────────────────────
+    // ── Filtros de búsqueda ──────────────────────────────────────────────────
+    const [busquedaCompras, setBusquedaCompras] = useState('');
+    const [filtroTipoCompras, setFiltroTipoCompras] = useState('todos');
+
+    const [busquedaVentas, setBusquedaVentas] = useState('');
+    const [filtroEstadoVentas, setFiltroEstadoVentas] = useState('todos');
+
+    // ── Estados del modal / formulario ───────────────────────────────────────
     const [modalOpen, setModalOpen] = useState(false);
     const [form, setForm] = useState(FORM_INICIAL);
     const [cxpPendientes, setCxpPendientes] = useState([]);
@@ -91,7 +90,7 @@ function RegistroComprobanteProveedor() {
     const [submitting, setSubmitting] = useState(false);
 
     // ── Toast ───────────────────────────────────────────────────────────────
-    const [toast, setToast] = useState(null); // { msg, type: 'ok'|'err' }
+    const [toast, setToast] = useState(null);
 
     const showToast = useCallback((msg, type = 'ok') => {
         setToast({ msg, type });
@@ -112,7 +111,7 @@ function RegistroComprobanteProveedor() {
 
     useEffect(() => { cargarDatos(); }, [cargarDatos]);
 
-    // ── Carga de comprobantes de venta (pestaña "Ventas") ──────────────────
+    // ── Carga de ventas ─────────────────────────────────────────────────────
     useEffect(() => {
         setLoadingVentas(true);
         listarVentasConfirmadas()
@@ -121,7 +120,7 @@ function RegistroComprobanteProveedor() {
             .finally(() => setLoadingVentas(false));
     }, []);
 
-    // ── Cuando cambia proveedor + tipo=NC, carga CxP pendientes ────────────
+    // ── CxP pendientes para NC ──────────────────────────────────────────────
     useEffect(() => {
         if (form.tipo_comprobante !== 'Nota de Crédito' || !form.proveedor_id) {
             setCxpPendientes([]);
@@ -134,107 +133,73 @@ function RegistroComprobanteProveedor() {
             .finally(() => setLoadingCxp(false));
     }, [form.proveedor_id, form.tipo_comprobante]);
 
-
+    // ── Carga de artículos ──────────────────────────────────────────────────
     useEffect(() => {
-        // Reemplaza esta URL por la ruta real de tu backend que trae los artículos
         fetch('http://localhost:3001/api/articles') 
             .then(res => res.json())
-            .then(respuesta => {
-                console.log("Lo que llegó del backend:", respuesta); // <--- MIRA ESTO EN LA CONSOLA
-            
-            // Probemos adaptarlo según lo que veas aquí:
-            setArticulos(respuesta.data || []);
-            })
+            .then(respuesta => setArticulos(respuesta.data || []))
             .catch(err => console.error("Error al cargar artículos:", err));
-    }, []); // El array vacío significa que se ejecuta una sola vez al abrir la pantalla
+    }, []);
 
+    // ── Filtrado de órdenes de compra según proveedor ───────────────────────
     useEffect(() => {
-    if (form.proveedor_id) {
-        // Llamamos al endpoint getAllPurchaseOrders que me pasaste
-        fetch('http://localhost:3001/api/purchase-orders')
+        if (form.proveedor_id) {
+            fetch('http://localhost:3001/api/purchase-orders')
+                .then(res => res.json())
+                .then(respuesta => {
+                    const todas = respuesta.data || [];
+                    const filtradas = todas.filter(
+                        (oc) => oc.proveedor_id === form.proveedor_id && oc.estado !== 'Cancelada'
+                    );
+                    setOrdenesCompra(filtradas);
+                })
+                .catch(error => {
+                    console.error("Error al obtener órdenes de compra:", error);
+                    setOrdenesCompra([]);
+                });
+        } else {
+            setOrdenesCompra([]);
+            setForm(prev => ({ ...prev, orden_compra_id: '' }));
+        }
+    }, [form.proveedor_id]);
+
+    // ── Autocarga de detalles desde Orden de Compra ─────────────────────────
+    useEffect(() => {
+        if (!form.orden_compra_id) return; 
+
+        fetch(`http://localhost:3001/api/purchase-orders/${form.orden_compra_id}/details`)
             .then(res => res.json())
             .then(respuesta => {
-                // Tu backend devuelve { data: result }, así que leemos "respuesta.data"
-                const todasLasOrdenes = respuesta.data || [];
-                
-                // Filtramos SOLO las que pertenecen al proveedor seleccionado
-                // (Asegúrate de que la propiedad se llame 'proveedor_id' en la base de datos)
-                const ordenesFiltradas = todasLasOrdenes.filter(
-                    (oc) => oc.proveedor_id === form.proveedor_id && oc.estado !== 'Cancelada' // Opcional: ignorar las canceladas
-                );
-                
-                setOrdenesCompra(ordenesFiltradas);
+                const itemsOrden = respuesta.data || respuesta;
+                const detallesAutocargados = itemsOrden.map(item => {
+                    const cant = Number(item.cantidad_solicitada) || 0; 
+                    const precio = Number(item.precio_unitario) || 0;
+                    return {
+                        articulo_id: item.articulo_id,
+                        cantidad: cant,
+                        precio_unitario: precio,
+                        subtotal: cant * precio
+                    };
+                });
+
+                setDetalles(detallesAutocargados);
+                const totalCalculado = detallesAutocargados.reduce((acc, curr) => acc + curr.subtotal, 0);
+                setForm(prev => ({ ...prev, monto_total: totalCalculado }));
             })
-            .catch(error => {
-                console.error("Error al obtener las órdenes de compra:", error);
-                setOrdenesCompra([]);
-            });
-    } else {
-        // Si no hay proveedor seleccionado, limpiamos la lista
-        setOrdenesCompra([]);
-        setForm(prev => ({ ...prev, orden_compra_id: '' }));
-    }
-}, [form.proveedor_id]);
+            .catch(err => console.error("Error al cargar detalles de la orden de compra:", err));
+    }, [form.orden_compra_id]);
 
-                // Cada vez que el usuario seleccione una Orden de Compra...
-useEffect(() => {
-    if (!form.orden_compra_id) {
-        // Si la deselecciona, podemos vaciar la grilla o dejarla libre
-        return; 
-    }
-
-    // Hacemos el fetch para traer los ítems de esa Orden de Compra específica
-    fetch(`http://localhost:3001/api/purchase-orders/${form.orden_compra_id}/details`)
-        .then(res => res.json())
-        .then(respuesta => {
-            const itemsOrden = respuesta.data || respuesta;
-            
-            // Transformamos los ítems de la orden al formato que usa nuestra grilla de comprobantes
-            const detallesAutocargados = itemsOrden.map(item => {
-                // 1. Imprimimos el ítem para ver cómo se llaman realmente sus campos
-                console.log("Ítem recibido de la OC:", item); 
-                        
-                // 2. Forzamos a que sean números reales. Si vienen vacíos, les ponemos 0.
-                // OJO: Si al ver la consola notas que la cantidad viene bajo otro nombre (ej: item.cantidad_pedida), cambialo aquí.
-                const cant = Number(item.cantidad_solicitada) || 0; 
-                const precio = Number(item.precio_unitario) || 0;
-                        
-                return {
-                    articulo_id: item.articulo_id,
-                    cantidad: cant,
-                    precio_unitario: precio,
-                    subtotal: cant * precio
-                };
-            });
-
-            // Inyectamos los detalles automáticamente en la grilla
-            setDetalles(detallesAutocargados);
-            
-            // Opcional: Podrías autocompletar el monto total sumando todo de forma automática
-            const totalCalculado = detallesAutocargados.reduce((acc, curr) => acc + curr.subtotal, 0);
-            setForm(prev => ({ ...prev, monto_total: totalCalculado }));
-        })
-        .catch(err => console.error("Error al cargar detalles de la orden de compra:", err));
-
-}, [form.orden_compra_id]); // Se dispara mágicamente al cambiar de orden de compra
-
-
-
-
-
-    // ── Monto máximo para NC (saldo de la CxP seleccionada) ────────────────
+    // ── Validaciones ────────────────────────────────────────────────────────
     const cxpSeleccionada = useMemo(
         () => cxpPendientes.find((c) => String(c.id) === String(form.id_cuenta_por_pagar)) ?? null,
         [cxpPendientes, form.id_cuenta_por_pagar]
     );
     const maxMontoNC = cxpSeleccionada ? Number(cxpSeleccionada.saldo_pendiente) : undefined;
-
-    // ── Validación del formulario (Regla 6 + CA-1 + R3) ────────────────────
     const esNC = form.tipo_comprobante === 'Nota de Crédito';
 
     const errFecha = useMemo(() => {
-        if (esNC) return null; // NC no tiene fecha de vencimiento
-        if (!form.fecha_vencimiento) return null; // el campo vacío lo captura el required
+        if (esNC) return null;
+        if (!form.fecha_vencimiento) return null;
         return form.fecha_vencimiento < form.fecha_emision
             ? 'La fecha de vencimiento no puede ser anterior a la de emisión.'
             : null;
@@ -257,67 +222,50 @@ useEffect(() => {
     }, [form, esNC, errFecha, maxMontoNC]);
 
     // ── Handlers de formulario ──────────────────────────────────────────────
-        // ── Handlers de formulario ──────────────────────────────────────────────
-                // ── Handlers de formulario ──────────────────────────────────────────────
-const handleChange = (e) => {
-    const { name, value } = e.target;
-    
-    setForm((prev) => {
-        const next = { ...prev };
+    const handleChange = (e) => {
+        const { name, value } = e.target;
+        setForm((prev) => {
+            const next = { ...prev };
 
-        // 1. Formatear el número de comprobante
-        if (name === 'numero_comprobante') {
-            let soloNumeros = value.replace(/\D/g, '');
-            if (soloNumeros.length > 12) soloNumeros = soloNumeros.substring(0, 12);
-            
-            if (soloNumeros.length > 4) {
-                next[name] = `${soloNumeros.substring(0, 4)}-${soloNumeros.substring(4)}`;
+            if (name === 'numero_comprobante') {
+                let soloNumeros = value.replace(/\D/g, '');
+                if (soloNumeros.length > 12) soloNumeros = soloNumeros.substring(0, 12);
+                if (soloNumeros.length > 4) {
+                    next[name] = `${soloNumeros.substring(0, 4)}-${soloNumeros.substring(4)}`;
+                } else {
+                    next[name] = soloNumeros;
+                }
+            } else if (name === 'monto_total') {
+                let montoLimpio = value.replace(/[^0-9.]/g, '');
+                next[name] = montoLimpio.substring(0, 13);
             } else {
-                next[name] = soloNumeros;
+                next[name] = value;
             }
-        } 
-        // 2. NUEVA LÓGICA: Limitar el monto a 13 dígitos
-        else if (name === 'monto_total') {
-            // Permite solo números y un punto decimal, limitando la longitud a 13
-            let montoLimpio = value.replace(/[^0-9.]/g, '');
-            next[name] = montoLimpio.substring(0, 13);
-        } 
-        // 3. Comportamiento normal para el resto
-        else {
-            next[name] = value;
-        }
 
-        // Al cambiar tipo, limpiar campos que no aplican
-        if (name === 'tipo_comprobante') {
-            next.id_cuenta_por_pagar = '';
-            next.monto_total = '';
-            if (value === 'Nota de Crédito') {
-                next.fecha_vencimiento = '';
-            }
-        }
-        
-        // Al cambiar la CxP, ajustar monto si supera el saldo
-        if (name === 'id_cuenta_por_pagar') {
-            const cxp = cxpPendientes.find((c) => String(c.id) === value);
-            if (cxp && Number(prev.monto_total) > Number(cxp.saldo_pendiente)) {
+            if (name === 'tipo_comprobante') {
+                next.id_cuenta_por_pagar = '';
                 next.monto_total = '';
+                if (value === 'Nota de Crédito') next.fecha_vencimiento = '';
             }
-        }
-        
-        return next;
-    });
-};
+            
+            if (name === 'id_cuenta_por_pagar') {
+                const cxp = cxpPendientes.find((c) => String(c.id) === value);
+                if (cxp && Number(prev.monto_total) > Number(cxp.saldo_pendiente)) {
+                    next.monto_total = '';
+                }
+            }
+            return next;
+        });
+    };
 
-    // Maneja los cambios de los inputs de la fila de detalle
     const handleDetalleChange = (e) => {
         const { name, value } = e.target;
         setDetalleActual(prev => ({ ...prev, [name]: value }));
     };
 
-    // Agrega la fila temporal al array de detalles
+    // Agregar detalle con recálculo automático de total
     const agregarDetalle = () => {
         const { articulo_id, cantidad, precio_unitario } = detalleActual;
-
         if (!articulo_id || !cantidad || !precio_unitario) {
             alert("Por favor, complete Artículo, Cantidad y Precio para agregar a la grilla.");
             return;
@@ -330,36 +278,31 @@ const handleChange = (e) => {
             subtotal: Number(cantidad) * Number(precio_unitario)
         };
 
-        setDetalles(prev => [...prev, nuevoDetalle]);
+        const nuevosDetalles = [...detalles, nuevoDetalle];
+        setDetalles(nuevosDetalles);
 
-        // Limpiamos los inputs para cargar el siguiente
+        // Recalcular monto_total del formulario automáticamente
+        const nuevoTotal = nuevosDetalles.reduce((acc, curr) => acc + curr.subtotal, 0);
+        setForm(prev => ({ ...prev, monto_total: nuevoTotal }));
+
         setDetalleActual({ articulo_id: '', cantidad: '', precio_unitario: '' });
     };
 
-    // Elimina una fila si el usuario se equivocó
-    // Elimina una fila previa confirmación del usuario
-const eliminarDetalle = (indexToRemove) => {
-    // 1. Mostrar la ventana de confirmación
-    const estaSeguro = window.confirm("¿Estás seguro de que deseas quitar este artículo del comprobante?");
-    
-    // 2. Si el usuario hace clic en "Cancelar", detenemos la función aquí mismo
-    if (!estaSeguro) {
-        return; 
-    }
+    // Quitar detalle con recálculo de total
+    const eliminarDetalle = (indexToRemove) => {
+        if (!window.confirm("¿Deseas quitar este artículo del comprobante?")) return;
 
-    // 3. Si hace clic en "Aceptar", procedemos a borrar y recalcular
-    setDetalles((prevDetalles) => {
-        const nuevosDetalles = prevDetalles.filter((_, i) => i !== indexToRemove);
-        const nuevoTotal = nuevosDetalles.reduce((acc, curr) => acc + curr.subtotal, 0);
-        
-        setForm((prevForm) => ({ ...prevForm, monto_total: nuevoTotal }));
-        
-        return nuevosDetalles;
-    });
-};
+        setDetalles((prevDetalles) => {
+            const nuevosDetalles = prevDetalles.filter((_, i) => i !== indexToRemove);
+            const nuevoTotal = nuevosDetalles.reduce((acc, curr) => acc + curr.subtotal, 0);
+            setForm((prevForm) => ({ ...prevForm, monto_total: nuevoTotal }));
+            return nuevosDetalles;
+        });
+    };
 
     const handleOpenModal = () => {
         setForm(FORM_INICIAL);
+        setDetalles([]);
         setCxpPendientes([]);
         setModalOpen(true);
     };
@@ -369,40 +312,17 @@ const eliminarDetalle = (indexToRemove) => {
         setModalOpen(false);
     };
 
-    // ── Submit ──────────────────────────────────────────────────────────────
+    // ── Submit limpio ───────────────────────────────────────────────────────
     const handleSubmit = async (e) => {
         e.preventDefault();
 
-        console.log("Estado del form:", form);
-    console.log("¿Es válido?:", isFormValid);
+        if (detalles.length === 0) {
+            alert("Debe agregar al menos un artículo al detalle del comprobante.");
+            return;
+        }
 
+        if (!isFormValid || submitting) return;
 
-            // 1. NUEVA VALIDACIÓN: Asegurar que hay detalles cargados
-    if (detalles.length === 0) {
-        alert("Debe agregar al menos un artículo al detalle del comprobante.");
-        return;
-    }
-
-    const esNC = form.tipo_comprobante === 'Nota de Crédito';
-
-    // 2. INYECTAR DETALLES AL PAYLOAD
-    const payload = {
-        proveedor_id: form.proveedor_id,
-        tipo_comprobante: form.tipo_comprobante,
-        numero_comprobante: form.numero_comprobante.trim(),
-        monto_total: Number(form.monto_total),
-        fecha_emision: form.fecha_emision,
-        fecha_vencimiento: esNC ? null : form.fecha_vencimiento,
-        id_cuenta_por_pagar: esNC ? form.id_cuenta_por_pagar : null,
-        orden_compra_id: form.orden_compra_id || null,
-        detalles: detalles // <--- SE ENVÍA EL ARRAY AL BACKEND
-    };
-
-        if (!isFormValid || submitting) {
-
-            console.log("Bloqueado por validación. Saliendo...");
-            return;}
-            
         setSubmitting(true);
         try {
             const payload = {
@@ -414,17 +334,13 @@ const eliminarDetalle = (indexToRemove) => {
                 fecha_vencimiento: esNC ? null : form.fecha_vencimiento,
                 id_cuenta_por_pagar: esNC ? form.id_cuenta_por_pagar : null,
                 orden_compra_id: form.orden_compra_id || null,
-                detalles: detalles
+                detalles
             };
 
             await registrarComprobante(payload);
-
             setModalOpen(false);
             cargarDatos();
-            showToast(
-                `${form.tipo_comprobante} ${form.numero_comprobante} registrada correctamente.`,
-                'ok'
-            );
+            showToast(`${form.tipo_comprobante} ${form.numero_comprobante} registrada correctamente.`, 'ok');
         } catch (err) {
             if (err.message === 'COMPROBANTE_DUPLICADO') {
                 showToast('Comprobante duplicado para este proveedor.', 'err');
@@ -436,35 +352,71 @@ const eliminarDetalle = (indexToRemove) => {
         }
     };
 
-    // ── KPIs de resumen ─────────────────────────────────────────────────────
+    // ── Filtrado dinámico de tablas ─────────────────────────────────────────
+    const comprobantesFiltrados = useMemo(() => {
+        const busq = busquedaCompras.trim().toLowerCase();
+        return comprobantes.filter((c) => {
+            const nro = (c.numero_comprobante || '').toLowerCase();
+            const prov = (c.proveedores?.razon_social || '').toLowerCase();
+            const coincideTexto = !busq || nro.includes(busq) || prov.includes(busq);
+
+            let coincideTipo = true;
+            if (filtroTipoCompras === 'facturas') {
+                coincideTipo = c.tipo_comprobante && c.tipo_comprobante.startsWith('Factura');
+            } else if (filtroTipoCompras !== 'todos') {
+                coincideTipo = c.tipo_comprobante === filtroTipoCompras;
+            }
+
+            return coincideTexto && coincideTipo;
+        });
+    }, [comprobantes, busquedaCompras, filtroTipoCompras]);
+
+    const ventasFiltradas = useMemo(() => {
+        const busq = busquedaVentas.trim().toLowerCase();
+        return ventas.filter((v) => {
+            const nro = (v.numeroComprobante || '').toLowerCase();
+            const cli = (v.cliente || '').toLowerCase();
+            const coincideTexto = !busq || nro.includes(busq) || cli.includes(busq);
+
+            const estado = v.estado || 'Confirmada';
+            const coincideEstado = filtroEstadoVentas === 'todos' || estado === filtroEstadoVentas;
+
+            return coincideTexto && coincideEstado;
+        });
+    }, [ventas, busquedaVentas, filtroEstadoVentas]);
+
+    // ── KPIs ────────────────────────────────────────────────────────────────
     const kpis = useMemo(() => {
         const facturas = comprobantes.filter((c) => c.tipo_comprobante && c.tipo_comprobante.startsWith('Factura'));
         const nc = comprobantes.filter((c) => c.tipo_comprobante === 'Nota de Crédito');
         const nd = comprobantes.filter((c) => c.tipo_comprobante === 'Nota de Débito');
-        const remitos = comprobantes.filter((c) => c.tipo_comprobante === 'Remito'); // <-- Agregado
-        
+        const remitos = comprobantes.filter((c) => c.tipo_comprobante === 'Remito');
         const totalFacturado = facturas.reduce((a, c) => a + Number(c.monto_total), 0);
         
         return { 
             facturas: facturas.length, 
             nc: nc.length, 
             nd: nd.length, 
-            remitos: remitos.length, // <-- Lo devolvemos para mostrarlo si lo deseas
+            remitos: remitos.length, 
             totalFacturado 
         };
-        }, [comprobantes]);
+    }, [comprobantes]);
 
     const kpisVentas = useMemo(() => {
-        const totalVendido = ventas.reduce((a, v) => a + v.total, 0);
-        const metodosUsados = new Set(ventas.flatMap((v) => v.metodosPago));
-        return { cantidad: ventas.length, totalVendido, metodosUsados: metodosUsados.size };
+        const confirmadas = ventas.filter(v => (v.estado || 'Confirmada') === 'Confirmada');
+        const pendientes = ventas.filter(v => v.estado === 'Pendiente');
+        const totalVendido = confirmadas.reduce((a, v) => a + v.total, 0);
+        return { 
+            cantidad: confirmadas.length, 
+            pendientes: pendientes.length, 
+            totalVendido 
+        };
     }, [ventas]);
 
-   
     // ── Render ──────────────────────────────────────────────────────────────
     return (
         <div>
-            {/* Toast */}
+            {/* Banner Toast */}
             {toast && (
                 <div className={`confirm-banner${toast.type === 'err' ? ' confirm-banner--error' : ''}`}
                     style={toast.type === 'err' ? {
@@ -481,12 +433,12 @@ const eliminarDetalle = (indexToRemove) => {
                 </div>
             )}
 
-            {/* Toolbar */}
-            <div className="catalog-toolbar">
+            {/* Selector de vista Compras / Ventas */}
+            <div className="catalog-toolbar" style={{ marginBottom: '14px' }}>
                 <span style={{ fontSize: '13px', color: 'var(--gray-500)' }}>
                     {vista === 'compras'
-                        ? `${comprobantes.length} comprobante${comprobantes.length !== 1 ? 's' : ''} de compra registrado${comprobantes.length !== 1 ? 's' : ''}`
-                        : `${ventas.length} comprobante${ventas.length !== 1 ? 's' : ''} de venta confirmado${ventas.length !== 1 ? 's' : ''}`}
+                        ? `${comprobantes.length} comprobante${comprobantes.length !== 1 ? 's' : ''} de compra registrados`
+                        : `${ventas.length} transacción${ventas.length !== 1 ? 'es' : ''} de venta registradas`}
                 </span>
 
                 <div className="view-toggle" style={{ marginLeft: 'auto' }}>
@@ -505,11 +457,7 @@ const eliminarDetalle = (indexToRemove) => {
                 </div>
 
                 {vista === 'compras' ? (
-                    <button
-                        className="btn btn-primary"
-                        onClick={handleOpenModal}
-                        disabled={loading}
-                    >
+                    <button className="btn btn-primary" onClick={handleOpenModal} disabled={loading}>
                         <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M12 5v14M5 12h14" />
                         </svg>
@@ -525,9 +473,12 @@ const eliminarDetalle = (indexToRemove) => {
                 )}
             </div>
 
+            {/* ============================================================== */}
+            {/* VISTA COMPRAS                                                 */}
+            {/* ============================================================== */}
             {vista === 'compras' ? (
                 <>
-                    {/* KPIs — Compras */}
+                    {/* KPIs Compras */}
                     <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(5, 1fr)' }}>
                         <div className="stat-card">
                             <div className="stat-value">{kpis.facturas}</div>
@@ -551,8 +502,39 @@ const eliminarDetalle = (indexToRemove) => {
                         </div>
                     </div>
 
-                    {/* Tabla — Compras */}
-                    <div className="table-panel">
+                    {/* Barra de Filtros de Compras */}
+                    <div className="catalog-toolbar" style={{ marginTop: '14px', background: '#fff', padding: '10px 14px', borderRadius: '6px', border: '1px solid var(--border-color, #e5e7eb)' }}>
+                        <div className="search-input" style={{ flex: 1 }}>
+                            <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <circle cx="11" cy="11" r="7" />
+                                <path d="m21 21-4.3-4.3" />
+                            </svg>
+                            <input
+                                type="text"
+                                placeholder="Buscar por número o proveedor…"
+                                value={busquedaCompras}
+                                onChange={(e) => setBusquedaCompras(e.target.value)}
+                            />
+                        </div>
+
+                        <div className="select-field" style={{ marginLeft: '12px' }}>
+                            Tipo:
+                            <select
+                                value={filtroTipoCompras}
+                                onChange={(e) => setFiltroTipoCompras(e.target.value)}
+                                style={{ border: 'none', outline: 'none', background: 'transparent', marginLeft: '6px', fontWeight: '500' }}
+                            >
+                                <option value="todos">Todos los tipos</option>
+                                <option value="facturas">Facturas (A, B, C)</option>
+                                <option value="Nota de Crédito">Notas de Crédito</option>
+                                <option value="Nota de Débito">Notas de Débito</option>
+                                <option value="Remito">Remitos</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    {/* Tabla Compras */}
+                    <div className="table-panel" style={{ marginTop: '12px' }}>
                         <div className="table-scroll">
                             <table>
                                 <thead>
@@ -569,17 +551,19 @@ const eliminarDetalle = (indexToRemove) => {
                                     {loading ? (
                                         <tr>
                                             <td colSpan={6} style={{ textAlign: 'center', padding: '30px', color: 'var(--gray-500)' }}>
-                                                Cargando…
+                                                Cargando comprobantes…
                                             </td>
                                         </tr>
-                                    ) : comprobantes.length === 0 ? (
+                                    ) : comprobantesFiltrados.length === 0 ? (
                                         <tr>
                                             <td colSpan={6} style={{ textAlign: 'center', padding: '30px', color: 'var(--gray-500)' }}>
-                                                No hay comprobantes registrados todavía.
+                                                {comprobantes.length === 0 
+                                                    ? 'No hay comprobantes registrados todavía.' 
+                                                    : 'No hay comprobantes que coincidan con la búsqueda.'}
                                             </td>
                                         </tr>
                                     ) : (
-                                        comprobantes.map((c) => {
+                                        comprobantesFiltrados.map((c) => {
                                             const badge = BADGE_MAP[c.tipo_comprobante] ?? { label: c.tipo_comprobante, cls: '' };
                                             return (
                                                 <tr key={c.id}>
@@ -604,25 +588,57 @@ const eliminarDetalle = (indexToRemove) => {
                     </div>
                 </>
             ) : (
+                /* ========================================================== */
+                /* VISTA VENTAS                                               */
+                /* ========================================================== */
                 <>
-                    {/* KPIs — Ventas */}
+                    {/* KPIs Ventas */}
                     <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
                         <div className="stat-card">
                             <div className="stat-value">{kpisVentas.cantidad}</div>
                             <div className="stat-label">Ventas confirmadas</div>
                         </div>
                         <div className="stat-card">
+                            <div className="stat-value" style={{ color: 'var(--amber, #f59e0b)' }}>{kpisVentas.pendientes}</div>
+                            <div className="stat-label">Pendientes de cobro</div>
+                        </div>
+                        <div className="stat-card">
                             <div className="stat-value" style={{ color: 'var(--green)' }}>{formatearMonto(kpisVentas.totalVendido)}</div>
                             <div className="stat-label">Total vendido</div>
                         </div>
-                        <div className="stat-card">
-                            <div className="stat-value">{kpisVentas.metodosUsados}</div>
-                            <div className="stat-label">Métodos de pago distintos usados</div>
+                    </div>
+
+                    {/* Barra de Filtros de Ventas */}
+                    <div className="catalog-toolbar" style={{ marginTop: '14px', background: '#fff', padding: '10px 14px', borderRadius: '6px', border: '1px solid var(--border-color, #e5e7eb)' }}>
+                        <div className="search-input" style={{ flex: 1 }}>
+                            <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <circle cx="11" cy="11" r="7" />
+                                <path d="m21 21-4.3-4.3" />
+                            </svg>
+                            <input
+                                type="text"
+                                placeholder="Buscar por número (ej: VTA-00001) o cliente…"
+                                value={busquedaVentas}
+                                onChange={(e) => setBusquedaVentas(e.target.value)}
+                            />
+                        </div>
+
+                        <div className="select-field" style={{ marginLeft: '12px' }}>
+                            Estado:
+                            <select
+                                value={filtroEstadoVentas}
+                                onChange={(e) => setFiltroEstadoVentas(e.target.value)}
+                                style={{ border: 'none', outline: 'none', background: 'transparent', marginLeft: '6px', fontWeight: '500' }}
+                            >
+                                <option value="todos">Todos los estados</option>
+                                <option value="Pendiente">Pendientes de cobro</option>
+                                <option value="Confirmada">Confirmadas</option>
+                            </select>
                         </div>
                     </div>
 
-                    {/* Tabla — Ventas */}
-                    <div className="table-panel">
+                    {/* Tabla Ventas */}
+                    <div className="table-panel" style={{ marginTop: '12px' }}>
                         <div className="table-scroll">
                             <table>
                                 <thead>
@@ -631,40 +647,58 @@ const eliminarDetalle = (indexToRemove) => {
                                         <th>Cliente</th>
                                         <th>Tienda</th>
                                         <th>Total</th>
-                                        <th>Fecha</th>
-                                        <th>Pago</th>
+                                        <th>Fecha / Hora</th>
+                                        <th>Estado / Pago</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {loadingVentas ? (
                                         <tr>
                                             <td colSpan={6} style={{ textAlign: 'center', padding: '30px', color: 'var(--gray-500)' }}>
-                                                Cargando…
+                                                Cargando ventas…
                                             </td>
                                         </tr>
-                                    ) : ventas.length === 0 ? (
+                                    ) : ventasFiltradas.length === 0 ? (
                                         <tr>
                                             <td colSpan={6} style={{ textAlign: 'center', padding: '30px', color: 'var(--gray-500)' }}>
-                                                Todavía no se confirmó ninguna venta desde el Punto de Venta.
+                                                {ventas.length === 0 
+                                                    ? 'No se registraron ventas en el Punto de Venta.' 
+                                                    : 'No hay ventas que coincidan con los filtros aplicados.'}
                                             </td>
                                         </tr>
                                     ) : (
-                                        ventas.map((v) => (
-                                            <tr key={v.ventaId}>
-                                                <td>
-                                                    <span className="badge badge-green">
-                                                        <span className="badge-dot" />
-                                                        VTA
-                                                    </span>{' '}
-                                                    <span className="cell-mono">{v.numeroComprobante}</span>
-                                                </td>
-                                                <td>{v.cliente}</td>
-                                                <td>{v.deposito}</td>
-                                                <td>{formatearMonto(v.total)}</td>
-                                                <td>{formatearFechaHora(v.fechaHoraRegistro)}</td>
-                                                <td>{v.metodosPago.join(', ') || '—'}</td>
-                                            </tr>
-                                        ))
+                                        ventasFiltradas.map((v) => {
+                                            const estado = v.estado || 'Confirmada';
+                                            const badge = BADGE_VENTAS[estado] || { label: estado, cls: 'badge-gray' };
+                                            const esPendiente = estado === 'Pendiente';
+
+                                            return (
+                                                <tr key={v.ventaId || v.id}>
+                                                    <td>
+                                                        <span className={`badge ${badge.cls}`}>
+                                                            <span className="badge-dot" />
+                                                            {badge.label}
+                                                        </span>{' '}
+                                                        <span className="cell-mono" style={{ fontWeight: '600' }}>
+                                                            {v.numeroComprobante || v.numero_comprobante}
+                                                        </span>
+                                                    </td>
+                                                    <td>{v.cliente || 'Consumidor final'}</td>
+                                                    <td>{v.deposito || '—'}</td>
+                                                    <td style={{ fontWeight: '500' }}>{formatearMonto(v.total)}</td>
+                                                    <td>{formatearFechaHora(v.fechaHoraRegistro || v.fechaHoraReserva)}</td>
+                                                    <td>
+                                                        {esPendiente ? (
+                                                            <span style={{ color: 'var(--amber, #f59e0b)', fontWeight: '500', fontSize: '12px' }}>
+                                                                Esperando cobro en caja
+                                                            </span>
+                                                        ) : (
+                                                            (v.metodosPago && v.metodosPago.length > 0) ? v.metodosPago.join(', ') : 'Contado'
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })
                                     )}
                                 </tbody>
                             </table>
@@ -673,9 +707,9 @@ const eliminarDetalle = (indexToRemove) => {
                 </>
             )}
 
-            {/* ================================================================ */}
-            {/* MODAL: REGISTRAR COMPROBANTE                                     */}
-            {/* ================================================================ */}
+            {/* ============================================================== */}
+            {/* MODAL: REGISTRAR COMPROBANTE DE PROVEEDOR                     */}
+            {/* ============================================================== */}
             <Modal
                 isOpen={modalOpen}
                 onClose={handleCloseModal}
@@ -686,11 +720,7 @@ const eliminarDetalle = (indexToRemove) => {
                         <button className="btn btn-outline" onClick={handleCloseModal} disabled={submitting}>
                             Cancelar
                         </button>
-                        <button
-                            className="btn btn-primary"
-                            disabled={submitting}
-                            onClick={handleSubmit}
-                        >
+                        <button className="btn btn-primary" disabled={submitting} onClick={handleSubmit}>
                             {submitting ? (
                                 <>
                                     <span className="spinner" style={{
@@ -711,7 +741,6 @@ const eliminarDetalle = (indexToRemove) => {
                 }
             >
                 <form onSubmit={handleSubmit} noValidate>
-
                     {/* Fila 1: Proveedor + Tipo */}
                     <div className="form-row">
                         <div className="form-field">
@@ -719,9 +748,7 @@ const eliminarDetalle = (indexToRemove) => {
                             <select name="proveedor_id" value={form.proveedor_id} onChange={handleChange} required>
                                 <option value="" disabled>Seleccionar proveedor…</option>
                                 {proveedores.map((p) => (
-                                    <option key={p.id} value={p.id}>
-                                        {p.razonSocial}
-                                        </option>
+                                    <option key={p.id} value={p.id}>{p.razonSocial}</option>
                                 ))}
                             </select>
                         </div>
@@ -732,25 +759,24 @@ const eliminarDetalle = (indexToRemove) => {
                             </select>
                         </div>
                     </div>
-                    {/* NUEVO CAMPO: Orden de Compra */}
-    <div className="form-field">
-        <label>Orden de Compra</label>
-        <select 
-            name="orden_compra_id" 
-            value={form.orden_compra_id || ''} 
-            onChange={handleChange}
-            disabled={!form.proveedor_id} /* Se habilita solo si hay un proveedor seleccionado */
-        >
-            <option value="">-- Opcional --</option>
-            
-            {/* Aquí debes mapear tu estado de órdenes de compra filtradas */}
-            {ordenesCompra?.map((oc) => (
-                <option key={oc.id} value={oc.id}>
-                    OC #{oc.numero_oc || oc.id.slice(0,8)}
-                </option>
-            ))}
-        </select>
-    </div>
+
+                    {/* Orden de Compra */}
+                    <div className="form-field">
+                        <label>Orden de Compra</label>
+                        <select 
+                            name="orden_compra_id" 
+                            value={form.orden_compra_id || ''} 
+                            onChange={handleChange}
+                            disabled={!form.proveedor_id}
+                        >
+                            <option value="">-- Opcional (Asociar a Orden de Compra) --</option>
+                            {ordenesCompra?.map((oc) => (
+                                <option key={oc.id} value={oc.id}>
+                                    OC #{oc.numero_oc || oc.id.slice(0, 8)}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
 
                     {/* Fila 2 (solo NC): Selección de factura pendiente */}
                     {esNC && (
@@ -800,9 +826,9 @@ const eliminarDetalle = (indexToRemove) => {
                                 value={form.numero_comprobante}
                                 onChange={handleChange}
                                 placeholder="Ej: 0001-00001234"
-                                maxLength="13" /* 12 números + 1 guion */
-                                pattern="\d{4}-\d{8}" /* Validación nativa de HTML5 */
-                                title="El formato debe ser 0000-00000000 (4 dígitos, un guion, 8 dígitos)"
+                                maxLength="13"
+                                pattern="\d{4}-\d{8}"
+                                title="El formato debe ser 0000-00000000"
                                 required
                             />
                         </div>
@@ -834,7 +860,7 @@ const eliminarDetalle = (indexToRemove) => {
                         </div>
                     </div>
 
-                    {/* Fila 4: Fecha emisión + Fecha vencimiento (oculta para NC) */}
+                    {/* Fila 4: Fechas */}
                     <div className="form-row">
                         <div className="form-field">
                             <label>Fecha de emisión <span className="req">*</span></label>
@@ -875,119 +901,116 @@ const eliminarDetalle = (indexToRemove) => {
                         )}
                     </div>
 
-                        {/* ================= SECCIÓN DE DETALLE DE ARTÍCULOS ================= */}
-<div className="detalle-section" style={{ marginTop: '20px', padding: '20px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px', boxSizing: 'border-box', width: '100%' }}>
-    <h3 style={{ marginTop: 0, marginBottom: '15px', fontSize: '1.1rem', color: '#333' }}>Detalle de Artículos</h3>
-    
-    {/* Fila de inputs usando CSS Grid para evitar desbordes */}
-    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(120px, 2fr) 1fr 1fr auto', gap: '15px', alignItems: 'end', marginBottom: '20px', width: '100%' }}>
-        
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-            <label style={{ fontSize: '0.9rem', color: '#555' }}>Artículo</label>
-            <select 
-                name="articulo_id" 
-                value={detalleActual.articulo_id} 
-                onChange={handleDetalleChange} 
-                style={{ width: '100%', padding: '8px', boxSizing: 'border-box', borderRadius: '4px', border: '1px solid #ccc' }}
-            >
-                <option value="">Seleccionar artículo...</option>
-                {articulos.map(art => (
-                    <option key={art.id} value={art.id}>
-                        {art.codigo_interno} - {art.descripcion}
-                    </option>
-                ))}
-            </select>
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-            <label style={{ fontSize: '0.9rem', color: '#555' }}>Cantidad</label>
-            <input 
-                type="number" 
-                name="cantidad" 
-                value={detalleActual.cantidad} 
-                onChange={handleDetalleChange} 
-                min="1" 
-                style={{ width: '100%', padding: '8px', boxSizing: 'border-box', borderRadius: '4px', border: '1px solid #ccc' }} 
-            />
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-            <label style={{ fontSize: '0.9rem', color: '#555' }}>Precio Unit.</label>
-            <input 
-                type="number" 
-                step="0.01" 
-                name="precio_unitario" 
-                value={detalleActual.precio_unitario} 
-                onChange={handleDetalleChange} 
-                style={{ width: '100%', padding: '8px', boxSizing: 'border-box', borderRadius: '4px', border: '1px solid #ccc' }} 
-            />
-        </div>
-
-        <div>
-            <button 
-                type="button" 
-                onClick={agregarDetalle} 
-                style={{ padding: '8px 16px', height: '35px', cursor: 'pointer', backgroundColor: '#e42e2e', color: '#fff', border: 'none', borderRadius: '4px', fontWeight: '500', whiteSpace: 'nowrap' }}
-            >
-                + Agregar
-            </button>
-        </div>
-    </div>
-
-    {/* Tabla de visualización de los detalles agregados */}
-    {detalles.length > 0 && (
-        <div style={{ overflowX: 'auto', width: '100%' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '10px', fontSize: '0.95rem' }}>
-                <thead>
-                    <tr style={{ borderBottom: '2px solid #ddd', textAlign: 'left' }}>
-                        <th style={{ padding: '8px' }}>Artículo</th>
-                        <th style={{ padding: '8px' }}>Cant.</th>
-                        <th style={{ padding: '8px' }}>Precio U.</th>
-                        <th style={{ padding: '8px' }}>Subtotal</th>
-                        <th style={{ padding: '8px', textAlign: 'center' }}>Acción</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {detalles.map((det, index) => {
-                        const articulo = articulos.find(a => String(a.id) === String(det.articulo_id));
-                        const nombreArticulo = articulo ? (articulo.nombre || articulo.descripcion) : 'Artículo Desconocido';
+                    {/* Detalle de Artículos */}
+                    <div className="detalle-section" style={{ marginTop: '20px', padding: '20px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px', boxSizing: 'border-box', width: '100%' }}>
+                        <h3 style={{ marginTop: 0, marginBottom: '15px', fontSize: '1.1rem', color: '#333' }}>Detalle de Artículos</h3>
                         
-                        return (
-                            <tr key={index} style={{ borderBottom: '1px solid #eee' }}>
-                                <td style={{ padding: '8px' }}>{nombreArticulo}</td>
-                                <td style={{ padding: '8px' }}>{det.cantidad}</td>
-                                <td style={{ padding: '8px' }}>${det.precio_unitario.toFixed(2)}</td>
-                                <td style={{ padding: '8px' }}>${det.subtotal.toFixed(2)}</td>
-                                <td style={{ padding: '8px', textAlign: 'center' }}>
-                                    <button type="button" onClick={() => eliminarDetalle(index)} style={{ color: '#ef4444', cursor: 'pointer', border: 'none', background: 'none', fontWeight: 'bold' }}>
-                                        Quitar
-                                    </button>
-                                </td>
-                            </tr>
-                        );
-                    })}
-                </tbody>
-                <tfoot>
-                    <tr>
-                        <td colSpan="3" style={{ textAlign: 'right', fontWeight: 'bold', padding: '12px 8px' }}>Total Calculado:</td>
-                        <td style={{ fontWeight: 'bold', padding: '12px 8px', color: '#047857' }}>
-                            ${detalles.reduce((acc, curr) => acc + curr.subtotal, 0).toFixed(2)}
-                        </td>
-                        <td></td>
-                    </tr>
-                </tfoot>
-            </table>
-        </div>
-    )}
-</div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(120px, 2fr) 1fr 1fr auto', gap: '15px', alignItems: 'end', marginBottom: '20px', width: '100%' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                                <label style={{ fontSize: '0.9rem', color: '#555' }}>Artículo</label>
+                                <select 
+                                    name="articulo_id" 
+                                    value={detalleActual.articulo_id} 
+                                    onChange={handleDetalleChange} 
+                                    style={{ width: '100%', padding: '8px', boxSizing: 'border-box', borderRadius: '4px', border: '1px solid #ccc' }}
+                                >
+                                    <option value="">Seleccionar artículo...</option>
+                                    {articulos.map(art => (
+                                        <option key={art.id} value={art.id}>
+                                            {art.codigo_interno} - {art.descripcion}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
 
-                    {/* Info visual según tipo */}
-                    {form.tipo_comprobante === 'Factura' && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                                <label style={{ fontSize: '0.9rem', color: '#555' }}>Cantidad</label>
+                                <input 
+                                    type="number" 
+                                    name="cantidad" 
+                                    value={detalleActual.cantidad} 
+                                    onChange={handleDetalleChange} 
+                                    min="1" 
+                                    style={{ width: '100%', padding: '8px', boxSizing: 'border-box', borderRadius: '4px', border: '1px solid #ccc' }} 
+                                />
+                            </div>
+
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                                <label style={{ fontSize: '0.9rem', color: '#555' }}>Precio Unit.</label>
+                                <input 
+                                    type="number" 
+                                    step="0.01" 
+                                    name="precio_unitario" 
+                                    value={detalleActual.precio_unitario} 
+                                    onChange={handleDetalleChange} 
+                                    style={{ width: '100%', padding: '8px', boxSizing: 'border-box', borderRadius: '4px', border: '1px solid #ccc' }} 
+                                />
+                            </div>
+
+                            <div>
+                                <button 
+                                    type="button" 
+                                    onClick={agregarDetalle} 
+                                    style={{ padding: '8px 16px', height: '35px', cursor: 'pointer', backgroundColor: '#e42e2e', color: '#fff', border: 'none', borderRadius: '4px', fontWeight: '500', whiteSpace: 'nowrap' }}
+                                >
+                                    + Agregar
+                                </button>
+                            </div>
+                        </div>
+
+                        {detalles.length > 0 && (
+                            <div style={{ overflowX: 'auto', width: '100%' }}>
+                                <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '10px', fontSize: '0.95rem' }}>
+                                    <thead>
+                                        <tr style={{ borderBottom: '2px solid #ddd', textAlign: 'left' }}>
+                                            <th style={{ padding: '8px' }}>Artículo</th>
+                                            <th style={{ padding: '8px' }}>Cant.</th>
+                                            <th style={{ padding: '8px' }}>Precio U.</th>
+                                            <th style={{ padding: '8px' }}>Subtotal</th>
+                                            <th style={{ padding: '8px', textAlign: 'center' }}>Acción</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {detalles.map((det, index) => {
+                                            const articulo = articulos.find(a => String(a.id) === String(det.articulo_id));
+                                            const nombreArticulo = articulo ? (articulo.nombre || articulo.descripcion) : 'Artículo Desconocido';
+                                            
+                                            return (
+                                                <tr key={index} style={{ borderBottom: '1px solid #eee' }}>
+                                                    <td style={{ padding: '8px' }}>{nombreArticulo}</td>
+                                                    <td style={{ padding: '8px' }}>{det.cantidad}</td>
+                                                    <td style={{ padding: '8px' }}>${det.precio_unitario.toFixed(2)}</td>
+                                                    <td style={{ padding: '8px' }}>${det.subtotal.toFixed(2)}</td>
+                                                    <td style={{ padding: '8px', textAlign: 'center' }}>
+                                                        <button type="button" onClick={() => eliminarDetalle(index)} style={{ color: '#ef4444', cursor: 'pointer', border: 'none', background: 'none', fontWeight: 'bold' }}>
+                                                            Quitar
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                    <tfoot>
+                                        <tr>
+                                            <td colSpan="3" style={{ textAlign: 'right', fontWeight: 'bold', padding: '12px 8px' }}>Total Calculado:</td>
+                                            <td style={{ fontWeight: 'bold', padding: '12px 8px', color: '#047857' }}>
+                                                ${detalles.reduce((acc, curr) => acc + curr.subtotal, 0).toFixed(2)}
+                                            </td>
+                                            <td></td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Avisos contextuales */}
+                    {form.tipo_comprobante.startsWith('Factura') && (
                         <div className="modal-notice">
                             <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <circle cx="12" cy="12" r="10" /><path d="M12 16v-4M12 8h.01" />
                             </svg>
-                            Al guardar se generará automáticamente una nueva Cuenta por Pagar por {Number(form.monto_total) > 0 ? formatearMonto(form.monto_total) : 'el monto ingresado'}.
+                            Al guardar se generará automáticamente una nueva Cuenta por Pagar por {Number(form.monto_total) > 0 ? formatearMonto(form.monto_total) : 'el monto total'}.
                         </div>
                     )}
                     {form.tipo_comprobante === 'Nota de Débito' && (
@@ -1003,14 +1026,11 @@ const eliminarDetalle = (indexToRemove) => {
                             <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <circle cx="12" cy="12" r="10" /><path d="M12 16v-4M12 8h.01" />
                             </svg>
-                            Se descontarán {Number(form.monto_total) > 0 ? formatearMonto(form.monto_total) : '…'}
-                            {' '}del saldo de la factura seleccionada (saldo actual: {formatearMonto(cxpSeleccionada.saldo_pendiente)}).
+                            Se descontarán {Number(form.monto_total) > 0 ? formatearMonto(form.monto_total) : '…'} del saldo de la factura seleccionada (saldo actual: {formatearMonto(cxpSeleccionada.saldo_pendiente)}).
                         </div>
                     )}
-
                 </form>
 
-                {/* Keyframe inline para el spinner (una sola vez) */}
                 <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
             </Modal>
         </div>
@@ -1018,4 +1038,3 @@ const eliminarDetalle = (indexToRemove) => {
 }
 
 export default RegistroComprobanteProveedor;
-

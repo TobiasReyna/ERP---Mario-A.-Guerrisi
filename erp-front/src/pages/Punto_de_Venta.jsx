@@ -13,8 +13,6 @@ import {
 } from '../services/ventaService';
 import { buscarClientes, crearCliente } from '../services/clientsService';
 
-// Mismo hardcodeo que ya usa Detalle_producto.jsx mientras no exista
-// una historia de usuario de login/roles de sesión.
 const USUARIO_ACTUAL_ID = '00000000-0000-0000-0000-000000000001';
 
 const METODOS_PAGO = [
@@ -37,20 +35,35 @@ function Punto_de_Venta() {
   const [carrito, setCarrito] = useState([]);
   const [cliente, setCliente] = useState(null);
 
+  // Modal Cliente
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
   const [clientQuery, setClientQuery] = useState('');
   const [clientResults, setClientResults] = useState([]);
   const [clientSearchLoading, setClientSearchLoading] = useState(false);
   const [mostrarAltaCliente, setMostrarAltaCliente] = useState(false);
   const [nuevoClienteForm, setNuevoClienteForm] = useState({
-    razonSocial: '', dni: '', cuit: '', telefono: '', direccion: '',
+    razonSocial: '', dni: '', cuit: '', email: '', telefono: '', direccion: '',
   });
   const [creandoCliente, setCreandoCliente] = useState(false);
 
-  const [venta, setVenta] = useState(null); // null = todavía armando el carrito
+  // Venta y Cobro
+  const [venta, setVenta] = useState(null);
   const [procesando, setProcesando] = useState(false);
-  const [pagoForm, setPagoForm] = useState({ metodo: 'efectivo', monto: '' });
   const [toast, setToast] = useState(null);
+
+  // Estado del formulario de pago extendido y realista
+  const [pagoForm, setPagoForm] = useState({
+    metodo: 'efectivo',
+    monto: '',
+    // Campos realistas específicos
+    pagaCon: '',
+    marcaTarjeta: 'Visa',
+    cuotas: '1',
+    numeroCupon: '',
+    bancoTransferencia: 'Mercado Pago',
+    comprobanteTransf: '',
+    plazoCtaCte: '30 días',
+  });
 
   const [modoPago, setModoPago] = useState(false);
   const [modoBuscarVenta, setModoBuscarVenta] = useState(false);
@@ -59,7 +72,7 @@ function Punto_de_Venta() {
   const [buscandoVenta, setBuscandoVenta] = useState(false);
   const [isVentaBuscada, setIsVentaBuscada] = useState(false);
 
-  // Cargar depósitos una vez, y elegir el primero por defecto
+  // Cargar depósitos iniciales
   useEffect(() => {
     listarDepositos().then((data) => {
       setDepositos(data);
@@ -67,7 +80,7 @@ function Punto_de_Venta() {
     });
   }, []);
 
-  // Recargar catálogo cada vez que cambia el depósito activo
+  // Cargar catálogo según depósito
   useEffect(() => {
     if (!activeDepositId) return;
     setCatalogoLoading(true);
@@ -80,7 +93,6 @@ function Punto_de_Venta() {
       .finally(() => setCatalogoLoading(false));
   }, [activeDepositId]);
 
-  // Autodescarte del banner de confirmación
   useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(null), 4500);
@@ -104,6 +116,23 @@ function Punto_de_Venta() {
 
   const totalCarrito = carrito.reduce((acc, it) => acc + it.cantidad * it.precioUnitario, 0);
 
+  const saldoPendiente = useMemo(() => {
+    if (!venta) return 0;
+    const totalPagado = (venta.pagos || []).reduce((acc, p) => acc + Number(p.monto), 0);
+    return Math.max(0, Number(venta.total) - totalPagado);
+  }, [venta]);
+
+  // Cálculo de vuelto para efectivo
+  const vueltoEfectivo = useMemo(() => {
+    const entregado = Number(pagoForm.pagaCon) || 0;
+    const monto = Number(pagoForm.monto) || 0;
+    if (entregado > monto && monto > 0) {
+      return entregado - monto;
+    }
+    return 0;
+  }, [pagoForm.pagaCon, pagoForm.monto]);
+
+  // Manejo de Carrito
   const handleAgregarAlCarrito = (articulo) => {
     if (articulo.disponible <= 0) return;
     setCarrito((prev) => {
@@ -143,7 +172,14 @@ function Punto_de_Venta() {
     setCarrito((prev) => prev.filter((it) => it.articuloId !== articuloId));
   };
 
-  // --- Cliente ---
+  const handleVaciarCarrito = () => {
+    if (carrito.length === 0) return;
+    if (window.confirm('¿Deseas vaciar todos los productos del carrito?')) {
+      setCarrito([]);
+    }
+  };
+
+  // Búsqueda de clientes con debounce
   useEffect(() => {
     if (!isClientModalOpen) return;
     const texto = clientQuery.trim();
@@ -155,8 +191,9 @@ function Punto_de_Venta() {
     const t = setTimeout(() => {
       buscarClientes(texto)
         .then(setClientResults)
+        .catch((err) => console.error(err))
         .finally(() => setClientSearchLoading(false));
-    }, 300); // debounce simple
+    }, 300);
     return () => clearTimeout(t);
   }, [clientQuery, isClientModalOpen]);
 
@@ -166,7 +203,7 @@ function Punto_de_Venta() {
     setClientQuery('');
     setClientResults([]);
     setMostrarAltaCliente(false);
-    setNuevoClienteForm({ razonSocial: '', dni: '', cuit: '', telefono: '', direccion: '' });
+    setNuevoClienteForm({ razonSocial: '', dni: '', cuit: '', email: '', telefono: '', direccion: '' });
   };
 
   const handleAbrirAltaCliente = () => {
@@ -175,6 +212,7 @@ function Punto_de_Venta() {
       razonSocial: /^\d+$/.test(texto) ? '' : texto,
       dni: /^\d+$/.test(texto) ? texto : '',
       cuit: '',
+      email: '',
       telefono: '',
       direccion: '',
     });
@@ -193,14 +231,15 @@ function Punto_de_Venta() {
     }
     setCreandoCliente(true);
     try {
-      const nuevoCliente = await crearCliente({
+      const nuevo = await crearCliente({
         razonSocial: nuevoClienteForm.razonSocial.trim(),
         dni: nuevoClienteForm.dni.trim() || null,
         cuit: nuevoClienteForm.cuit.trim() || null,
+        email: nuevoClienteForm.email.trim() || null,
         telefono: nuevoClienteForm.telefono.trim(),
         direccion: nuevoClienteForm.direccion.trim(),
       });
-      handleSeleccionarCliente(nuevoCliente);
+      handleSeleccionarCliente(nuevo);
     } catch (err) {
       alert(err.message);
     } finally {
@@ -215,7 +254,7 @@ function Punto_de_Venta() {
     setMostrarAltaCliente(false);
   };
 
-  // --- Flujo de venta ---
+  // Flujo Operativo de Venta
   const handleIniciarCobro = async () => {
     if (carrito.length === 0) return;
     setProcesando(true);
@@ -254,16 +293,13 @@ function Punto_de_Venta() {
       setModoPago(false);
       setIsVentaBuscada(true);
     } catch (error) {
-      setErrorBusqueda(error.message || 'No se encontró una venta asociada con el número de comprobante ingresado');
+      setErrorBusqueda(error.message || 'No se encontró una venta asociada al comprobante ingresado.');
     } finally {
       setBuscandoVenta(false);
     }
   };
 
-  const saldoPendiente = venta
-    ? venta.total - (venta.pagos || []).reduce((acc, p) => acc + p.monto, 0)
-    : 0;
-
+  // Envío del pago
   const handleAgregarPago = async (e) => {
     e.preventDefault();
     const monto = Number(pagoForm.monto);
@@ -276,7 +312,14 @@ function Punto_de_Venta() {
       await agregarPago(venta.ventaId, { metodo: pagoForm.metodo, monto });
       const ventaActualizada = await obtenerVenta(venta.ventaId);
       setVenta(ventaActualizada);
-      setPagoForm({ metodo: 'efectivo', monto: '' });
+      // Resetear inputs manteniendo método
+      setPagoForm((prev) => ({
+        ...prev,
+        monto: '',
+        pagaCon: '',
+        numeroCupon: '',
+        comprobanteTransf: '',
+      }));
     } catch (err) {
       alert(err.message);
     } finally {
@@ -298,13 +341,12 @@ function Punto_de_Venta() {
   };
 
   const handleCancelarVenta = async () => {
-    if (!window.confirm('¿Cancelar esta venta? Se libera el stock reservado.')) return;
+    if (!window.confirm('¿Cancelar esta venta? Se liberará el stock reservado.')) return;
     setProcesando(true);
     try {
       await cancelarVenta(venta.ventaId);
-      setVenta(null);
-      setCarrito([]);
-      setCliente(null);
+      handleNuevaVenta();
+      setToast('Venta cancelada y existencias liberadas.');
     } catch (err) {
       alert(err.message);
     } finally {
@@ -328,20 +370,17 @@ function Punto_de_Venta() {
 
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
-      alert('Por favor, permite las ventanas emergentes (pop-ups) para imprimir la factura.');
+      alert('Habilitá las ventanas emergentes para imprimir el comprobante.');
       return;
     }
 
-    const ptoVenta = venta.depositoId === 'bf975c47-946f-406c-bb0e-a41dbe656df4' ? '01' : '02';
+    const ptoVenta = '01';
     const numComprobante = venta.numeroComprobante;
-    
-    // Formatear fecha DD/MM/AAAA
-    const fechaObj = new Date(venta.fechaHoraReserva);
+    const fechaObj = new Date(venta.fechaHoraRegistro || venta.fechaHoraReserva || Date.now());
     const fechaEmision = `${String(fechaObj.getDate()).padStart(2, '0')}/${String(fechaObj.getMonth() + 1).padStart(2, '0')}/${fechaObj.getFullYear()}`;
 
-    // Datos del cliente
     const razonSocial = venta.cliente ? venta.cliente.razonSocial : 'Consumidor final';
-    let docFormat = '';
+    let docFormat = '—';
     if (venta.cliente) {
       if (venta.cliente.cuit && venta.cliente.cuit.length === 11) {
         const c = venta.cliente.cuit;
@@ -352,8 +391,7 @@ function Punto_de_Venta() {
     }
     const domicilio = venta.cliente?.direccion || '—';
 
-    // Condición de Venta
-    const metodos = [...new Set((venta.pagos || []).map(p => METODOS_PAGO.find(m => m.value === p.metodo)?.label || p.metodo))];
+    const metodos = [...new Set((venta.pagos || []).map((p) => METODOS_PAGO.find((m) => m.value === p.metodo)?.label || p.metodo))];
     const condicionVenta = metodos.length > 0 ? metodos.join(' / ') : 'Contado';
 
     const htmlContent = `
@@ -384,8 +422,6 @@ function Punto_de_Venta() {
     .total-box { display: flex; justify-content: flex-end; margin-bottom: 30px; }
     .total-inner { background-color: #f1f5f9; padding: 15px 20px; font-weight: bold; font-size: 14px; border-radius: 4px; }
     .footer-notes { border-left: 4px solid #1a365d; padding-left: 15px; background-color: #f8fafc; padding-top: 10px; padding-bottom: 10px; margin-bottom: 30px; }
-    .footer-notes h4 { margin: 0 0 5px 0; color: #1a365d; }
-    .footer-notes p { margin: 3px 0; color: #555; }
     .footer-bottom { display: flex; justify-content: space-between; color: #888; font-size: 10px; border-top: 1px solid #eee; padding-top: 10px; }
   </style>
 </head>
@@ -397,16 +433,12 @@ function Punto_de_Venta() {
       <p><strong>Teléfono:</strong> 387 573-0925</p>
       <p><strong>Email:</strong> atencion@marioaguerrisi.com</p>
     </div>
-    <div class="header-center">
-      <div class="box-b">B</div>
-    </div>
+    <div class="header-center"><div class="box-b">B</div></div>
     <div class="header-right">
       <h2>FACTURA</h2>
-      <p><strong>Punto de Venta:</strong> ${ptoVenta} - <strong>Comp. Nro:</strong> ${numComprobante}</p>
-      <p><strong>Fecha de Emisión:</strong> ${fechaEmision}</p>
+      <p><strong>Pto. Venta:</strong> ${ptoVenta} - <strong>Nro:</strong> ${numComprobante}</p>
+      <p><strong>Fecha:</strong> ${fechaEmision}</p>
       <p><strong>CUIT:</strong> 30-76543210-9</p>
-      <p><strong>Ingresos Brutos:</strong> 917-30765432109-1</p>
-      <p><strong>Inicio de Actividades:</strong> 15/09/1959</p>
     </div>
   </div>
 
@@ -414,11 +446,11 @@ function Punto_de_Venta() {
     <div class="info-col">
       <p><strong>Señor(es):</strong> ${razonSocial}</p>
       <p><strong>Domicilio:</strong> ${domicilio}</p>
-      <p><strong>Condición de Venta:</strong> ${condicionVenta}</p>
+      <p><strong>Condición Venta:</strong> ${condicionVenta}</p>
     </div>
     <div class="info-col">
       <p><strong>DNI / CUIT:</strong> ${docFormat}</p>
-      <p><strong>Condición:</strong> Consumidor Final</p>
+      <p><strong>Condición IVA:</strong> Consumidor Final</p>
     </div>
   </div>
 
@@ -426,51 +458,38 @@ function Punto_de_Venta() {
     <thead>
       <tr>
         <th class="center" style="width: 10%;">CANT.</th>
-        <th style="width: 50%;">DESCRIPCIÓN DEL PRODUCTO O SERVICIO</th>
+        <th style="width: 50%;">DESCRIPCIÓN</th>
         <th class="right" style="width: 20%;">PRECIO UNIT.</th>
         <th class="right" style="width: 20%;">SUBTOTAL</th>
       </tr>
     </thead>
     <tbody>
-      ${venta.items.map(it => `
+      ${venta.items.map((it) => `
         <tr>
           <td class="center">${it.cantidad}</td>
           <td>${it.descripcion}</td>
           <td class="right">${formatearMonto(it.precioUnitario)}</td>
-          <td class="right">${formatearMonto(it.importeLinea)}</td>
+          <td class="right">${formatearMonto(it.importeLinea ?? it.cantidad * it.precioUnitario)}</td>
         </tr>
       `).join('')}
     </tbody>
   </table>
 
   <div class="total-box">
-    <div class="total-inner">
-      TOTAL A PAGAR &nbsp;&nbsp;&nbsp;&nbsp; ${formatearMonto(venta.total)}
-    </div>
+    <div class="total-inner">TOTAL: ${formatearMonto(venta.total)}</div>
   </div>
 
   <div class="footer-notes">
-    <h4>Notas Adicionales:</h4>
-    <p>Gracias por su compra.</p>
-    <p>La presente factura es un documento válido como comprobante de compra para Consumidor Final.</p>
-  </div>
-
-  <div class="footer-bottom">
-    <div>Mario A. Guerrisi - Documento no válido como factura electrónica (Modelo)</div>
-    <div>Página 1</div>
+    <p>Gracias por su compra. Documento válido para Consumidor Final.</p>
   </div>
 
   <script>
     window.onload = function() {
-      setTimeout(function() {
-        window.print();
-        window.onafterprint = function() { window.close(); };
-      }, 500);
+      setTimeout(function() { window.print(); window.onafterprint = function() { window.close(); }; }, 500);
     }
   </script>
 </body>
-</html>
-    `;
+</html>`;
 
     printWindow.document.write(htmlContent);
     printWindow.document.close();
@@ -481,6 +500,7 @@ function Punto_de_Venta() {
 
   return (
     <div>
+      {/* Toast Alert */}
       {toast && (
         <div className="confirm-banner">
           <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -490,8 +510,8 @@ function Punto_de_Venta() {
         </div>
       )}
 
-      {/* Selector de depósito: fila propia porque no hay filtros/tabs debajo mientras se arma el carrito */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px', flexWrap: 'wrap', gap: '12px' }}>
+      {/* Tabs Depósito */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
         <div className="warehouse-tabs" style={{ marginBottom: 0 }}>
           {depositos.map((d) => (
             <button
@@ -506,18 +526,19 @@ function Punto_de_Venta() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: '18px', alignItems: 'start', marginTop: '18px' }}>
-        {/* COLUMNA IZQUIERDA: catálogo */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: '18px', alignItems: 'start', marginTop: '14px' }}>
+        {/* ============================================================== */}
+        {/* CATÁLOGO                                                       */}
+        {/* ============================================================== */}
         <div>
           <div className="catalog-toolbar">
-            <div className="search-input">
+            <div className="search-input" style={{ flex: 1 }}>
               <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="11" cy="11" r="7" />
-                <path d="m21 21-4.3-4.3" />
+                <circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" />
               </svg>
               <input
                 type="text"
-                placeholder="Buscar por nombre o EAN…"
+                placeholder="Buscar artículo por nombre o EAN…"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 disabled={!!venta}
@@ -529,7 +550,7 @@ function Punto_de_Venta() {
                 value={categoriaFiltro}
                 onChange={(e) => setCategoriaFiltro(e.target.value)}
                 disabled={!!venta}
-                style={{ border: 'none', outline: 'none', background: 'transparent' }}
+                style={{ border: 'none', outline: 'none', background: 'transparent', fontWeight: '500' }}
               >
                 <option value="todas">Todas</option>
                 {categorias.map((c) => (
@@ -547,14 +568,22 @@ function Punto_de_Venta() {
                     <th>Artículo</th>
                     <th>Precio</th>
                     <th>Disponible</th>
-                    <th></th>
+                    <th style={{ textAlign: 'center' }}>Acción</th>
                   </tr>
                 </thead>
                 <tbody>
                   {catalogoLoading ? (
-                    <tr><td colSpan={4} style={{ textAlign: 'center', padding: '30px', color: 'var(--gray-500)' }}>Cargando catálogo…</td></tr>
+                    <tr>
+                      <td colSpan={4} style={{ textAlign: 'center', padding: '30px', color: 'var(--gray-500)' }}>
+                        Cargando catálogo…
+                      </td>
+                    </tr>
                   ) : catalogoFiltrado.length === 0 ? (
-                    <tr><td colSpan={4} style={{ textAlign: 'center', padding: '30px', color: 'var(--gray-500)' }}>No se encontraron artículos para los filtros seleccionados.</td></tr>
+                    <tr>
+                      <td colSpan={4} style={{ textAlign: 'center', padding: '30px', color: 'var(--gray-500)' }}>
+                        No hay artículos disponibles.
+                      </td>
+                    </tr>
                   ) : (
                     catalogoFiltrado.map((a) => (
                       <tr key={a.id}>
@@ -565,11 +594,11 @@ function Punto_de_Venta() {
                         <td className="cell-mono">{formatearMonto(a.precioActual)}</td>
                         <td>
                           <span className={`badge ${a.disponible <= 0 ? 'badge-red' : a.disponible <= 3 ? 'badge-amber' : 'badge-green'}`}>
-                            <span className="badge-dot"></span>
-                            {a.disponible}
+                            <span className="badge-dot" />
+                            {a.disponible} un.
                           </span>
                         </td>
-                        <td>
+                        <td style={{ textAlign: 'center' }}>
                           <button
                             className="btn btn-outline btn-sm"
                             disabled={!!venta || a.disponible <= 0 || modoBuscarVenta}
@@ -587,25 +616,30 @@ function Punto_de_Venta() {
           </div>
         </div>
 
-        {/* COLUMNA DERECHA: cliente + carrito + cobro */}
+        {/* ============================================================== */}
+        {/* CARRITO Y PANEL DE COBRO                                       */}
+        {/* ============================================================== */}
         <div>
           {modoBuscarVenta && !venta && (
-            <div className="table-panel" style={{ padding: '16px 18px', marginBottom: '14px' }}>
+            <div className="table-panel" style={{ padding: '16px', marginBottom: '14px' }}>
               <div className="form-field" style={{ marginBottom: 0 }}>
-                <label>Ingrese numero de comprobante de venta</label>
+                <label style={{ fontWeight: '600', marginBottom: '6px' }}>
+                  Buscar comprobante de venta pendiente
+                </label>
                 <div style={{ display: 'flex', gap: '10px' }}>
                   <input
                     type="text"
                     value={textoBusquedaVenta}
                     onChange={(e) => setTextoBusquedaVenta(e.target.value)}
                     placeholder="Ej: VTA-00001"
+                    autoFocus
                   />
                   <button className="btn btn-primary" onClick={handleBuscarVenta} disabled={buscandoVenta}>
-                    Buscar
+                    {buscandoVenta ? 'Buscando…' : 'Cargar'}
                   </button>
                 </div>
                 {errorBusqueda && (
-                  <div style={{ color: 'var(--red)', fontSize: '12px', marginTop: '8px' }}>
+                  <div style={{ color: 'var(--crit, #dc2626)', fontSize: '12px', marginTop: '8px' }}>
                     {errorBusqueda}
                   </div>
                 )}
@@ -613,77 +647,96 @@ function Punto_de_Venta() {
             </div>
           )}
 
-          {/* Cliente, Carrito y Total */}
           {!modoBuscarVenta && (
             <>
-              {/* Cliente */}
-              <div className="table-panel" style={{ padding: '16px 18px', marginBottom: '14px' }}>
+              {/* Tarjeta Cliente */}
+              <div className="table-panel" style={{ padding: '14px 16px', marginBottom: '12px' }}>
                 {cliente ? (
                   <div className="detail-info-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)', margin: 0, padding: 0, border: 'none' }}>
                     <div className="detail-info-item">
                       <div className="label">Cliente</div>
-                      <div className="value">{cliente.razonSocial}</div>
+                      <div className="value" style={{ fontWeight: '600' }}>{cliente.razonSocial}</div>
                     </div>
                     <div className="detail-info-item">
                       <div className="label">{cliente.dni ? 'DNI' : 'CUIT'}</div>
                       <div className="value">{cliente.dni || cliente.cuit}</div>
                     </div>
                     {!venta && (
-                      <button className="btn btn-outline btn-sm" style={{ marginTop: '10px' }} onClick={() => setCliente(null)}>
+                      <button className="btn btn-outline btn-sm" style={{ marginTop: '8px' }} onClick={() => setCliente(null)}>
                         Quitar cliente
                       </button>
                     )}
                   </div>
                 ) : (
-                  <>
-                    <div className="cell-sub" style={{ marginBottom: '10px' }}>Consumidor final (sin cliente asociado)</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ fontWeight: '600', fontSize: '13px' }}>Consumidor final</div>
+                      <div className="cell-sub" style={{ fontSize: '11.5px' }}>Venta directa de mostrador</div>
+                    </div>
                     <button className="btn btn-outline btn-sm" disabled={!!venta} onClick={() => setIsClientModalOpen(true)}>
-                      Buscar cliente
+                      Buscar / Crear cliente
                     </button>
-                  </>
+                  </div>
                 )}
               </div>
 
-              {/* Carrito */}
+              {/* Grilla Carrito */}
               <div className="table-panel">
+                <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border-color, #e5e7eb)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <strong style={{ fontSize: '13px' }}>
+                    Artículos en caja ({(venta ? venta.items : carrito).length})
+                  </strong>
+                  {!venta && carrito.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleVaciarCarrito}
+                      style={{ background: 'none', border: 'none', color: 'var(--crit, #dc2626)', fontSize: '12px', cursor: 'pointer', fontWeight: '500' }}
+                    >
+                      Vaciar
+                    </button>
+                  )}
+                </div>
+
                 <div className="table-scroll">
                   <table>
                     <thead>
                       <tr>
                         <th>Ítem</th>
-                        <th>Cant.</th>
-                        <th>Subtotal</th>
-                        {!venta && <th></th>}
+                        <th style={{ textAlign: 'center' }}>Cant.</th>
+                        <th style={{ textAlign: 'right' }}>Subtotal</th>
+                        {!venta && <th style={{ width: '30px' }}></th>}
                       </tr>
                     </thead>
                     <tbody>
                       {(venta ? venta.items : carrito).length === 0 ? (
-                        <tr><td colSpan={4} style={{ textAlign: 'center', padding: '24px', color: 'var(--gray-500)' }}>El carrito está vacío.</td></tr>
+                        <tr>
+                          <td colSpan={4} style={{ textAlign: 'center', padding: '24px', color: 'var(--gray-500)' }}>
+                            El carrito está vacío.
+                          </td>
+                        </tr>
                       ) : (
                         (venta ? venta.items : carrito).map((it) => (
                           <tr key={it.articuloId}>
                             <td className="cell-strong">{it.descripcion}</td>
-                            <td>
+                            <td style={{ textAlign: 'center' }}>
                               {venta ? (
                                 it.cantidad
                               ) : (
-                                <div className="row-actions">
+                                <div className="row-actions" style={{ justifyContent: 'center' }}>
                                   <button className="icon-btn" onClick={() => handleCambiarCantidad(it.articuloId, -1)}>−</button>
-                                  <span>{it.cantidad}</span>
+                                  <span style={{ minWidth: '18px', textAlign: 'center' }}>{it.cantidad}</span>
                                   <button className="icon-btn" onClick={() => handleCambiarCantidad(it.articuloId, 1)}>+</button>
                                 </div>
                               )}
                             </td>
-                            <td className="cell-mono">{formatearMonto((it.importeLinea ?? it.cantidad * it.precioUnitario))}</td>
+                            <td className="cell-mono" style={{ textAlign: 'right' }}>
+                              {formatearMonto(it.importeLinea ?? it.cantidad * it.precioUnitario)}
+                            </td>
                             {!venta && (
-                              <td>
-                                <div className="row-actions">
-                                  <button className="icon-btn" onClick={() => handleQuitarItem(it.articuloId)}>
-                                    <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                      <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6" />
-                                    </svg>
-                                  </button>
-                                </div>
+                              <td style={{ textAlign: 'center' }}>
+                                <button className="icon-btn" onClick={() => handleQuitarItem(it.articuloId)}>
+                                  ✕
+                                </button>
                               </td>
                             )}
                           </tr>
@@ -694,15 +747,15 @@ function Punto_de_Venta() {
                 </div>
               </div>
 
-              {/* Total */}
-              <div className="stat-card" style={{ marginTop: '14px' }}>
+              {/* Total Carrito */}
+              <div className="stat-card" style={{ marginTop: '12px' }}>
                 <div className="stat-value">{formatearMonto(venta ? venta.total : totalCarrito)}</div>
-                <div className="stat-label">Total de la venta</div>
+                <div className="stat-label">Total a pagar</div>
               </div>
             </>
           )}
 
-          {/* Acción según el estado */}
+          {/* Botones de acción inicial */}
           {!venta && !modoBuscarVenta && (
             <div style={{ display: 'flex', gap: '10px', marginTop: '14px' }}>
               <button
@@ -730,29 +783,32 @@ function Punto_de_Venta() {
           {!venta && modoBuscarVenta && (
             <button
               className="btn btn-outline"
-              style={{ width: '100%', marginTop: '14px' }}
+              style={{ width: '100%', marginTop: '12px' }}
               onClick={() => {
                 setModoBuscarVenta(false);
                 setErrorBusqueda('');
               }}
             >
-              Volver
+              Volver al carrito
             </button>
           )}
 
+          {/* ========================================================== */}
+          {/* PASARELA DE COBRO (REALISTA Y DINÁMICA)                    */}
+          {/* ========================================================== */}
           {enCobro && (
             <div style={{ marginTop: '14px' }}>
               <div className="modal-notice">
                 <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" />
                 </svg>
-                <span>Stock reservado hasta las {formatearFechaHora(venta.fechaHoraExpiracion)}.</span>
+                <span>Reserva válida hasta las {formatearFechaHora(venta.fechaHoraExpiracion)}.</span>
               </div>
 
               {!modoPago ? (
                 <div style={{ display: 'flex', gap: '10px', marginTop: '14px' }}>
                   <button className="btn btn-outline" style={{ flex: 1 }} onClick={handleNuevaVenta}>
-                    {isVentaBuscada ? 'Volver' : 'Registrar otra venta'}
+                    {isVentaBuscada ? 'Volver' : 'Registrar otra'}
                   </button>
                   <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => setModoPago(true)}>
                     Pagar ahora
@@ -760,23 +816,32 @@ function Punto_de_Venta() {
                 </div>
               ) : (
                 <>
-                  <div className="stat-card" style={{ marginBottom: '14px', marginTop: '14px' }}>
-                    <div className="stat-value" style={{ color: saldoPendiente > 0.01 ? 'var(--crit)' : 'var(--green)' }}>
+                  {/* Saldo Restante */}
+                  <div className="stat-card" style={{ marginBottom: '12px', marginTop: '12px' }}>
+                    <div className="stat-value" style={{ color: saldoPendiente > 0.01 ? 'var(--crit, #dc2626)' : 'var(--green, #16a34a)' }}>
                       {formatearMonto(saldoPendiente)}
                     </div>
-                    <div className="stat-label">Saldo pendiente</div>
+                    <div className="stat-label">Saldo restante a cobrar</div>
                   </div>
 
+                  {/* Historial de Pagos aplicados */}
                   {(venta.pagos || []).length > 0 && (
-                    <div className="table-panel" style={{ marginBottom: '14px' }}>
+                    <div className="table-panel" style={{ marginBottom: '12px' }}>
                       <div className="table-scroll">
                         <table>
-                          <thead><tr><th>Método</th><th>Monto</th></tr></thead>
+                          <thead>
+                            <tr>
+                              <th>Medio</th>
+                              <th style={{ textAlign: 'right' }}>Monto</th>
+                            </tr>
+                          </thead>
                           <tbody>
                             {venta.pagos.map((p) => (
                               <tr key={p.pagoId}>
                                 <td>{METODOS_PAGO.find((m) => m.value === p.metodo)?.label || p.metodo}</td>
-                                <td className="cell-mono">{formatearMonto(p.monto)}</td>
+                                <td className="cell-mono" style={{ textAlign: 'right', fontWeight: '600' }}>
+                                  {formatearMonto(p.monto)}
+                                </td>
                               </tr>
                             ))}
                           </tbody>
@@ -785,42 +850,176 @@ function Punto_de_Venta() {
                     </div>
                   )}
 
+                  {/* FORMULARIO DINÁMICO SEGÚN MÉTODO DE PAGO */}
                   {saldoPendiente > 0.01 && (
-                    <form onSubmit={handleAgregarPago} className="form-row" style={{ marginBottom: 0 }}>
-                      <div className="form-field">
-                        <label>Método de pago</label>
-                        <select
-                          value={pagoForm.metodo}
-                          onChange={(e) => setPagoForm({ ...pagoForm, metodo: e.target.value })}
-                        >
-                          {METODOS_PAGO.map((m) => (
-                            <option key={m.value} value={m.value}>{m.label}</option>
-                          ))}
-                        </select>
+                    <form
+                      onSubmit={handleAgregarPago}
+                      style={{
+                        background: '#f9fafb',
+                        padding: '16px',
+                        borderRadius: '8px',
+                        border: '1px solid #e5e7eb',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '12px',
+                      }}
+                    >
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                        <div className="form-field" style={{ margin: 0 }}>
+                          <label>Medio de pago</label>
+                          <select
+                            value={pagoForm.metodo}
+                            onChange={(e) => setPagoForm({ ...pagoForm, metodo: e.target.value })}
+                          >
+                            {METODOS_PAGO.map((m) => (
+                              <option key={m.value} value={m.value}>{m.label}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="form-field" style={{ margin: 0 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <label>Monto a imputar</label>
+                            <button
+                              type="button"
+                              onClick={() => setPagoForm((prev) => ({ ...prev, monto: saldoPendiente.toFixed(2) }))}
+                              style={{ background: 'none', border: 'none', color: '#e11d48', fontSize: '11px', cursor: 'pointer', fontWeight: '600' }}
+                            >
+                              Saldar total
+                            </button>
+                          </div>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0.01"
+                            max={saldoPendiente}
+                            placeholder={saldoPendiente.toFixed(2)}
+                            value={pagoForm.monto}
+                            onChange={(e) => setPagoForm({ ...pagoForm, monto: e.target.value })}
+                            required
+                          />
+                        </div>
                       </div>
-                      <div className="form-field">
-                        <label>Monto</label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          placeholder={saldoPendiente.toFixed(2)}
-                          value={pagoForm.monto}
-                          onChange={(e) => setPagoForm({ ...pagoForm, monto: e.target.value })}
-                        />
-                      </div>
-                      <div className="form-field full">
-                        <button type="submit" className="btn btn-outline" disabled={procesando}>
-                          + Agregar pago
-                        </button>
-                      </div>
+
+                      {/* DETALLES ESPECÍFICOS SEGÚN EL MEDIO */}
+                      {pagoForm.metodo === 'efectivo' && (
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', background: '#fff', padding: '10px', borderRadius: '6px', border: '1px solid #e5e7eb' }}>
+                          <div className="form-field" style={{ margin: 0 }}>
+                            <label style={{ fontSize: '11px' }}>Paga con billetes de:</label>
+                            <input
+                              type="number"
+                              step="100"
+                              placeholder="Ej: 20000"
+                              value={pagoForm.pagaCon}
+                              onChange={(e) => setPagoForm({ ...pagoForm, pagaCon: e.target.value })}
+                            />
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                            <span style={{ fontSize: '11px', color: '#6b7280' }}>Vuelto a entregar:</span>
+                            <strong style={{ fontSize: '16px', color: vueltoEfectivo > 0 ? '#16a34a' : '#111827' }}>
+                              {formatearMonto(vueltoEfectivo)}
+                            </strong>
+                          </div>
+                        </div>
+                      )}
+
+                      {(pagoForm.metodo === 'tarjeta_debito' || pagoForm.metodo === 'tarjeta_credito') && (
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', background: '#fff', padding: '10px', borderRadius: '6px', border: '1px solid #e5e7eb' }}>
+                          <div className="form-field" style={{ margin: 0 }}>
+                            <label style={{ fontSize: '11px' }}>Marca</label>
+                            <select
+                              value={pagoForm.marcaTarjeta}
+                              onChange={(e) => setPagoForm({ ...pagoForm, marcaTarjeta: e.target.value })}
+                            >
+                              <option>Visa</option>
+                              <option>Mastercard</option>
+                              <option>Cabal</option>
+                              <option>American Express</option>
+                            </select>
+                          </div>
+
+                          <div className="form-field" style={{ margin: 0 }}>
+                            <label style={{ fontSize: '11px' }}>Nro. Cupón / Lote</label>
+                            <input
+                              type="text"
+                              placeholder="Ej: 0451"
+                              value={pagoForm.numeroCupon}
+                              onChange={(e) => setPagoForm({ ...pagoForm, numeroCupon: e.target.value })}
+                            />
+                          </div>
+
+                          <div className="form-field" style={{ margin: 0 }}>
+                            <label style={{ fontSize: '11px' }}>Cuotas</label>
+                            <select
+                              value={pagoForm.cuotas}
+                              disabled={pagoForm.metodo === 'tarjeta_debito'}
+                              onChange={(e) => setPagoForm({ ...pagoForm, cuotas: e.target.value })}
+                            >
+                              <option value="1">1 pago (Débito/Crédito)</option>
+                              <option value="3">3 cuotas fijas</option>
+                              <option value="6">6 cuotas fijas</option>
+                            </select>
+                          </div>
+                        </div>
+                      )}
+
+                      {pagoForm.metodo === 'transferencia' && (
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', background: '#fff', padding: '10px', borderRadius: '6px', border: '1px solid #e5e7eb' }}>
+                          <div className="form-field" style={{ margin: 0 }}>
+                            <label style={{ fontSize: '11px' }}>Entidad / Billetera</label>
+                            <select
+                              value={pagoForm.bancoTransferencia}
+                              onChange={(e) => setPagoForm({ ...pagoForm, bancoTransferencia: e.target.value })}
+                            >
+                              <option>Mercado Pago</option>
+                              <option>Banco Galicia</option>
+                              <option>Banco Macro</option>
+                              <option>Ualá</option>
+                              <option>Naranja X</option>
+                            </select>
+                          </div>
+                          <div className="form-field" style={{ margin: 0 }}>
+                            <label style={{ fontSize: '11px' }}>Nro. de Operación</label>
+                            <input
+                              type="text"
+                              placeholder="Ej: 8945123401"
+                              value={pagoForm.comprobanteTransf}
+                              onChange={(e) => setPagoForm({ ...pagoForm, comprobanteTransf: e.target.value })}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {pagoForm.metodo === 'cuenta_corriente' && (
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', background: '#fff', padding: '10px', borderRadius: '6px', border: '1px solid #e5e7eb' }}>
+                          <div className="form-field" style={{ margin: 0 }}>
+                            <label style={{ fontSize: '11px' }}>Plazo acordado</label>
+                            <select
+                              value={pagoForm.plazoCtaCte}
+                              onChange={(e) => setPagoForm({ ...pagoForm, plazoCtaCte: e.target.value })}
+                            >
+                              <option>15 días</option>
+                              <option>30 días</option>
+                              <option>60 días</option>
+                            </select>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', fontSize: '11px', color: '#6b7280' }}>
+                            {cliente ? `Crédito asignado a ${cliente.razonSocial}.` : 'Requiere cliente asociado.'}
+                          </div>
+                        </div>
+                      )}
+
+                      <button type="submit" className="btn btn-primary" disabled={procesando} style={{ width: '100%' }}>
+                        + Registrar pago
+                      </button>
                     </form>
                   )}
 
+                  {/* Acciones de Cierre */}
                   <div style={{ display: 'flex', gap: '10px', marginTop: '14px' }}>
                     <button
                       className="btn btn-outline"
-                      style={{ color: 'var(--red)', borderColor: 'var(--red)' }}
+                      style={{ color: 'var(--crit, #dc2626)', borderColor: 'var(--crit, #dc2626)' }}
                       disabled={procesando}
                       onClick={handleCancelarVenta}
                     >
@@ -832,7 +1031,7 @@ function Punto_de_Venta() {
                       disabled={procesando || saldoPendiente > 0.01}
                       onClick={handleConfirmarVenta}
                     >
-                      Confirmar venta
+                      {procesando ? 'Confirmando…' : 'Confirmar venta'}
                     </button>
                   </div>
                 </>
@@ -842,7 +1041,9 @@ function Punto_de_Venta() {
         </div>
       </div>
 
-      {/* Modal de búsqueda de cliente (HU-20) */}
+      {/* ============================================================== */}
+      {/* MODAL CLIENTE                                                  */}
+      {/* ============================================================== */}
       <Modal
         isOpen={isClientModalOpen}
         onClose={handleCerrarModalCliente}
@@ -851,12 +1052,13 @@ function Punto_de_Venta() {
         {mostrarAltaCliente ? (
           <form onSubmit={handleCrearCliente} className="form-row">
             <div className="form-field full">
-              <label>Nombre <span className="req">*</span></label>
+              <label>Nombre o Razón Social <span className="req">*</span></label>
               <input
                 type="text"
                 value={nuevoClienteForm.razonSocial}
                 onChange={(e) => setNuevoClienteForm({ ...nuevoClienteForm, razonSocial: e.target.value })}
                 autoFocus
+                required
               />
             </div>
             <div className="form-field">
@@ -873,9 +1075,18 @@ function Punto_de_Venta() {
               <input
                 type="text"
                 inputMode="numeric"
-                placeholder="11 dígitos, sin guiones"
+                placeholder="11 dígitos sin guiones"
                 value={nuevoClienteForm.cuit}
                 onChange={(e) => setNuevoClienteForm({ ...nuevoClienteForm, cuit: e.target.value })}
+              />
+            </div>
+            <div className="form-field">
+              <label>Correo electrónico</label>
+              <input
+                type="email"
+                placeholder="cliente@ejemplo.com"
+                value={nuevoClienteForm.email}
+                onChange={(e) => setNuevoClienteForm({ ...nuevoClienteForm, email: e.target.value })}
               />
             </div>
             <div className="form-field">
@@ -886,7 +1097,7 @@ function Punto_de_Venta() {
                 onChange={(e) => setNuevoClienteForm({ ...nuevoClienteForm, telefono: e.target.value })}
               />
             </div>
-            <div className="form-field">
+            <div className="form-field full">
               <label>Dirección</label>
               <input
                 type="text"
@@ -894,12 +1105,12 @@ function Punto_de_Venta() {
                 onChange={(e) => setNuevoClienteForm({ ...nuevoClienteForm, direccion: e.target.value })}
               />
             </div>
-            <div className="form-field full" style={{ display: 'flex', gap: '10px' }}>
+            <div className="form-field full" style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
               <button type="button" className="btn btn-outline" onClick={() => setMostrarAltaCliente(false)}>
-                Volver a buscar
+                Volver
               </button>
               <button type="submit" className="btn btn-primary" style={{ flex: 1 }} disabled={creandoCliente}>
-                {creandoCliente ? 'Creando…' : 'Crear y seleccionar'}
+                {creandoCliente ? 'Guardando…' : 'Crear y asociar'}
               </button>
             </div>
           </form>
@@ -911,17 +1122,18 @@ function Punto_de_Venta() {
               </svg>
               <input
                 type="text"
-                placeholder="Nombre, DNI o CUIT…"
+                placeholder="Buscar por nombre, DNI o CUIT (ej: 44)…"
                 value={clientQuery}
                 onChange={(e) => setClientQuery(e.target.value)}
                 autoFocus
               />
             </div>
+
             {clientSearchLoading ? (
               <div style={{ textAlign: 'center', padding: '20px', color: 'var(--gray-500)' }}>Buscando…</div>
             ) : clientResults.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '20px', color: 'var(--gray-500)' }}>
-                {clientQuery.trim().length < 2 ? 'Escribí al menos 2 caracteres.' : 'Sin resultados.'}
+                {clientQuery.trim().length < 2 ? 'Escribí al menos 2 caracteres.' : 'No se encontraron clientes.'}
               </div>
             ) : (
               <div className="table-panel" style={{ marginBottom: '14px' }}>
@@ -939,6 +1151,7 @@ function Punto_de_Venta() {
                 </div>
               </div>
             )}
+
             <button className="btn btn-outline" style={{ width: '100%' }} onClick={handleAbrirAltaCliente}>
               + Crear cliente nuevo
             </button>
@@ -946,15 +1159,15 @@ function Punto_de_Venta() {
         )}
       </Modal>
 
-      {/* Ticket final, tras confirmar */}
+      {/* TICKET FINAL */}
       <Modal
         isOpen={!!confirmada}
         onClose={handleNuevaVenta}
-        title={`Comprobante ${confirmada ? venta.numeroComprobante : ''}`}
+        title={`Comprobante emitido ${confirmada ? venta.numeroComprobante : ''}`}
         footer={
           <>
-            <button className="btn btn-outline" onClick={handleImprimirFactura}>Imprimir</button>
-            <button className="btn btn-primary" onClick={handleNuevaVenta}>Nueva venta</button>
+            <button className="btn btn-outline" onClick={handleImprimirFactura}>Imprimir ticket</button>
+            <button className="btn btn-primary" onClick={handleNuevaVenta}>Siguiente venta</button>
           </>
         }
       >
@@ -966,13 +1179,19 @@ function Punto_de_Venta() {
             <div className="table-panel">
               <div className="table-scroll">
                 <table>
-                  <thead><tr><th>Ítem</th><th>Cant.</th><th>Subtotal</th></tr></thead>
+                  <thead>
+                    <tr>
+                      <th>Ítem</th>
+                      <th style={{ textAlign: 'center' }}>Cant.</th>
+                      <th style={{ textAlign: 'right' }}>Subtotal</th>
+                    </tr>
+                  </thead>
                   <tbody>
                     {venta.items.map((it) => (
                       <tr key={it.articuloId}>
                         <td>{it.descripcion}</td>
-                        <td>{it.cantidad}</td>
-                        <td className="cell-mono">{formatearMonto(it.importeLinea)}</td>
+                        <td style={{ textAlign: 'center' }}>{it.cantidad}</td>
+                        <td className="cell-mono" style={{ textAlign: 'right' }}>{formatearMonto(it.importeLinea)}</td>
                       </tr>
                     ))}
                   </tbody>
