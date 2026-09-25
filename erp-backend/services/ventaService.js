@@ -1,10 +1,6 @@
 const { supabaseAdmin } = require('../config/supabase');
 
 class VentaService {
-  /**
-   * Listado de comprobantes de venta (Confirmadas y Pendientes) para el
-   * apartado unificado de Comprobantes — HU-15/23.
-   */
   static async listarVentasConfirmadas() {
     const { data, error } = await supabaseAdmin
       .from('ventas')
@@ -32,9 +28,6 @@ class VentaService {
     }));
   }
 
-  /**
-   * Correlativo único global: último numero_comprobante + 1 (HU-15)
-   */
   static async generarNumeroComprobante() {
     const { data, error } = await supabaseAdmin
       .from('ventas')
@@ -54,10 +47,6 @@ class VentaService {
     return `VTA-${siguiente}`;
   }
 
-  /**
-   * Trae la venta + detalle + cliente, para armar cualquiera de
-   * las dos respuestas del contrato (Parte 1 o Confirmación)
-   */
   static async obtenerVentaCompleta(ventaId) {
     const { data: venta, error } = await supabaseAdmin
       .from('ventas')
@@ -110,10 +99,6 @@ class VentaService {
     };
   }
 
-  /**
-   * Parte 1 del contrato: captura los ítems y reserva stock.
-   * La reserva de todos los ítems es atómica vía RPC (todo o nada).
-   */
   static async crearVentaPendiente(payload) {
     const { depositoId, usuarioId, clienteId, items, ipOrigen } = payload;
 
@@ -129,17 +114,17 @@ class VentaService {
       }
     }
 
-    // 1. Reservar stock de forma atómica (todo o nada)
+    // 1. Reservar stock vía RPC atómico
     const { error: errReserva } = await supabaseAdmin.rpc('reservar_stock_venta', {
       p_deposito_id: depositoId,
       p_items: items.map((it) => ({ articuloId: it.articuloId, cantidad: it.cantidad })),
     });
     if (errReserva) throw new Error(`No se pudo reservar el stock: ${errReserva.message}`);
 
-    // 1.5. Generar número de comprobante temprano
+    // 1.5. Generar número de comprobante
     const numeroComprobante = await this.generarNumeroComprobante();
 
-    // 2. Insertar cabecera en estado Pendiente
+    // 2. Insertar cabecera
     const total = items.reduce((acc, it) => acc + it.cantidad * it.precioUnitario, 0);
 
     const { data: venta, error: errVenta } = await supabaseAdmin
@@ -159,12 +144,10 @@ class VentaService {
       .single();
 
     if (errVenta) {
-      // Si falla la cabecera, liberamos lo que ya se reservó arriba
-      await supabaseAdmin
-        .rpc('liberar_stock_items', {
-          p_deposito_id: depositoId,
-          p_items: items.map((it) => ({ articuloId: it.articuloId, cantidad: it.cantidad })),
-        });
+      await supabaseAdmin.rpc('liberar_stock_items', {
+        p_deposito_id: depositoId,
+        p_items: items.map((it) => ({ articuloId: it.articuloId, cantidad: it.cantidad })),
+      });
       throw new Error(`Error al registrar la cabecera de la venta: ${errVenta.message}`);
     }
 
@@ -183,9 +166,6 @@ class VentaService {
     return this.obtenerVentaCompleta(venta.id);
   }
 
-  /**
-   * Parte 2 del contrato: agrega un método de pago a la vez (HU-16)
-   */
   static async agregarPago(ventaId, pago) {
     const { metodo, monto } = pago;
 
@@ -234,10 +214,6 @@ class VentaService {
     };
   }
 
-  /**
-   * Confirmación: valida pago exacto, descuenta stock real y
-   * genera el número de comprobante (el "contrato entregado").
-   */
   static async confirmarVenta(ventaId) {
     const { data: venta, error: errVenta } = await supabaseAdmin
       .from('ventas')
@@ -257,7 +233,7 @@ class VentaService {
       throw new Error(`El total pagado ($${totalPagado.toFixed(2)}) no coincide con el total de la venta ($${Number(venta.total).toFixed(2)}).`);
     }
 
-    // El trigger en la base de datos se encarga de confirmar el stock al pasar a 'Confirmada'
+    // El Trigger de la BD se encarga del descuento de existencias al pasar a Confirmada
     const { error: errUpdate } = await supabaseAdmin
       .from('ventas')
       .update({
@@ -271,14 +247,10 @@ class VentaService {
     return this.obtenerVentaCompleta(ventaId);
   }
 
-  /**
-   * Cancelación manual antes de las 2 horas (el job de pg_cron
-   * cubre el vencimiento automático)
-   */
   static async cancelarVenta(ventaId) {
     const { data: venta, error: errVenta } = await supabaseAdmin
       .from('ventas')
-      .select('id, estado')
+      .select('id, estado, deposito_id, ventas_detalle ( articulo_id, cantidad )')
       .eq('id', ventaId)
       .single();
 
@@ -287,7 +259,18 @@ class VentaService {
       throw new Error('Solo se puede cancelar una venta en estado Pendiente.');
     }
 
-    // El trigger en la BD se encarga de liberar la reserva de stock al pasar a 'Cancelada'
+    // Liberar reserva si existe la función RPC
+    try {
+      if (venta.ventas_detalle && venta.ventas_detalle.length > 0) {
+        await supabaseAdmin.rpc('liberar_stock_items', {
+          p_deposito_id: venta.deposito_id,
+          p_items: venta.ventas_detalle.map((it) => ({
+            articuloId: it.articulo_id,
+            cantidad: it.cantidad,
+          })),
+        });
+      }
+    } catch (_) {}
 
     const { error: errUpdate } = await supabaseAdmin
       .from('ventas')
