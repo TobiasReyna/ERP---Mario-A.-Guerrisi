@@ -1075,75 +1075,121 @@ function Punto_de_Venta() {
         isOpen={isClientModalOpen}
         onClose={handleCerrarModalCliente}
         title={mostrarAltaCliente ? 'Nuevo cliente' : 'Buscar cliente'}
+        wide={mostrarAltaCliente}
       >
         {mostrarAltaCliente ? (
-          <form onSubmit={handleCrearCliente} className="form-row">
-            <div className="form-field full">
-              <label>Nombre o Razón Social <span className="req">*</span></label>
-              <input
-                type="text"
-                value={nuevoClienteForm.razonSocial}
-                onChange={(e) => setNuevoClienteForm({ ...nuevoClienteForm, razonSocial: e.target.value })}
-                autoFocus
-                required
-              />
+          <div style={{ display: 'grid', gap: '18px' }}>
+            <div className="modal-notice">
+              <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="9" />
+                <path d="M12 8v4" />
+                <path d="M12 16h.01" />
+              </svg>
+              Completa los datos y asociá este cliente a la venta actual.
             </div>
-            <div className="form-field">
-              <label>DNI</label>
-              <input
-                type="text"
-                inputMode="numeric"
-                value={nuevoClienteForm.dni}
-                onChange={(e) => setNuevoClienteForm({ ...nuevoClienteForm, dni: e.target.value.replace(/\D/g, '') })}
-              />
-            </div>
-            <div className="form-field">
-              <label>CUIT</label>
-              <input
-                type="text"
-                inputMode="numeric"
-                placeholder="11 dígitos sin guiones"
-                value={nuevoClienteForm.cuit}
-                onChange={(e) => setNuevoClienteForm({ ...nuevoClienteForm, cuit: e.target.value.replace(/\D/g, '') })}
-              />
-            </div>
-            <div className="form-field">
-              <label>Correo electrónico</label>
-              <input
-                type="email"
-                placeholder="cliente@ejemplo.com"
-                value={nuevoClienteForm.email}
-                onChange={(e) => setNuevoClienteForm({ ...nuevoClienteForm, email: e.target.value.trimStart() })}
-              />
-            </div>
-            <div className="form-field">
-              <label>Teléfono</label>
-              <input
-                type="tel"
-                value={nuevoClienteForm.telefono}
-                onChange={(e) => setNuevoClienteForm({ ...nuevoClienteForm, telefono: e.target.value.replace(/[^\d+\-\s()]/g, '') })}
-              />
-            </div>
-            <div className="form-field full">
-              <label>Dirección</label>
-              <input
-                type="text"
-                value={nuevoClienteForm.direccion}
-                onChange={(e) => setNuevoClienteForm({ ...nuevoClienteForm, direccion: e.target.value })}
-              />
-            </div>
-            <div className="form-field full" style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
-              <button type="button" className="btn btn-outline" onClick={() => setMostrarAltaCliente(false)}>
-                Volver
-              </button>
-              <button type="submit" className="btn btn-primary" style={{ flex: 1 }} disabled={creandoCliente}>
-                {creandoCliente ? 'Guardando…' : 'Crear y asociar'}
-              </button>
-            </div>
-          </form>
+
+            <form onSubmit={handleCrearCliente} style={{ display: 'grid', gap: '0' }}>
+              <div
+                style={{
+                  background: 'var(--gray-50)',
+                  border: '1px solid var(--gray-200)',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  display: 'grid',
+                  gap: '14px',
+                }}
+              >
+                <div className="form-row" style={{ margin: 0 }}>
+                  <div className="form-field full">
+                    <label>Nombre o Razón Social <span className="req">*</span></label>
+                    <input
+                      type="text"
+                      value={nuevoClienteForm.razonSocial}
+                      onChange={(e) => setNuevoClienteForm({ ...nuevoClienteForm, razonSocial: e.target.value })}
+                      autoFocus
+                      required
+                    />
+                  </div>
+                  <div className="form-field">
+                    <label>DNI</label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={nuevoClienteForm.dni}
+                      onChange={(e) => setNuevoClienteForm({ ...nuevoClienteForm, dni: e.target.value.replace(/\D/g, '') })}
+                    />
+                  </div>
+                  <div className="form-field">
+                    <label>CUIT</label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="11 dígitos sin guiones"
+                      value={nuevoClienteForm.cuit}
+                      onChange={(e) => setNuevoClienteForm({ ...nuevoClienteForm, cuit: e.target.value.replace(/\D/g, '') })}
+                    />
+                  </div>
+                  <div className="form-field">
+                    <label>Correo electrónico</label>
+                    <input
+                      type="email"
+                      placeholder="cliente@ejemplo.com"
+                      value={nuevoClienteForm.email}
+                      onChange={(e) => setNuevoClienteForm({ ...nuevoClienteForm, email: e.target.value.trimStart() })}
+                    />
+                  </div>
+                  <div className="form-field">
+                    <label>Teléfono</label>
+                    <input
+                      type="tel"
+                      value={nuevoClienteForm.telefono}
+                      onChange={(e) => setNuevoClienteForm({ ...nuevoClienteForm, telefono: e.target.value.replace(/[^\d+\-\s()]/g, '') })}
+                    />
+                  </div>
+                  <div className="form-field full">
+                    <label>Dirección</label>
+                    <input
+                      type="text"
+                      value={nuevoClienteForm.direccion}
+                      onChange={(e) => setNuevoClienteForm({ ...nuevoClienteForm, direccion: e.target.value })}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'flex-end',
+                  gap: '10px',
+                  marginTop: '16px',
+                  padding: '16px 24px',
+                  borderTop: '1px solid var(--gray-200)',
+                  background: 'var(--gray-50)',
+                  marginLeft: '-24px',
+                  marginRight: '-24px',
+                  marginBottom: '-22px',
+                  minHeight: '72px',
+                }}
+              >
+                <button type="button" className="btn btn-outline" onClick={() => setMostrarAltaCliente(false)}>
+                  Volver
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  style={{ minWidth: '180px', justifyContent: 'center', height: '40px' }}
+                  disabled={creandoCliente}
+                >
+                  {creandoCliente ? 'Guardando…' : 'Crear y asociar'}
+                </button>
+              </div>
+            </form>
+          </div>
         ) : (
-          <>
-            <div className="search-input" style={{ marginBottom: '14px' }}>
+          <div style={{ display: 'grid', gap: '14px' }}>
+            <div className="search-input" style={{ marginBottom: '2px', background: 'var(--gray-50)', border: '1px solid var(--gray-200)' }}>
               <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" />
               </svg>
@@ -1157,20 +1203,22 @@ function Punto_de_Venta() {
             </div>
 
             {clientSearchLoading ? (
-              <div style={{ textAlign: 'center', padding: '20px', color: 'var(--gray-500)' }}>Buscando…</div>
+              <div style={{ textAlign: 'center', padding: '24px 18px', color: 'var(--gray-500)', background: 'var(--gray-50)', border: '1px solid var(--gray-200)', borderRadius: '10px' }}>
+                Buscando clientes…
+              </div>
             ) : clientResults.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '20px', color: 'var(--gray-500)' }}>
-                {clientQuery.trim().length < 2 ? 'Escribí al menos 2 caracteres.' : 'No se encontraron clientes.'}
+              <div style={{ textAlign: 'center', padding: '24px 18px', color: 'var(--gray-500)', background: 'var(--gray-50)', border: '1px solid var(--gray-200)', borderRadius: '10px' }}>
+                {clientQuery.trim().length < 2 ? 'Escribí al menos 2 caracteres para buscar.' : 'No se encontraron clientes.'}
               </div>
             ) : (
-              <div className="table-panel" style={{ marginBottom: '14px' }}>
+              <div className="table-panel" style={{ marginBottom: '4px', borderRadius: '10px', overflow: 'hidden' }}>
                 <div className="table-scroll">
                   <table>
                     <tbody>
                       {clientResults.map((c) => (
                         <tr key={c.id} style={{ cursor: 'pointer' }} onClick={() => handleSeleccionarCliente(c)}>
                           <td className="cell-strong">{c.razonSocial}</td>
-                          <td className="cell-mono">{c.dni || c.cuit}</td>
+                          <td className="cell-mono" style={{ textAlign: 'right' }}>{c.dni || c.cuit}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -1179,10 +1227,13 @@ function Punto_de_Venta() {
               </div>
             )}
 
-            <button className="btn btn-outline" style={{ width: '100%' }} onClick={handleAbrirAltaCliente}>
-              + Crear cliente nuevo
+            <button className="btn btn-outline" style={{ width: '100%', justifyContent: 'center' }} onClick={handleAbrirAltaCliente}>
+              <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '14px', height: '14px', marginRight: '8px' }}>
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+              Crear cliente nuevo
             </button>
-          </>
+          </div>
         )}
       </Modal>
 
