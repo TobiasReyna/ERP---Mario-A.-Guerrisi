@@ -208,9 +208,11 @@ function Punto_de_Venta() {
 
   const handleAbrirAltaCliente = () => {
     const texto = clientQuery.trim();
+    const esNumero = /^\d+$/.test(texto);
+
     setNuevoClienteForm({
-      razonSocial: /^\d+$/.test(texto) ? '' : texto,
-      dni: /^\d+$/.test(texto) ? texto : '',
+      razonSocial: esNumero ? '' : texto,
+      dni: esNumero ? texto : '',
       cuit: '',
       email: '',
       telefono: '',
@@ -221,23 +223,48 @@ function Punto_de_Venta() {
 
   const handleCrearCliente = async (e) => {
     e.preventDefault();
-    if (!nuevoClienteForm.razonSocial.trim()) {
-      alert('El nombre es obligatorio.');
+
+    const razonSocial = nuevoClienteForm.razonSocial.trim();
+    const dni = nuevoClienteForm.dni.trim().replace(/\D/g, '');
+    const cuit = nuevoClienteForm.cuit.trim().replace(/\D/g, '');
+    const email = nuevoClienteForm.email.trim();
+    const telefono = nuevoClienteForm.telefono.trim().replace(/[^\d+\-\s()]/g, '');
+    const direccion = nuevoClienteForm.direccion.trim();
+
+    if (!razonSocial) {
+      alert('El nombre o razón social es obligatorio.');
       return;
     }
-    if (!nuevoClienteForm.dni.trim() && !nuevoClienteForm.cuit.trim()) {
+    if (!dni && !cuit) {
       alert('Cargá al menos un DNI o un CUIT.');
       return;
     }
+    if (dni && !/^\d{7,8}$/.test(dni)) {
+      alert('El DNI debe tener 7 u 8 dígitos sin puntos ni espacios.');
+      return;
+    }
+    if (cuit && !/^\d{11}$/.test(cuit)) {
+      alert('El CUIT debe tener 11 dígitos sin guiones.');
+      return;
+    }
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      alert('El correo electrónico no tiene un formato válido.');
+      return;
+    }
+    if (telefono && !/^[0-9+\-\s()]{6,20}$/.test(telefono)) {
+      alert('El teléfono tiene un formato inválido.');
+      return;
+    }
+
     setCreandoCliente(true);
     try {
       const nuevo = await crearCliente({
-        razonSocial: nuevoClienteForm.razonSocial.trim(),
-        dni: nuevoClienteForm.dni.trim() || null,
-        cuit: nuevoClienteForm.cuit.trim() || null,
-        email: nuevoClienteForm.email.trim() || null,
-        telefono: nuevoClienteForm.telefono.trim(),
-        direccion: nuevoClienteForm.direccion.trim(),
+        razonSocial,
+        dni: dni || null,
+        cuit: cuit || null,
+        email: email || null,
+        telefono,
+        direccion,
       });
       handleSeleccionarCliente(nuevo);
     } catch (err) {
@@ -1067,7 +1094,7 @@ function Punto_de_Venta() {
                 type="text"
                 inputMode="numeric"
                 value={nuevoClienteForm.dni}
-                onChange={(e) => setNuevoClienteForm({ ...nuevoClienteForm, dni: e.target.value })}
+                onChange={(e) => setNuevoClienteForm({ ...nuevoClienteForm, dni: e.target.value.replace(/\D/g, '') })}
               />
             </div>
             <div className="form-field">
@@ -1077,7 +1104,7 @@ function Punto_de_Venta() {
                 inputMode="numeric"
                 placeholder="11 dígitos sin guiones"
                 value={nuevoClienteForm.cuit}
-                onChange={(e) => setNuevoClienteForm({ ...nuevoClienteForm, cuit: e.target.value })}
+                onChange={(e) => setNuevoClienteForm({ ...nuevoClienteForm, cuit: e.target.value.replace(/\D/g, '') })}
               />
             </div>
             <div className="form-field">
@@ -1086,15 +1113,15 @@ function Punto_de_Venta() {
                 type="email"
                 placeholder="cliente@ejemplo.com"
                 value={nuevoClienteForm.email}
-                onChange={(e) => setNuevoClienteForm({ ...nuevoClienteForm, email: e.target.value })}
+                onChange={(e) => setNuevoClienteForm({ ...nuevoClienteForm, email: e.target.value.trimStart() })}
               />
             </div>
             <div className="form-field">
               <label>Teléfono</label>
               <input
-                type="text"
+                type="tel"
                 value={nuevoClienteForm.telefono}
-                onChange={(e) => setNuevoClienteForm({ ...nuevoClienteForm, telefono: e.target.value })}
+                onChange={(e) => setNuevoClienteForm({ ...nuevoClienteForm, telefono: e.target.value.replace(/[^\d+\-\s()]/g, '') })}
               />
             </div>
             <div className="form-field full">
