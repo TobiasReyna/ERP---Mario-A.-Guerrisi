@@ -22,7 +22,6 @@ const METODOS_PAGO = [
   { value: 'tarjeta_debito', label: 'Tarjeta de débito' },
   { value: 'tarjeta_credito', label: 'Tarjeta de crédito' },
   { value: 'transferencia', label: 'Transferencia' },
-  { value: 'cuenta_corriente', label: 'Cuenta corriente' },
 ];
 
 // ── VALIDACIONES AFIP Y FORMATO ──────────────────────────────────────────────
@@ -318,7 +317,6 @@ function Punto_de_Venta() {
     numeroCupon: '',
     bancoTransferencia: 'Mercado Pago',
     comprobanteTransf: '',
-    plazoCtaCte: '30 días',
   });
 
   const [esPagoParcial, setEsPagoParcial] = useState(false);
@@ -451,7 +449,6 @@ function Punto_de_Venta() {
       numeroCupon: '',
       bancoTransferencia: 'Mercado Pago',
       comprobanteTransf: '',
-      plazoCtaCte: '30 días',
     });
   }, []);
 
@@ -810,13 +807,6 @@ function Punto_de_Venta() {
     if (pagoForm.metodo === 'transferencia') {
       if (!pagoForm.comprobanteTransf || pagoForm.comprobanteTransf.trim().length < 4) {
         alert('Ingresá el número de comprobante u operación de la transferencia.');
-        return;
-      }
-    }
-
-    if (pagoForm.metodo === 'cuenta_corriente') {
-      if (!cliente || !cliente.id) {
-        alert('No podés vender en Cuenta Corriente a "Consumidor final". Creá o seleccioná un cliente.');
         return;
       }
     }
@@ -2092,28 +2082,6 @@ function Punto_de_Venta() {
                               onChange={(e) => setPagoForm({ ...pagoForm, comprobanteTransf: e.target.value })}
                               required
                             />
-                          </div>
-                        </div>
-                      )}
-
-                      {/* CUENTA CORRIENTE */}
-                      {pagoForm.metodo === 'cuenta_corriente' && (
-                        <div style={{ background: '#fff', padding: '10px', borderRadius: '6px', border: '1px solid #e5e7eb' }}>
-                          <div className="form-field" style={{ margin: 0 }}>
-                            <label style={{ fontSize: '11px' }}>Plazo de crédito acordado</label>
-                            <select
-                              value={pagoForm.plazoCtaCte}
-                              onChange={(e) => setPagoForm({ ...pagoForm, plazoCtaCte: e.target.value })}
-                            >
-                              <option>15 días</option>
-                              <option>30 días</option>
-                              <option>60 días</option>
-                            </select>
-                          </div>
-                          <div style={{ fontSize: '11.5px', marginTop: '6px', color: cliente ? '#16a34a' : 'var(--crit, #dc2626)', fontWeight: '600' }}>
-                            {cliente
-                              ? `✓ Imputación autorizada para cliente: ${cliente.razonSocial}`
-                              : '⚠️ Requiere asociar un cliente antes de imputar a cuenta corriente.'}
                           </div>
                         </div>
                       )}
