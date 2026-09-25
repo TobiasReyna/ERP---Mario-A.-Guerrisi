@@ -12,6 +12,10 @@ function Movimientos() {
   const [selectedUser, setSelectedUser] = useState('Todos');
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Paginación
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(15);
+
   // Toast confirmación
   const [confirmToast, setConfirmToast] = useState(null);
 
@@ -28,28 +32,36 @@ function Movimientos() {
   const [submitError, setSubmitError] = useState(null);
 
   // =========================================================================
-  // 1. CARGA DE HISTORIAL (AJUSTES + TRANSFERENCIAS)
+  // 1. CARGA Y RECONSTRUCCIÓN CRONOLÓGICA DE STOCK (AJUSTES + VENTAS)
   // =========================================================================
   const fetchAllMovements = async () => {
     setIsLoading(true);
     try {
-      const [artRes, depRes, usuRes, motRes, ajRes, trRes] = await Promise.all([
+      const [artRes, depRes, usuRes, motRes, ajRes, vtaRes, vtaDetRes, exRes] = await Promise.all([
         supabase.from('articulos').select('id, descripcion, modelo'),
         supabase.from('depositos').select('id, nombre'),
         supabase.from('usuarios').select('id, nombre'),
         supabase.from('motivos_ajustes').select('id, nombre'),
         supabase.from('ajustes_stock').select('*'),
-        supabase.from('transferencias_stock').select('*'),
+        supabase.from('ventas').select('*').eq('estado', 'Confirmada'),
+        supabase.from('ventas_detalle').select('*'),
+        supabase.from('existencias').select('articulo_id, deposito_id, cantidad'),
       ]);
 
       const artMap = new Map((artRes.data || []).map((a) => [a.id, a]));
       const depMap = new Map((depRes.data || []).map((d) => [d.id, d.nombre]));
       const usuMap = new Map((usuRes.data || []).map((u) => [u.id, u.nombre]));
       const motMap = new Map((motRes.data || []).map((m) => [m.id, m.nombre]));
+      const vtaMap = new Map((vtaRes.data || []).map((v) => [v.id, v]));
 
-      const lista = [];
+      // Mapa con stock físico actual: "articuloId_depositoId" => cantidad
+      const stockActualMap = new Map(
+        (exRes.data || []).map((e) => [`${e.articulo_id}_${e.deposito_id}`, Number(e.cantidad) || 0])
+      );
 
-      // A. Mapeo de Ajustes (Tienen stock anterior y nuevo)
+      const rawMovements = [];
+
+      // A. Mapeo de Ajustes Manuales
       if (ajRes.data) {
         ajRes.data.forEach((a) => {
           const dateObj = new Date(a.fecha_hora_registro);
@@ -57,7 +69,7 @@ function Movimientos() {
 
           const art = artMap.get(a.articulo_id);
           const depNombre = depMap.get(a.deposito_id) || 'Depósito';
-          const usuNombre = usuMap.get(a.usuario_id) || 'Administrador de Sistema';
+          const usuNombre = usuMap.get(a.usuario_id) || 'Administrador';
           const motNombre = motMap.get(a.motivo_id) || 'Ajuste de inventario';
 
           const cantAnt = a.cantidad_anterior ?? 0;
@@ -65,8 +77,10 @@ function Movimientos() {
           const delta = cantNue - cantAnt;
           const tipoLabel = delta >= 0 ? 'Ajuste positivo' : 'Ajuste negativo';
 
-          lista.push({
+          rawMovements.push({
             id: `aj-${a.id}`,
+            articulo_id: a.articulo_id,
+            deposito_id: a.deposito_id,
             rawDate: dateObj,
             date: dateFormatted,
             product: art?.descripcion || 'Producto no especificado',
@@ -76,44 +90,79 @@ function Movimientos() {
             qty: delta >= 0 ? `+${delta}` : `${delta}`,
             reason: motNombre,
             user: usuNombre,
-            stockChange: `${cantAnt} → ${cantNue}`,
+            isAjuste: true,
+            cantAnt,
+            cantNue,
           });
         });
       }
 
-      // B. Mapeo de Transferencias
-      if (trRes.data) {
-        trRes.data.forEach((t) => {
-          const dateObj = new Date(t.fecha_hora_registro);
+      // B. Mapeo de Ventas Mostrador Confirmadas
+      if (vtaDetRes.data) {
+        vtaDetRes.data.forEach((vd) => {
+          const v = vtaMap.get(vd.venta_id);
+          if (!v) return;
+
+          const dateObj = new Date(v.fecha_hora_registro || v.fecha_hora_reserva || Date.now());
           const dateFormatted = `${String(dateObj.getDate()).padStart(2, '0')}/${String(dateObj.getMonth() + 1).padStart(2, '0')}/${dateObj.getFullYear()} ${String(dateObj.getHours()).padStart(2, '0')}:${String(dateObj.getMinutes()).padStart(2, '0')}`;
 
-          const art = artMap.get(t.articulo_id);
-          const origen = depMap.get(t.deposito_origen_id) || 'Origen';
-          const destino = depMap.get(t.deposito_destino_id) || 'Destino';
-          const usuNombre = usuMap.get(t.usuario_id) || 'Usuario de Sistema';
-          const motNombre = motMap.get(t.motivo_id) || 'Transferencia';
+          const art = artMap.get(vd.articulo_id);
+          const depNombre = depMap.get(v.deposito_id) || 'Depósito';
+          const usuNombre = usuMap.get(v.usuario_id) || 'Cajero';
+          const cantVendida = Number(vd.cantidad) || 0;
 
-          const isSameWarehouse = t.deposito_origen_id === t.deposito_destino_id;
-          const warehouseDisplay = isSameWarehouse ? origen : `${origen} → ${destino}`;
-
-          lista.push({
-            id: `tr-${t.id}`,
+          rawMovements.push({
+            id: `vta-${v.id}-${vd.id}`,
+            articulo_id: vd.articulo_id,
+            deposito_id: v.deposito_id,
             rawDate: dateObj,
             date: dateFormatted,
             product: art?.descripcion || 'Producto no especificado',
             model: art?.modelo || 'Estándar',
-            type: 'Transferencia',
-            warehouse: warehouseDisplay,
-            qty: `${t.cantidad}`,
-            reason: motNombre,
+            type: 'Salida',
+            warehouse: depNombre,
+            qty: `-${cantVendida}`,
+            reason: `Venta mostrador (${v.numero_comprobante || 'S/N'})`,
             user: usuNombre,
-            stockChange: '-',
+            isAjuste: false,
+            cantVendida,
           });
         });
       }
 
-      lista.sort((a, b) => b.rawDate - a.rawDate);
-      setAllMovements(lista);
+      // C. Reconstrucción cronológica de "Stock ant. → nuevo" por artículo y depósito
+      const agrupadosPorArtDep = new Map();
+      rawMovements.forEach((m) => {
+        const key = `${m.articulo_id}_${m.deposito_id}`;
+        if (!agrupadosPorArtDep.has(key)) {
+          agrupadosPorArtDep.set(key, []);
+        }
+        agrupadosPorArtDep.get(key).push(m);
+      });
+
+      const listaFinal = [];
+
+      agrupadosPorArtDep.forEach((grupoMovimientos, key) => {
+        grupoMovimientos.sort((a, b) => b.rawDate - a.rawDate);
+
+        let runningStock = stockActualMap.get(key) ?? 0;
+
+        grupoMovimientos.forEach((m) => {
+          if (m.isAjuste) {
+            m.stockChange = `${m.cantAnt} → ${m.cantNue}`;
+            runningStock = m.cantAnt;
+          } else {
+            const stockNuevo = runningStock;
+            const stockAnterior = runningStock + m.cantVendida;
+            m.stockChange = `${stockAnterior} → ${stockNuevo}`;
+            runningStock = stockAnterior;
+          }
+          listaFinal.push(m);
+        });
+      });
+
+      listaFinal.sort((a, b) => b.rawDate - a.rawDate);
+      setAllMovements(listaFinal);
     } catch (err) {
       console.error('Error cargando movimientos:', err);
     } finally {
@@ -154,8 +203,8 @@ function Movimientos() {
     return allMovements.filter((mov) => {
       const matchesType =
         selectedType === 'Todos' ||
-        (selectedType === 'Entrada' && mov.type === 'Ajuste positivo') ||
-        (selectedType === 'Salida' && mov.type === 'Ajuste negativo') ||
+        (selectedType === 'Entrada' && (mov.type === 'Entrada' || mov.type === 'Ajuste positivo')) ||
+        (selectedType === 'Salida' && (mov.type === 'Salida' || mov.type === 'Ajuste negativo')) ||
         mov.type.toLowerCase().includes(selectedType.toLowerCase());
 
       const matchesWarehouse =
@@ -175,6 +224,21 @@ function Movimientos() {
     });
   }, [allMovements, selectedType, selectedWarehouse, selectedUser, searchQuery]);
 
+  // Al cambiar filtros, volver a la página 1 automáticamente
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedType, selectedWarehouse, selectedUser, searchQuery]);
+
+  // =========================================================================
+  // 4. LÓGICA DE PAGINACIÓN
+  // =========================================================================
+  const totalPages = Math.ceil(filteredMovements.length / rowsPerPage) || 1;
+
+  const paginatedMovements = useMemo(() => {
+    const start = (currentPage - 1) * rowsPerPage;
+    return filteredMovements.slice(start, start + rowsPerPage);
+  }, [filteredMovements, currentPage, rowsPerPage]);
+
   const showToast = (msg) => {
     setConfirmToast(msg);
     setTimeout(() => setConfirmToast(null), 4000);
@@ -185,7 +249,7 @@ function Movimientos() {
   };
 
   // =========================================================================
-  // 5. REGISTRO SEGURO MULTIPRODUCTO A TRAVÉS DEL BACKEND (Bypasea RLS)
+  // 5. REGISTRO MANUAL DE AJUSTES MULTIPRODUCTO
   // =========================================================================
   const handleConfirmMultiProductMovement = async ({ headerData, productos }) => {
     setIsSubmitting(true);
@@ -195,7 +259,6 @@ function Movimientos() {
       const { deposito, tipoMovimiento, responsable } = headerData;
 
       for (const item of productos) {
-        // 1. Obtener existencia actual del artículo en ese depósito
         const { data: existData } = await supabase
           .from('existencias')
           .select('cantidad')
@@ -220,7 +283,6 @@ function Movimientos() {
           finalStock = cant;
         }
 
-        // 2. Registrar en backend (ajustes_stock)
         const res = await fetch('http://localhost:3001/api/stock/adjust', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -239,7 +301,6 @@ function Movimientos() {
           throw new Error(json.error || json.message || 'Error al registrar el ajuste en el backend.');
         }
 
-        // 3. Actualizar tabla existencias en Supabase
         if (existData) {
           await supabase
             .from('existencias')
@@ -262,11 +323,6 @@ function Movimientos() {
       showToast(`Movimiento registrado con éxito para ${productos.length} producto(s).`);
     } catch (err) {
       alert(`Error en la transacción: ${err.message}`);
-      if (err.message && err.message.toLowerCase().includes('failed to fetch')) {
-        alert('❌ Error de conexión: No se pudo contactar con el backend (http://localhost:3001). Asegúrate de que el servidor Express esté iniciado ejecutando "node server.js" en la carpeta erp-backend.');
-      } else {
-        alert(`❌ Error en la transacción: ${err.message}`);
-      }
     } finally {
       setIsSubmitting(false);
     }
@@ -294,7 +350,6 @@ function Movimientos() {
             <option>Salida</option>
             <option>Ajuste positivo</option>
             <option>Ajuste negativo</option>
-            <option>Transferencia</option>
           </select>
         </div>
 
@@ -343,7 +398,7 @@ function Movimientos() {
         </button>
       </div>
 
-      {/* TABLA DE MOVIMIENTOS */}
+      {/* TABLA DE MOVIMIENTOS CON PAGINACIÓN */}
       <div className="table-panel">
         <div className="table-scroll">
           <table>
@@ -362,31 +417,40 @@ function Movimientos() {
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan="8" style={{ textAlign: 'center', padding: '32px', color: 'var(--gray-500)' }}>
+                  <td colSpan="8" style={{ textAlign: 'center', padding: '36px', color: 'var(--gray-500)' }}>
                     Cargando movimientos...
                   </td>
                 </tr>
               ) : filteredMovements.length === 0 ? (
                 <tr>
-                  <td colSpan="8" style={{ textAlign: 'center', padding: '32px', color: 'var(--gray-500)' }}>
+                  <td colSpan="8" style={{ textAlign: 'center', padding: '36px', color: 'var(--gray-500)' }}>
                     No se encontraron movimientos registrados bajo los filtros seleccionados.
                   </td>
                 </tr>
               ) : (
-                filteredMovements.map((mov) => (
+                paginatedMovements.map((mov) => (
                   <tr key={mov.id}>
                     <td>{mov.date}</td>
                     <td className="cell-strong">{mov.product}</td>
                     <td>{mov.model}</td>
                     <td>{mov.warehouse}</td>
-                    <td className="cell-strong">{mov.qty}</td>
+                    <td
+                      className="cell-strong"
+                      style={{
+                        color: mov.qty.startsWith('-') ? 'var(--crit, #dc2626)' : 'var(--green, #16a34a)',
+                        fontVariantNumeric: 'tabular-nums',
+                      }}
+                    >
+                      {mov.qty}
+                    </td>
                     <td>{mov.reason}</td>
                     <td>{mov.user}</td>
                     <td
                       className="cell-mono"
                       style={{
                         fontWeight: '700',
-                        color: mov.stockChange !== '-' ? 'var(--gray-900)' : 'var(--gray-400)',
+                        color: 'var(--gray-900)',
+                        fontVariantNumeric: 'tabular-nums',
                       }}
                     >
                       {mov.stockChange}
@@ -397,6 +461,102 @@ function Movimientos() {
             </tbody>
           </table>
         </div>
+
+        {/* BARRA DE CONTROL DE PAGINACIÓN */}
+        {!isLoading && filteredMovements.length > 0 && (
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '12px 18px',
+              borderTop: '1px solid var(--border-color, #e5e7eb)',
+              fontSize: '12.5px',
+              color: '#64748b',
+              flexWrap: 'wrap',
+              gap: '10px',
+              background: '#fafafa',
+            }}
+          >
+            {/* Selector de filas por página */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span>Filas por página:</span>
+              <select
+                value={rowsPerPage}
+                onChange={(e) => {
+                  setRowsPerPage(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                style={{
+                  padding: '3px 8px',
+                  borderRadius: '6px',
+                  border: '1px solid #cbd5e1',
+                  background: '#fff',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  color: '#0f172a',
+                  cursor: 'pointer',
+                  outline: 'none',
+                }}
+              >
+                <option value={10}>10</option>
+                <option value={15}>15</option>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+              </select>
+              <span style={{ marginLeft: '6px' }}>
+                Mostrando{' '}
+                <strong style={{ color: '#0f172a' }}>
+                  {(currentPage - 1) * rowsPerPage + 1}
+                </strong>{' '}
+                -{' '}
+                <strong style={{ color: '#0f172a' }}>
+                  {Math.min(currentPage * rowsPerPage, filteredMovements.length)}
+                </strong>{' '}
+                de <strong style={{ color: '#0f172a' }}>{filteredMovements.length}</strong> movimientos
+              </span>
+            </div>
+
+            {/* Navegación entre páginas */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                style={{
+                  padding: '4px 10px',
+                  fontSize: '11.5px',
+                  fontWeight: '600',
+                  cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                  opacity: currentPage === 1 ? 0.5 : 1,
+                }}
+              >
+                ← Anterior
+              </button>
+
+              <span style={{ fontWeight: '700', padding: '0 6px', color: '#0f172a' }}>
+                Página {currentPage} de {totalPages}
+              </span>
+
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                disabled={currentPage >= totalPages}
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                style={{
+                  padding: '4px 10px',
+                  fontSize: '11.5px',
+                  fontWeight: '600',
+                  cursor: currentPage >= totalPages ? 'not-allowed' : 'pointer',
+                  opacity: currentPage >= totalPages ? 0.5 : 1,
+                }}
+              >
+                Siguiente →
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* MODAL REGISTRAR MOVIMIENTO MULTIPRODUCTO */}

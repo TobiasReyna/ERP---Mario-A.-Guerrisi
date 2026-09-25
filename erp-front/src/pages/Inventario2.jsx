@@ -15,7 +15,11 @@ function Inventario2() {
   const [selectedStatus, setSelectedStatus] = useState('Todos');
   const [searchFilter, setSearchFilter] = useState('');
 
-  // Estados para Modal2 (Movimientos Multi-producto)
+  // Paginación
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(15);
+
+  // Estados para Modal2 (Movimientos Multi-producto / Ajustes)
   const [usuarios, setUsuarios] = useState([]);
   const [motivos, setMotivos] = useState([]);
   const [catalogoProductos, setCatalogoProductos] = useState([]);
@@ -38,7 +42,7 @@ function Inventario2() {
   const [isTransferring, setIsTransferring] = useState(false);
 
   // =========================================================================
-  // FUNCIONES DE APOYO BÁSICAS
+  // FUNCIONES DE APOYO
   // =========================================================================
   const showConfirm = (text) => {
     setConfirmBanner(text);
@@ -72,7 +76,7 @@ function Inventario2() {
   };
 
   // =========================================================================
-  // CARGA DE DATOS (useEffect)
+  // CARGA DE DATOS
   // =========================================================================
   const fetchInventory = async () => {
     try {
@@ -97,7 +101,6 @@ function Inventario2() {
         }
       })
       .catch((err) => console.error('Error fetching inventory:', err));
-    fetchInventory();
 
     // 2. Categorías
     fetch('http://localhost:3001/api/categories')
@@ -171,7 +174,7 @@ function Inventario2() {
   }, []);
 
   // =========================================================================
-  // HOOKS MEMOIZADOS (Nivel superior)
+  // HOOKS MEMOIZADOS
   // =========================================================================
   const activeDeposit = useMemo(() => {
     return depositos.find((d) => String(d.id) === String(activeDepositId)) || depositos[0] || { id: '1', nombre: 'Depósito' };
@@ -206,6 +209,19 @@ function Inventario2() {
       return matchCategory && matchStatus && matchSearch;
     });
   }, [items, activeDeposit, selectedCategory, selectedStatus, searchFilter]);
+
+  // Reseteo de página al filtrar
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeDepositId, selectedCategory, selectedStatus, searchFilter]);
+
+  // Cálculos de Paginación
+  const totalPages = Math.ceil(filteredItems.length / rowsPerPage) || 1;
+
+  const paginatedItems = useMemo(() => {
+    const start = (currentPage - 1) * rowsPerPage;
+    return filteredItems.slice(start, start + rowsPerPage);
+  }, [filteredItems, currentPage, rowsPerPage]);
 
   // =========================================================================
   // HANDLERS DE MOVIMIENTOS
@@ -335,9 +351,6 @@ function Inventario2() {
     return <span className="badge badge-red"><span className="badge-dot"></span>Crítico</span>;
   };
 
-  // =========================================================================
-  // RENDER (JSX)
-  // =========================================================================
   return (
     <div>
       {confirmBanner && (
@@ -349,34 +362,68 @@ function Inventario2() {
         </div>
       )}
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', flexWrap: 'wrap', gap: '12px' }}>
+      {/* CABECERA: TABS DE DEPÓSITO Y ACCIONES */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
         <div className="warehouse-tabs" style={{ marginBottom: 0 }}>
           {depositos.map((dep) => (
-            <button key={dep.id} className={`warehouse-tab ${activeDepositId === dep.id ? 'active' : ''}`} onClick={() => setActiveDepositId(dep.id)}>
+            <button
+              key={dep.id}
+              className={`warehouse-tab ${activeDepositId === dep.id ? 'active' : ''}`}
+              onClick={() => setActiveDepositId(dep.id)}
+            >
               {dep.nombre}
             </button>
           ))}
         </div>
-        <button
-          className="btn btn-primary"
-          onClick={() => setIsModalOpen(true)}
-        >
-          Transferir stock
-        </button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            className="btn btn-outline"
+            onClick={() => setIsTransferModalOpen(true)}
+          >
+            Transferir stock
+          </button>
+          <button
+            className="btn btn-primary"
+            onClick={() => setIsModalOpen(true)}
+          >
+            + Registrar movimiento
+          </button>
+        </div>
       </div>
 
+      {/* BARRA DE FILTROS */}
       <div className="filter-bar">
-        <div className="select-field">
-          Buscar:
-          <input type="text" placeholder="Artículo, modelo..." value={searchFilter} onChange={(e) => setSearchFilter(e.target.value)} style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--gray-300)', marginLeft: '6px' }} />
+        <div className="search-input" style={{ maxWidth: '280px' }}>
+          <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" />
+          </svg>
+          <input
+            type="text"
+            placeholder="Buscar por artículo, modelo o código…"
+            value={searchFilter}
+            onChange={(e) => setSearchFilter(e.target.value)}
+          />
+          {searchFilter && (
+            <button
+              type="button"
+              onClick={() => setSearchFilter('')}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--gray-400)' }}
+            >
+              ✕
+            </button>
+          )}
         </div>
+
         <div className="select-field">
           Categoría:
           <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)}>
             <option value="">Todas</option>
-            {categorias.map((cat) => <option key={cat.id} value={cat.id}>{cat.nombre}</option>)}
+            {categorias.map((cat) => (
+              <option key={cat.id} value={cat.id}>{cat.nombre}</option>
+            ))}
           </select>
         </div>
+
         <div className="select-field">
           Estado:
           <select value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value)}>
@@ -388,36 +435,54 @@ function Inventario2() {
         </div>
       </div>
 
+      {/* TABLA DE INVENTARIO CON SOMBREADO EN STOCK CERO */}
       <div className="table-panel">
         <div className="table-scroll">
           <table>
             <thead>
               <tr>
                 <th>Producto</th>
-                <th>Código</th>
+                <th>Código interno</th>
                 <th>Categoría</th>
-                <th>Stock en {activeDeposit.nombre}</th>
+                <th style={{ textAlign: 'right' }}>Stock en {activeDeposit.nombre}</th>
                 <th>Estado</th>
               </tr>
             </thead>
             <tbody>
               {filteredItems.length === 0 ? (
                 <tr>
-                  <td colSpan="5" style={{ textAlign: 'center', padding: '36px' }}>
-                    No se encontraron productos en <strong>{activeDeposit.nombre}</strong>.
+                  <td colSpan="5" style={{ textAlign: 'center', padding: '36px', color: 'var(--gray-500)' }}>
+                    No se encontraron productos en <strong>{activeDeposit.nombre}</strong> con los filtros actuales.
                   </td>
                 </tr>
               ) : (
-                filteredItems.map((item) => {
+                paginatedItems.map((item) => {
                   const stock = getProductStockInDeposit(item, activeDeposit);
                   const status = calculateDepositStatus(stock);
                   const productName = `${item.marca || ''} ${item.modelo || ''}`.trim() || item.name;
+                  const isZero = stock <= 0;
+
                   return (
-                    <tr key={item.id}>
-                      <td className="cell-strong">{productName}</td>
-                      <td className="cell-mono">{item.code}</td>
-                      <td>{item.category || 'Sin categoría'}</td>
-                      <td className={`stock-cell ${stock === 0 ? 'zero' : stock <= 2 ? 'low' : ''}`}>
+                    <tr
+                      key={item.id}
+                      style={{
+                        background: isZero ? '#f8fafc' : 'transparent',
+                        transition: 'background-color 0.15s ease',
+                      }}
+                    >
+                      <td className="cell-strong" style={{ color: isZero ? '#64748b' : 'var(--ink)' }}>
+                        {productName}
+                      </td>
+                      <td className="cell-mono" style={{ color: isZero ? '#94a3b8' : 'inherit' }}>
+                        {item.code || '—'}
+                      </td>
+                      <td style={{ color: isZero ? '#94a3b8' : 'inherit' }}>
+                        {item.category || 'Sin categoría'}
+                      </td>
+                      <td
+                        className={`stock-cell ${isZero ? 'zero' : stock <= 2 ? 'low' : ''}`}
+                        style={{ textAlign: 'right' }}
+                      >
                         <strong>{stock}</strong> <span>uds.</span>
                       </td>
                       <td>{getStatusBadge(status)}</td>
@@ -428,21 +493,125 @@ function Inventario2() {
             </tbody>
           </table>
         </div>
+
+        {/* BARRA DE PAGINACIÓN */}
+        {filteredItems.length > 0 && (
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '12px 18px',
+              borderTop: '1px solid var(--border-color, #e5e7eb)',
+              fontSize: '12.5px',
+              color: '#64748b',
+              flexWrap: 'wrap',
+              gap: '10px',
+              background: '#fafafa',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span>Filas por página:</span>
+              <select
+                value={rowsPerPage}
+                onChange={(e) => {
+                  setRowsPerPage(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                style={{
+                  padding: '3px 8px',
+                  borderRadius: '6px',
+                  border: '1px solid #cbd5e1',
+                  background: '#fff',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  color: '#0f172a',
+                  cursor: 'pointer',
+                  outline: 'none',
+                }}
+              >
+                <option value={10}>10</option>
+                <option value={15}>15</option>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+              </select>
+              <span style={{ marginLeft: '6px' }}>
+                Mostrando{' '}
+                <strong style={{ color: '#0f172a' }}>
+                  {(currentPage - 1) * rowsPerPage + 1}
+                </strong>{' '}
+                -{' '}
+                <strong style={{ color: '#0f172a' }}>
+                  {Math.min(currentPage * rowsPerPage, filteredItems.length)}
+                </strong>{' '}
+                de <strong style={{ color: '#0f172a' }}>{filteredItems.length}</strong> artículos
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                style={{
+                  padding: '4px 10px',
+                  fontSize: '11.5px',
+                  fontWeight: '600',
+                  cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                  opacity: currentPage === 1 ? 0.5 : 1,
+                }}
+              >
+                ← Anterior
+              </button>
+
+              <span style={{ fontWeight: '700', padding: '0 6px', color: '#0f172a' }}>
+                Página {currentPage} de {totalPages}
+              </span>
+
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                disabled={currentPage >= totalPages}
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                style={{
+                  padding: '4px 10px',
+                  fontSize: '11.5px',
+                  fontWeight: '600',
+                  cursor: currentPage >= totalPages ? 'not-allowed' : 'pointer',
+                  opacity: currentPage >= totalPages ? 0.5 : 1,
+                }}
+              >
+                Siguiente →
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
-      <Modal isOpen={isTransferModalOpen} onClose={() => setIsTransferModalOpen(false)} title="Transferir stock entre depósitos" footer={
-        <>
-          <button className="btn btn-outline" onClick={() => setIsTransferModalOpen(false)}>Cancelar</button>
-          <button className="btn btn-primary" onClick={handleConfirmTransfer}>{isTransferring ? 'Transfiriendo...' : 'Confirmar transferencia'}</button>
-        </>
-      }>
+      {/* MODAL TRANSFERENCIA ENTRE DEPÓSITOS */}
+      <Modal
+        isOpen={isTransferModalOpen}
+        onClose={() => setIsTransferModalOpen(false)}
+        title="Transferir stock entre depósitos"
+        footer={
+          <>
+            <button className="btn btn-outline" onClick={() => setIsTransferModalOpen(false)}>Cancelar</button>
+            <button className="btn btn-primary" onClick={handleConfirmTransfer}>
+              {isTransferring ? 'Transfiriendo...' : 'Confirmar transferencia'}
+            </button>
+          </>
+        }
+      >
         <form onSubmit={handleConfirmTransfer}>
           <div className="form-row">
             <div className="form-field full">
               <label>Producto *</label>
               <select value={selectedProductId} onChange={(e) => setSelectedProductId(e.target.value)}>
                 {items.map((prod) => (
-                  <option key={prod.id} value={prod.id}>{`${prod.marca || ''} ${prod.modelo || ''}`.trim() || prod.name} ({prod.code})</option>
+                  <option key={prod.id} value={prod.id}>
+                    {`${prod.marca || ''} ${prod.modelo || ''}`.trim() || prod.name} ({prod.code})
+                  </option>
                 ))}
               </select>
             </div>
@@ -450,26 +619,46 @@ function Inventario2() {
           <div className="form-row">
             <div className="form-field">
               <label>Depósito origen *</label>
-              <select value={transferData.origenId} onChange={(e) => setTransferData({ ...transferData, origenId: e.target.value })}>
-                {depositos.map((d) => <option key={d.id} value={d.id}>{d.nombre}</option>)}
+              <select
+                value={transferData.origenId}
+                onChange={(e) => setTransferData({ ...transferData, origenId: e.target.value })}
+              >
+                {depositos.map((d) => (
+                  <option key={d.id} value={d.id}>{d.nombre}</option>
+                ))}
               </select>
             </div>
             <div className="form-field">
               <label>Depósito destino *</label>
-              <select value={transferData.destinoId} onChange={(e) => setTransferData({ ...transferData, destinoId: e.target.value })}>
-                {depositos.filter((d) => d.id !== transferData.origenId).map((d) => <option key={d.id} value={d.id}>{d.nombre}</option>)}
+              <select
+                value={transferData.destinoId}
+                onChange={(e) => setTransferData({ ...transferData, destinoId: e.target.value })}
+              >
+                {depositos
+                  .filter((d) => d.id !== transferData.origenId)
+                  .map((d) => (
+                    <option key={d.id} value={d.id}>{d.nombre}</option>
+                  ))}
               </select>
             </div>
           </div>
           <div className="form-row">
             <div className="form-field">
-              <label>Cantidad *</label>
-              <input type="number" min="1" value={transferData.cantidad} onChange={(e) => setTransferData({ ...transferData, cantidad: Math.max(1, Number(e.target.value) || 1) })} />
+              <label>Cantidad a transferir *</label>
+              <input
+                type="number"
+                min="1"
+                value={transferData.cantidad}
+                onChange={(e) =>
+                  setTransferData({ ...transferData, cantidad: Math.max(1, Number(e.target.value) || 1) })
+                }
+              />
             </div>
           </div>
         </form>
       </Modal>
 
+      {/* MODAL REGISTRAR MOVIMIENTO (AJUSTES) */}
       <Modal2
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
@@ -477,11 +666,15 @@ function Inventario2() {
         depositos={depositos}
         usuarios={usuarios}
         motivos={motivos}
-        catalogoProductos={catalogoProductos.length > 0 ? catalogoProductos : items.map((it) => ({
-          id: it.id,
-          descripcion: it.name || `${it.marca || ''} ${it.modelo || ''}`.trim(),
-          modelo: it.modelo || '',
-        }))}
+        catalogoProductos={
+          catalogoProductos.length > 0
+            ? catalogoProductos
+            : items.map((it) => ({
+                id: it.id,
+                descripcion: it.name || `${it.marca || ''} ${it.modelo || ''}`.trim(),
+                modelo: it.modelo || '',
+              }))
+        }
         isSubmitting={isSubmitting}
         initialTipoMovimiento="ajuste"
         initialDeposito={activeDepositId}

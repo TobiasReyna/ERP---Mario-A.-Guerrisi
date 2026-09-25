@@ -10,7 +10,7 @@ import Modal from '../components/Modal';
 import { formatearMonto, formatearFecha, formatearFechaHora, hoyISO } from '../utils/format';
 import { listarComprobantes, listarCxpPendientes, registrarComprobante } from '../services/comprobantesService';
 import { listarProveedoresReferencia } from '../services/purchasingService';
-import { listarVentasConfirmadas } from '../services/ventaService';
+import { listarVentasConfirmadas, obtenerVenta } from '../services/ventaService';
 
 // ---------------------------------------------------------------------------
 // Constantes
@@ -56,10 +56,226 @@ function isValidNumeroComprobante(val) {
 }
 
 // ---------------------------------------------------------------------------
+// Helper: Generador e impresor oficial de Factura AFIP
+// ---------------------------------------------------------------------------
+function imprimirFacturaHTML(venta) {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+        alert('Por favor, habilitá las ventanas emergentes (pop-ups) para imprimir la factura.');
+        return;
+    }
+
+    const ptoVenta = '0001';
+    const numComprobante = venta.numeroComprobante || 'VTA-00001';
+    const numSolo = numComprobante.replace(/\D/g, '').padStart(8, '0');
+    
+    // Fechas y horas
+    const fechaObj = new Date(venta.fechaHoraRegistro || venta.fechaHoraReserva || Date.now());
+    const fechaEmision = `${String(fechaObj.getDate()).padStart(2, '0')}/${String(fechaObj.getMonth() + 1).padStart(2, '0')}/${fechaObj.getFullYear()}`;
+    const horaEmision = `${String(fechaObj.getHours()).padStart(2, '0')}:${String(fechaObj.getMinutes()).padStart(2, '0')} hs`;
+
+    // Fecha vencimiento CAE (+10 días)
+    const vtoCaeObj = new Date(fechaObj);
+    vtoCaeObj.setDate(vtoCaeObj.getDate() + 10);
+    const fechaVtoCae = `${String(vtoCaeObj.getDate()).padStart(2, '0')}/${String(vtoCaeObj.getMonth() + 1).padStart(2, '0')}/${vtoCaeObj.getFullYear()}`;
+
+    // Datos del cliente
+    const razonSocial = venta.cliente ? venta.cliente.razonSocial : 'Consumidor final';
+    let docFormat = '—';
+    if (venta.cliente) {
+        if (venta.cliente.cuit && venta.cliente.cuit.length === 11) {
+            const c = venta.cliente.cuit;
+            docFormat = `${c.slice(0, 2)}-${c.slice(2, 10)}-${c.slice(10)}`;
+        } else if (venta.cliente.dni) {
+            docFormat = venta.cliente.dni;
+        }
+    }
+    const domicilio = venta.cliente?.direccion || '—';
+    const telefono = venta.cliente?.telefono || '—';
+    const email = venta.cliente?.email || '—';
+
+    // Métodos de pago
+    const metodos = [...new Set((venta.pagos || []).map((p) => p.metodo || p))];
+    const condicionVenta = metodos.length > 0 ? metodos.join(' / ') : 'Contado';
+
+    // Cálculos de IVA
+    const total = Number(venta.total) || 0;
+    const netoGravado = total / 1.21;
+    const ivaContenido = total - netoGravado;
+
+    // CAE simulado (14 dígitos)
+    const caeSimulado = `7438${String(total).replace('.', '').slice(0, 4).padStart(4, '0')}9281`;
+
+    const htmlContent = `
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Factura ${numComprobante}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; margin: 0; padding: 24px; color: #1f2937; font-size: 12px; line-height: 1.4; }
+    .invoice-card { border: 1.5px solid #111; padding: 20px; max-width: 800px; margin: 0 auto; background: #fff; }
+    
+    .header { display: flex; justify-content: space-between; position: relative; border-bottom: 2px solid #111; padding-bottom: 16px; }
+    .header-left { width: 44%; }
+    .header-left h1 { margin: 0 0 4px 0; font-size: 20px; font-weight: 800; color: #000; letter-spacing: -0.5px; }
+    .header-left p { margin: 2px 0; font-size: 11px; color: #4b5563; }
+    
+    .header-center { position: absolute; left: 50%; transform: translateX(-50%); top: 0; text-align: center; }
+    .box-letter { border: 2px solid #000; width: 44px; height: 44px; line-height: 44px; font-size: 26px; font-weight: 900; background: #fff; margin: 0 auto; }
+    .box-code { font-size: 9px; font-weight: 700; margin-top: 3px; letter-spacing: 0.5px; }
+    
+    .header-right { width: 44%; text-align: right; }
+    .header-right h2 { margin: 0 0 4px 0; font-size: 18px; font-weight: 800; }
+    .header-right p { margin: 2px 0; font-size: 11px; color: #4b5563; }
+    
+    .client-box { display: grid; grid-template-columns: 1.2fr 1fr; gap: 16px; border-bottom: 1px solid #e5e7eb; padding: 10px 14px; margin-bottom: 16px; background: #fafafa; border-radius: 4px; }
+    .client-box p { margin: 3px 0; font-size: 11.5px; }
+    .client-box strong { color: #111; }
+    
+    table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+    th { background: #f3f4f6; color: #374151; font-size: 10.5px; font-weight: 700; text-transform: uppercase; padding: 8px 10px; border-top: 1px solid #111; border-bottom: 1px solid #111; }
+    td { padding: 9px 10px; border-bottom: 1px solid #f3f4f6; font-size: 11.5px; }
+    td.right, th.right { text-align: right; }
+    td.center, th.center { text-align: center; }
+    .mono { font-family: monospace; font-size: 11.5px; }
+    
+    .totals-area { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
+    .totals-legal { font-size: 10.5px; color: #6b7280; max-width: 50%; }
+    .totals-box { width: 45%; border: 1px solid #e5e7eb; border-radius: 6px; overflow: hidden; }
+    .total-row { display: flex; justify-content: space-between; padding: 6px 12px; font-size: 11.5px; }
+    .total-row.main { background: #111; color: #fff; font-size: 14px; font-weight: 800; padding: 10px 12px; }
+    
+    .afip-footer { display: flex; justify-content: space-between; align-items: center; border-top: 2px solid #111; padding-top: 14px; margin-top: 10px; }
+    .afip-qr { display: flex; align-items: center; gap: 12px; }
+    .afip-qr img { width: 75px; height: 75px; }
+    .afip-brand { font-size: 13px; font-weight: 900; letter-spacing: -0.5px; color: #000; }
+    .afip-cae-box { text-align: right; font-size: 11.5px; }
+    .afip-cae-box strong { font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="invoice-card">
+    
+    <div class="header">
+      <div class="header-left">
+        <h1>Mario A. Guerrisi</h1>
+        <p><strong>Razón Social:</strong> Mario A. Guerrisi e Hijos S.R.L.</p>
+        <p><strong>Dirección:</strong> San Juan 956, Salta Capital (CP 4400)</p>
+        <p><strong>Teléfono:</strong> (0387) 573-0925</p>
+        <p><strong>Email:</strong> atencion@marioaguerrisi.com</p>
+        <p><strong>IVA:</strong> Responsable Inscripto</p>
+      </div>
+
+      <div class="header-center">
+        <div class="box-letter">B</div>
+        <div class="box-code">COD. 006</div>
+      </div>
+
+      <div class="header-right">
+        <h2>FACTURA</h2>
+        <p><strong>Punto de Venta:</strong> ${ptoVenta} &nbsp; <strong>Comp. Nro:</strong> ${numSolo}</p>
+        <p><strong>Fecha de Emisión:</strong> ${fechaEmision} (${horaEmision})</p>
+        <p><strong>CUIT:</strong> 30-76543210-9</p>
+        <p><strong>Ingresos Brutos:</strong> 917-30765432109-1</p>
+        <p><strong>Inicio de Actividades:</strong> 15/09/1959</p>
+      </div>
+    </div>
+
+    <div class="client-box">
+      <div>
+        <p><strong>Cliente:</strong> ${razonSocial}</p>
+        <p><strong>DNI / CUIT:</strong> ${docFormat}</p>
+        <p><strong>Condición IVA:</strong> Consumidor Final</p>
+        <p><strong>Domicilio:</strong> ${domicilio}</p>
+      </div>
+      <div>
+        <p><strong>Teléfono:</strong> ${telefono}</p>
+        <p><strong>Email:</strong> ${email}</p>
+        <p><strong>Condición de Venta:</strong> ${condicionVenta}</p>
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th class="center" style="width: 8%;">Cant.</th>
+          <th>Descripción</th>
+          <th class="right" style="width: 18%;">Precio Unit.</th>
+          <th class="right" style="width: 18%;">Subtotal</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${(venta.items || []).map(it => `
+          <tr>
+            <td class="center mono">${it.cantidad}</td>
+            <td><strong>${it.descripcion}</strong></td>
+            <td class="right mono">$${Number(it.precioUnitario).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td>
+            <td class="right mono">$${(Number(it.cantidad) * Number(it.precioUnitario)).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+
+    <div class="totals-area">
+      <div class="totals-legal">
+        <p><strong>Régimen de Transparencia Fiscal:</strong></p>
+        <p>IVA 21% incluido estimado: $${ivaContenido.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</p>
+        <p>Neto gravado estimado: $${netoGravado.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</p>
+      </div>
+
+      <div class="totals-box">
+        <div class="total-row">
+          <span>Subtotal:</span>
+          <span class="mono">$${total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+        </div>
+        <div class="total-row main">
+          <span>TOTAL:</span>
+          <span class="mono">$${total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="afip-footer">
+      <div class="afip-qr">
+        <img 
+          src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://www.afip.gob.ar/fe/qr/?p=${btoa(JSON.stringify({ ver:1, fecha:fechaEmision, cuit:30765432109, ptoVta:1, tipoCmp:6, nroCmp:numSolo, importe:total, cae:caeSimulado }))}" 
+          alt="QR AFIP"
+        />
+        <div>
+          <div class="afip-brand">ARCA / AFIP</div>
+          <div style="font-size: 10px; color: #4b5563;">Comprobante Autorizado</div>
+        </div>
+      </div>
+
+      <div class="afip-cae-box">
+        <p style="margin: 2px 0;"><strong>CAE Nº:</strong> <span class="mono">${caeSimulado}</span></p>
+        <p style="margin: 2px 0;"><strong>Fecha de Vto. de CAE:</strong> <span class="mono">${fechaVtoCae}</span></p>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    window.onload = function() {
+      setTimeout(function() {
+        window.print();
+        window.onafterprint = function() { window.close(); };
+      }, 500);
+    };
+  </script>
+</body>
+</html>
+    `;
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+}
+
+// ---------------------------------------------------------------------------
 // Componente principal
 // ---------------------------------------------------------------------------
 function RegistroComprobanteProveedor() {
-    // ── Estados principales ──────────────────────────────────────────────────
     const [vista, setVista] = useState('compras'); // 'compras' | 'ventas'
     const [comprobantes, setComprobantes] = useState([]);
     const [ventas, setVentas] = useState([]);
@@ -75,21 +291,23 @@ function RegistroComprobanteProveedor() {
         precio_unitario: ''
     });
 
-    // ── Filtros de búsqueda ──────────────────────────────────────────────────
+    const [imprimiendoId, setImprimiendoId] = useState(null);
+
+    // Filtros
     const [busquedaCompras, setBusquedaCompras] = useState('');
     const [filtroTipoCompras, setFiltroTipoCompras] = useState('todos');
 
     const [busquedaVentas, setBusquedaVentas] = useState('');
     const [filtroEstadoVentas, setFiltroEstadoVentas] = useState('todos');
 
-    // ── Estados del modal / formulario ───────────────────────────────────────
+    // Modal
     const [modalOpen, setModalOpen] = useState(false);
     const [form, setForm] = useState(FORM_INICIAL);
     const [cxpPendientes, setCxpPendientes] = useState([]);
     const [loadingCxp, setLoadingCxp] = useState(false);
     const [submitting, setSubmitting] = useState(false);
 
-    // ── Toast ───────────────────────────────────────────────────────────────
+    // Toast
     const [toast, setToast] = useState(null);
 
     const showToast = useCallback((msg, type = 'ok') => {
@@ -97,7 +315,6 @@ function RegistroComprobanteProveedor() {
         setTimeout(() => setToast(null), 5000);
     }, []);
 
-    // ── Carga inicial ───────────────────────────────────────────────────────
     const cargarDatos = useCallback(() => {
         setLoading(true);
         Promise.all([listarComprobantes(), listarProveedoresReferencia()])
@@ -111,7 +328,6 @@ function RegistroComprobanteProveedor() {
 
     useEffect(() => { cargarDatos(); }, [cargarDatos]);
 
-    // ── Carga de ventas ─────────────────────────────────────────────────────
     useEffect(() => {
         setLoadingVentas(true);
         listarVentasConfirmadas()
@@ -120,7 +336,18 @@ function RegistroComprobanteProveedor() {
             .finally(() => setLoadingVentas(false));
     }, []);
 
-    // ── CxP pendientes para NC ──────────────────────────────────────────────
+    const handleImprimirVenta = async (ventaId) => {
+        setImprimiendoId(ventaId);
+        try {
+            const ventaCompleta = await obtenerVenta(ventaId);
+            imprimirFacturaHTML(ventaCompleta);
+        } catch (err) {
+            alert('Error al recuperar los datos de la factura: ' + (err.message || 'Error desconocido'));
+        } finally {
+            setImprimiendoId(null);
+        }
+    };
+
     useEffect(() => {
         if (form.tipo_comprobante !== 'Nota de Crédito' || !form.proveedor_id) {
             setCxpPendientes([]);
@@ -133,7 +360,6 @@ function RegistroComprobanteProveedor() {
             .finally(() => setLoadingCxp(false));
     }, [form.proveedor_id, form.tipo_comprobante]);
 
-    // ── Carga de artículos ──────────────────────────────────────────────────
     useEffect(() => {
         fetch('http://localhost:3001/api/articles') 
             .then(res => res.json())
@@ -141,7 +367,6 @@ function RegistroComprobanteProveedor() {
             .catch(err => console.error("Error al cargar artículos:", err));
     }, []);
 
-    // ── Filtrado de órdenes de compra según proveedor ───────────────────────
     useEffect(() => {
         if (form.proveedor_id) {
             fetch('http://localhost:3001/api/purchase-orders')
@@ -163,7 +388,6 @@ function RegistroComprobanteProveedor() {
         }
     }, [form.proveedor_id]);
 
-    // ── Autocarga de detalles desde Orden de Compra ─────────────────────────
     useEffect(() => {
         if (!form.orden_compra_id) return; 
 
@@ -189,7 +413,6 @@ function RegistroComprobanteProveedor() {
             .catch(err => console.error("Error al cargar detalles de la orden de compra:", err));
     }, [form.orden_compra_id]);
 
-    // ── Validaciones ────────────────────────────────────────────────────────
     const cxpSeleccionada = useMemo(
         () => cxpPendientes.find((c) => String(c.id) === String(form.id_cuenta_por_pagar)) ?? null,
         [cxpPendientes, form.id_cuenta_por_pagar]
@@ -221,7 +444,6 @@ function RegistroComprobanteProveedor() {
         return base && !!form.fecha_vencimiento;
     }, [form, esNC, errFecha, maxMontoNC]);
 
-    // ── Handlers de formulario ──────────────────────────────────────────────
     const handleChange = (e) => {
         const { name, value } = e.target;
         setForm((prev) => {
@@ -263,7 +485,6 @@ function RegistroComprobanteProveedor() {
         setDetalleActual(prev => ({ ...prev, [name]: value }));
     };
 
-    // Agregar detalle con recálculo automático de total
     const agregarDetalle = () => {
         const { articulo_id, cantidad, precio_unitario } = detalleActual;
         if (!articulo_id || !cantidad || !precio_unitario) {
@@ -281,14 +502,12 @@ function RegistroComprobanteProveedor() {
         const nuevosDetalles = [...detalles, nuevoDetalle];
         setDetalles(nuevosDetalles);
 
-        // Recalcular monto_total del formulario automáticamente
         const nuevoTotal = nuevosDetalles.reduce((acc, curr) => acc + curr.subtotal, 0);
         setForm(prev => ({ ...prev, monto_total: nuevoTotal }));
 
         setDetalleActual({ articulo_id: '', cantidad: '', precio_unitario: '' });
     };
 
-    // Quitar detalle con recálculo de total
     const eliminarDetalle = (indexToRemove) => {
         if (!window.confirm("¿Deseas quitar este artículo del comprobante?")) return;
 
@@ -312,7 +531,6 @@ function RegistroComprobanteProveedor() {
         setModalOpen(false);
     };
 
-    // ── Submit limpio ───────────────────────────────────────────────────────
     const handleSubmit = async (e) => {
         e.preventDefault();
 
@@ -352,7 +570,6 @@ function RegistroComprobanteProveedor() {
         }
     };
 
-    // ── Filtrado dinámico de tablas ─────────────────────────────────────────
     const comprobantesFiltrados = useMemo(() => {
         const busq = busquedaCompras.trim().toLowerCase();
         return comprobantes.filter((c) => {
@@ -385,7 +602,6 @@ function RegistroComprobanteProveedor() {
         });
     }, [ventas, busquedaVentas, filtroEstadoVentas]);
 
-    // ── KPIs ────────────────────────────────────────────────────────────────
     const kpis = useMemo(() => {
         const facturas = comprobantes.filter((c) => c.tipo_comprobante && c.tipo_comprobante.startsWith('Factura'));
         const nc = comprobantes.filter((c) => c.tipo_comprobante === 'Nota de Crédito');
@@ -413,7 +629,6 @@ function RegistroComprobanteProveedor() {
         };
     }, [ventas]);
 
-    // ── Render ──────────────────────────────────────────────────────────────
     return (
         <div>
             {/* Banner Toast */}
@@ -456,29 +671,19 @@ function RegistroComprobanteProveedor() {
                     </button>
                 </div>
 
-                {vista === 'compras' ? (
+                {vista === 'compras' && (
                     <button className="btn btn-primary" onClick={handleOpenModal} disabled={loading}>
                         <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M12 5v14M5 12h14" />
                         </svg>
                         Registrar comprobante
                     </button>
-                ) : (
-                    <Link to="/Punto_de_Venta" className="btn btn-primary">
-                        <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M12 5v14M5 12h14" />
-                        </svg>
-                        Ir al Punto de Venta
-                    </Link>
                 )}
             </div>
 
-            {/* ============================================================== */}
-            {/* VISTA COMPRAS                                                 */}
-            {/* ============================================================== */}
+            {/* VISTA COMPRAS */}
             {vista === 'compras' ? (
                 <>
-                    {/* KPIs Compras */}
                     <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(5, 1fr)' }}>
                         <div className="stat-card">
                             <div className="stat-value">{kpis.facturas}</div>
@@ -502,7 +707,6 @@ function RegistroComprobanteProveedor() {
                         </div>
                     </div>
 
-                    {/* Barra de Filtros de Compras */}
                     <div className="catalog-toolbar" style={{ marginTop: '14px', background: '#fff', padding: '10px 14px', borderRadius: '6px', border: '1px solid var(--border-color, #e5e7eb)' }}>
                         <div className="search-input" style={{ flex: 1 }}>
                             <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -533,7 +737,6 @@ function RegistroComprobanteProveedor() {
                         </div>
                     </div>
 
-                    {/* Tabla Compras */}
                     <div className="table-panel" style={{ marginTop: '12px' }}>
                         <div className="table-scroll">
                             <table>
@@ -588,11 +791,8 @@ function RegistroComprobanteProveedor() {
                     </div>
                 </>
             ) : (
-                /* ========================================================== */
-                /* VISTA VENTAS                                               */
-                /* ========================================================== */
+                /* VISTA VENTAS */
                 <>
-                    {/* KPIs Ventas */}
                     <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
                         <div className="stat-card">
                             <div className="stat-value">{kpisVentas.cantidad}</div>
@@ -608,7 +808,6 @@ function RegistroComprobanteProveedor() {
                         </div>
                     </div>
 
-                    {/* Barra de Filtros de Ventas */}
                     <div className="catalog-toolbar" style={{ marginTop: '14px', background: '#fff', padding: '10px 14px', borderRadius: '6px', border: '1px solid var(--border-color, #e5e7eb)' }}>
                         <div className="search-input" style={{ flex: 1 }}>
                             <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -637,7 +836,6 @@ function RegistroComprobanteProveedor() {
                         </div>
                     </div>
 
-                    {/* Tabla Ventas */}
                     <div className="table-panel" style={{ marginTop: '12px' }}>
                         <div className="table-scroll">
                             <table>
@@ -649,18 +847,19 @@ function RegistroComprobanteProveedor() {
                                         <th>Total</th>
                                         <th>Fecha / Hora</th>
                                         <th>Estado / Pago</th>
+                                        <th style={{ textAlign: 'center', minWidth: '150px' }}>Acción</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {loadingVentas ? (
                                         <tr>
-                                            <td colSpan={6} style={{ textAlign: 'center', padding: '30px', color: 'var(--gray-500)' }}>
+                                            <td colSpan={7} style={{ textAlign: 'center', padding: '30px', color: 'var(--gray-500)' }}>
                                                 Cargando ventas…
                                             </td>
                                         </tr>
                                     ) : ventasFiltradas.length === 0 ? (
                                         <tr>
-                                            <td colSpan={6} style={{ textAlign: 'center', padding: '30px', color: 'var(--gray-500)' }}>
+                                            <td colSpan={7} style={{ textAlign: 'center', padding: '30px', color: 'var(--gray-500)' }}>
                                                 {ventas.length === 0 
                                                     ? 'No se registraron ventas en el Punto de Venta.' 
                                                     : 'No hay ventas que coincidan con los filtros aplicados.'}
@@ -671,16 +870,19 @@ function RegistroComprobanteProveedor() {
                                             const estado = v.estado || 'Confirmada';
                                             const badge = BADGE_VENTAS[estado] || { label: estado, cls: 'badge-gray' };
                                             const esPendiente = estado === 'Pendiente';
+                                            const nroComp = v.numeroComprobante || v.numero_comprobante;
+                                            const idVenta = v.ventaId || v.id;
+                                            const estaImprimiendo = imprimiendoId === idVenta;
 
                                             return (
-                                                <tr key={v.ventaId || v.id}>
+                                                <tr key={idVenta}>
                                                     <td>
                                                         <span className={`badge ${badge.cls}`}>
                                                             <span className="badge-dot" />
                                                             {badge.label}
                                                         </span>{' '}
                                                         <span className="cell-mono" style={{ fontWeight: '600' }}>
-                                                            {v.numeroComprobante || v.numero_comprobante}
+                                                            {nroComp}
                                                         </span>
                                                     </td>
                                                     <td>{v.cliente || 'Consumidor final'}</td>
@@ -689,12 +891,47 @@ function RegistroComprobanteProveedor() {
                                                     <td>{formatearFechaHora(v.fechaHoraRegistro || v.fechaHoraReserva)}</td>
                                                     <td>
                                                         {esPendiente ? (
-                                                            <span style={{ color: 'var(--amber, #f59e0b)', fontWeight: '500', fontSize: '12px' }}>
+                                                            <span style={{ color: 'var(--amber, #f59e0b)', fontWeight: '600', fontSize: '12px' }}>
                                                                 Esperando cobro en caja
                                                             </span>
                                                         ) : (
                                                             (v.metodosPago && v.metodosPago.length > 0) ? v.metodosPago.join(', ') : 'Contado'
                                                         )}
+                                                    </td>
+                                                    <td style={{ textAlign: 'center' }}>
+                                                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}>
+                                                            {esPendiente ? (
+                                                                <Link
+                                                                    to={`/Punto_de_Venta?cobrar=${nroComp}`}
+                                                                    className="btn btn-sm btn-primary"
+                                                                    style={{ padding: '4px 10px', fontSize: '11.5px', textDecoration: 'none' }}
+                                                                >
+                                                                    Cobrar en POS
+                                                                </Link>
+                                                            ) : (
+                                                                <button
+                                                                    type="button"
+                                                                    className="btn btn-sm btn-outline"
+                                                                    onClick={() => handleImprimirVenta(idVenta)}
+                                                                    disabled={estaImprimiendo}
+                                                                    style={{
+                                                                        padding: '4px 10px',
+                                                                        fontSize: '11.5px',
+                                                                        display: 'inline-flex',
+                                                                        alignItems: 'center',
+                                                                        gap: '5px',
+                                                                    }}
+                                                                    title="Imprimir Factura"
+                                                                >
+                                                                    <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '13px', height: '13px' }}>
+                                                                        <polyline points="6 9 6 2 18 2 18 9" />
+                                                                        <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+                                                                        <rect x="6" y="14" width="12" height="8" />
+                                                                    </svg>
+                                                                    {estaImprimiendo ? 'Generando…' : 'Imprimir'}
+                                                                </button>
+                                                            )}
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             );
@@ -707,9 +944,7 @@ function RegistroComprobanteProveedor() {
                 </>
             )}
 
-            {/* ============================================================== */}
-            {/* MODAL: REGISTRAR COMPROBANTE DE PROVEEDOR                     */}
-            {/* ============================================================== */}
+            {/* MODAL REGISTRO */}
             <Modal
                 isOpen={modalOpen}
                 onClose={handleCloseModal}
@@ -741,7 +976,6 @@ function RegistroComprobanteProveedor() {
                 }
             >
                 <form onSubmit={handleSubmit} noValidate>
-                    {/* Fila 1: Proveedor + Tipo */}
                     <div className="form-row">
                         <div className="form-field">
                             <label>Proveedor <span className="req">*</span></label>
@@ -760,7 +994,6 @@ function RegistroComprobanteProveedor() {
                         </div>
                     </div>
 
-                    {/* Orden de Compra */}
                     <div className="form-field">
                         <label>Orden de Compra</label>
                         <select 
@@ -778,7 +1011,6 @@ function RegistroComprobanteProveedor() {
                         </select>
                     </div>
 
-                    {/* Fila 2 (solo NC): Selección de factura pendiente */}
                     {esNC && (
                         <div className="form-row">
                             <div className="form-field full">
@@ -816,7 +1048,6 @@ function RegistroComprobanteProveedor() {
                         </div>
                     )}
 
-                    {/* Fila 3: Número + Monto */}
                     <div className="form-row">
                         <div className="form-field">
                             <label>Número de comprobante <span className="req">*</span></label>
@@ -860,7 +1091,6 @@ function RegistroComprobanteProveedor() {
                         </div>
                     </div>
 
-                    {/* Fila 4: Fechas */}
                     <div className="form-row">
                         <div className="form-field">
                             <label>Fecha de emisión <span className="req">*</span></label>
@@ -901,7 +1131,6 @@ function RegistroComprobanteProveedor() {
                         )}
                     </div>
 
-                    {/* Detalle de Artículos */}
                     <div className="detalle-section" style={{ marginTop: '20px', padding: '20px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px', boxSizing: 'border-box', width: '100%' }}>
                         <h3 style={{ marginTop: 0, marginBottom: '15px', fontSize: '1.1rem', color: '#333' }}>Detalle de Artículos</h3>
                         
@@ -1004,7 +1233,6 @@ function RegistroComprobanteProveedor() {
                         )}
                     </div>
 
-                    {/* Avisos contextuales */}
                     {form.tipo_comprobante.startsWith('Factura') && (
                         <div className="modal-notice">
                             <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

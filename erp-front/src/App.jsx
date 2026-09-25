@@ -29,7 +29,7 @@ const ROUTE_INFO = {
   '/Cuentas_por_pagar': { title: 'Cuentas por Pagar', subtitle: 'Obligaciones con proveedores, vencimientos y pagos' },
   '/Notas_credito_debito': { title: 'Notas de Crédito y Débito', subtitle: 'Devoluciones y ajustes de facturación' },
   '/Limites_de_credito': { title: 'Límites de Crédito', subtitle: 'Cuentas corrientes de clientes mayoristas (B2B)' },
-  '/Punto_de_Venta': { title: 'Punto de Venta', subtitle: 'Caja única — venta, cobro mixto y comprobante' },
+  '/Punto_de_Venta': { title: 'Punto de Venta', subtitle: 'Caja única — venta rápida, cobro mixto y comprobante' },
   '/Perfil': { title: 'Mi perfil', subtitle: 'Información de la cuenta y el depósito asignado' },
   '/registro-comprobantes': { title: 'Registro de Comprobantes', subtitle: 'Facturas, Notas de Crédito y Notas de Débito de proveedores' },
 };
@@ -37,6 +37,9 @@ const ROUTE_INFO = {
 function App() {
   const location = useLocation();
   const navigate = useNavigate();
+
+  // Detecta si estamos operando en la caja
+  const esModoPOS = location.pathname.toLowerCase() === '/punto_de_venta';
 
   const [notifications, setNotifications] = useState([]);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
@@ -138,222 +141,225 @@ function App() {
     navigate('/Alertas_de_stock');
   };
 
-  const handleSearchKeyDown = (e) => {
-    if (e.key === 'Enter' && searchQuery.trim() !== '') {
-      navigate('/Catalogo_de_productos');
-    }
-  };
-
   return (
-    <div className="app">
-      {/* SIDEBAR */}
-      <aside className="sidebar">
-        <div className="sidebar-brand">
-          <div className="brand-mark">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9 18V5l12-2v13" />
-              <circle cx="6" cy="18" r="3" />
-              <circle cx="18" cy="16" r="3" />
-            </svg>
+    <div className={`app ${esModoPOS ? 'app--pos-fullscreen' : ''}`}>
+      {/* 1. SIDEBAR (Solo visible si NO estamos en el Punto de Venta) */}
+      {!esModoPOS && (
+        <aside className="sidebar">
+          <div className="sidebar-brand">
+            <div className="brand-mark">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 18V5l12-2v13" />
+                <circle cx="6" cy="18" r="3" />
+                <circle cx="18" cy="16" r="3" />
+              </svg>
+            </div>
+            <div className="brand-text">
+              <span className="brand-name">Mario A. Guerrisi</span>
+              <span className="brand-sub">Inventario</span>
+            </div>
           </div>
-          <div className="brand-text">
-            <span className="brand-name">Mario A. Guerrisi</span>
-            <span className="brand-sub">Inventario</span>
+
+          <nav className="nav-group">
+            <div className="nav-group-label">Navegación</div>
+
+            <NavLink
+              to="/Catalogo_de_productos"
+              className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+            >
+              <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20.59 13.41 11 3.83A2 2 0 0 0 9.59 3.24L4 3v5.59a2 2 0 0 0 .59 1.41l9.59 9.59a2 2 0 0 0 2.82 0l3.59-3.59a2 2 0 0 0 0-2.59Z" />
+                <circle cx="8" cy="8" r="1.2" />
+              </svg>
+              Catálogo
+            </NavLink>
+
+            <NavLink
+              to="/Inventario"
+              className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+            >
+              <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 8 12 3 3 8l9 5 9-5Z" />
+                <path d="M3 8v8l9 5 9-5V8" />
+                <path d="M12 13v8" />
+              </svg>
+              Inventario
+            </NavLink>
+
+            <NavLink
+              to="/Movimientos"
+              className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+            >
+              <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M7 7h13l-3-3M17 17H4l3 3" />
+              </svg>
+              Movimientos
+            </NavLink>
+
+            <NavLink
+              to="/Alertas_de_stock"
+              className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+            >
+              <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+                <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+              </svg>
+              Alertas y notificaciones
+              {unreadCount > 0 && <span className="nav-item-badge">{unreadCount}</span>}
+            </NavLink>
+          </nav>
+
+          <nav className="nav-group">
+            <div className="nav-group-label">Compras</div>
+
+            <NavLink
+              to="/Gestion_de_proveedores"
+              className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+            >
+              <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="1" y="3" width="15" height="13" rx="1.5" />
+                <path d="M16 8h3.5l3.5 3.5V16h-7" />
+                <circle cx="5.5" cy="18.5" r="2.2" />
+                <circle cx="18.5" cy="18.5" r="2.2" />
+              </svg>
+              Proveedores
+            </NavLink>
+
+            <NavLink
+              to="/Cotizaciones_ordenes_compra"
+              className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+            >
+              <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
+                <path d="M14 2v6h6" />
+                <path d="M9 13h6M9 17h6" />
+              </svg>
+              Cotizaciones y OC
+            </NavLink>
+
+            <NavLink
+              to="/Cuentas_por_pagar"
+              className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+            >
+              <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="5" width="20" height="14" rx="2" />
+                <path d="M2 10h20" />
+              </svg>
+              Cuentas por Pagar
+            </NavLink>
+
+            <NavLink
+              to="/registro-comprobantes"
+              className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+            >
+              <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
+                <path d="M14 2v6h6" />
+                <path d="M9 13h6M9 17h3" />
+                <circle cx="17" cy="17" r="3" />
+                <path d="M17 15v2l1 1" />
+              </svg>
+              Comprobantes
+            </NavLink>
+          </nav>
+
+          <div className="sidebar-footer">
+            <div className="sidebar-footer-text">
+              Mario A. Guerrisi<br />
+              Instrumentos Musicales &copy; 2026<br />
+              Sprint 1 · v1.1
+            </div>
           </div>
-        </div>
+        </aside>
+      )}
 
-        <nav className="nav-group">
-          <div className="nav-group-label">Navegación</div>
-
-          {/* <NavLink
-            to="/"
-            end
-            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-          >
-            <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="7" height="9" rx="1.5" />
-              <rect x="14" y="3" width="7" height="5" rx="1.5" />
-              <rect x="14" y="12" width="7" height="9" rx="1.5" />
-              <rect x="3" y="16" width="7" height="5" rx="1.5" />
-            </svg>
-            Dashboard
-          </NavLink> */}
-
-          <NavLink
-            to="/Catalogo_de_productos"
-            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-          >
-            <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M20.59 13.41 11 3.83A2 2 0 0 0 9.59 3.24L4 3v5.59a2 2 0 0 0 .59 1.41l9.59 9.59a2 2 0 0 0 2.82 0l3.59-3.59a2 2 0 0 0 0-2.59Z" />
-              <circle cx="8" cy="8" r="1.2" />
-            </svg>
-            Catálogo
-          </NavLink>
-
-          <NavLink
-            to="/Inventario"
-            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-          >
-            <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 8 12 3 3 8l9 5 9-5Z" />
-              <path d="M3 8v8l9 5 9-5V8" />
-              <path d="M12 13v8" />
-            </svg>
-            Inventario
-          </NavLink>
-
-          <NavLink
-            to="/Movimientos"
-            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-          >
-            <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M7 7h13l-3-3M17 17H4l3 3" />
-            </svg>
-            Movimientos
-          </NavLink>
-
-          <NavLink
-            to="/Alertas_de_stock"
-            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-          >
-            <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
-              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-            </svg>
-            Alertas y notificaciones
-            {unreadCount > 0 && <span className="nav-item-badge">{unreadCount}</span>}
-          </NavLink>
-        </nav>
-
-        <nav className="nav-group">
-          <div className="nav-group-label">Ventas</div>
-
-          <NavLink
-            to="/Punto_de_Venta"
-            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-          >
-            <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="2" y="7" width="20" height="14" rx="2" />
-              <path d="M16 3v4M8 3v4M2 11h20" />
-            </svg>
-            Punto de Venta
-          </NavLink>
-        </nav>
-
-        <nav className="nav-group">
-          <div className="nav-group-label">Compras</div>
-
-          <NavLink
-            to="/Gestion_de_proveedores"
-            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-          >
-            <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="1" y="3" width="15" height="13" rx="1.5" />
-              <path d="M16 8h3.5l3.5 3.5V16h-7" />
-              <circle cx="5.5" cy="18.5" r="2.2" />
-              <circle cx="18.5" cy="18.5" r="2.2" />
-            </svg>
-            Proveedores
-          </NavLink>
-
-          <NavLink
-            to="/Cotizaciones_ordenes_compra"
-            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-          >
-            <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
-              <path d="M14 2v6h6" />
-              <path d="M9 13h6M9 17h6" />
-            </svg>
-            Cotizaciones y OC
-          </NavLink>
-
-          <NavLink
-            to="/Cuentas_por_pagar"
-            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-          >
-            <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="2" y="5" width="20" height="14" rx="2" />
-              <path d="M2 10h20" />
-            </svg>
-            Cuentas por Pagar
-          </NavLink>
-
-          <NavLink
-            to="/registro-comprobantes"
-            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-          >
-            <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
-              <path d="M14 2v6h6" />
-              <path d="M9 13h6M9 17h3" />
-              <circle cx="17" cy="17" r="3" />
-              <path d="M17 15v2l1 1" />
-            </svg>
-            Comprobantes
-          </NavLink>
-        </nav>
-
-    {/*      <nav className="nav-group">
-        <div className="nav-group-label">Tesorería</div>  
-
-          <NavLink
-            to="/Notas_credito_debito"
-            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-          >
-            <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9 14 4 9l5-5" />
-              <path d="M4 9h10.5A5.5 5.5 0 0 1 20 14.5v0A5.5 5.5 0 0 1 14.5 20H11" />
-            </svg>
-            Notas de Crédito/Débito
-          </NavLink>
-
-          <NavLink
-            to="/Limites_de_credito"
-            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-          >
-            <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="2" y="4" width="20" height="16" rx="2" />
-              <path d="M2 10h20" />
-              <path d="M6 15h4" />
-            </svg>
-            Límites de Crédito
-          </NavLink>
-        </nav>
-*/}
-        <div className="sidebar-footer">
-          <div className="sidebar-footer-text">
-            Mario A. Guerrisi<br />
-            Instrumentos Musicales &copy; 2026<br />
-            Sprint 1 · v1.1
-          </div>
-        </div>
-      </aside>
-
-      {/* MAIN */}
-      <div className="main">
+      {/* 2. MAIN CONTAINER */}
+      <div className="main" style={esModoPOS ? { width: '100%' } : {}}>
         {/* TOPBAR */}
         <header className="topbar">
+          {/* LADO IZQUIERDO: Título limpio */}
           <div className="topbar-left">
-            <h1 className="topbar-title">{currentRouteInfo.title}</h1>
-            <span className="topbar-subtitle">{currentRouteInfo.subtitle}</span>
+            {esModoPOS ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div className="brand-mark" style={{ width: '32px', height: '32px', borderRadius: '8px' }}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '16px', height: '16px' }}>
+                    <path d="M9 18V5l12-2v13" />
+                    <circle cx="6" cy="18" r="3" />
+                    <circle cx="18" cy="16" r="3" />
+                  </svg>
+                </div>
+                <div>
+                  <h1 className="topbar-title" style={{ fontSize: '15px', margin: 0 }}>Mario A. Guerrisi</h1>
+                  <span className="topbar-subtitle" style={{ fontSize: '11px' }}>Punto de Venta — Caja</span>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <h1 className="topbar-title">{currentRouteInfo.title}</h1>
+                <span className="topbar-subtitle">{currentRouteInfo.subtitle}</span>
+              </div>
+            )}
           </div>
 
-          <div className="topbar-right">
-            {/* <div className="global-search">
-              <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="11" cy="11" r="7" />
-                <path d="m21 21-4.3-4.3" />
-              </svg>
-              <input
-                type="text"
-                placeholder="Buscar artículo, EAN o marca..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={handleSearchKeyDown}
-              />
-            </div> */}
+          {/* CENTRO: Switch ERP vs POS flotante */}
+          <div className="topbar-center" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+            <div
+              style={{
+                background: '#f4f4f5',
+                padding: '3px',
+                borderRadius: '9px',
+                border: '1px solid #e4e4e7',
+                display: 'inline-flex',
+                gap: '4px',
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => navigate('/Inventario')}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '6px 14px',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  borderRadius: '7px',
+                  cursor: 'pointer',
+                  border: 'none',
+                  transition: 'all 0.15s ease',
+                  background: !esModoPOS ? '#18181b' : 'transparent',
+                  color: !esModoPOS ? '#ffffff' : '#71717a',
+                  boxShadow: !esModoPOS ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                }}
+              >
+                <span>🏢</span> Gestión ERP
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('/Punto_de_Venta')}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '6px 14px',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  borderRadius: '7px',
+                  cursor: 'pointer',
+                  border: 'none',
+                  transition: 'all 0.15s ease',
+                  background: esModoPOS ? '#e11d48' : 'transparent',
+                  color: esModoPOS ? '#ffffff' : '#71717a',
+                  boxShadow: esModoPOS ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                }}
+              >
+                <span>🛒</span> Modo Caja (POS)
+              </button>
+            </div>
+          </div>
 
+          {/* LADO DERECHO: Notificaciones y Perfil */}
+          <div className="topbar-right">
             {/* NOTIFICACIONES */}
             <div className="topbar-item" ref={notifRef}>
               <button
@@ -484,11 +490,10 @@ function App() {
           </div>
         </header>
 
-        {/* CONTENIDO PRINCIPAL CON ANIMACIÓN GPU */}
-        <main className="content">
+        {/* 3. CONTENIDO PRINCIPAL */}
+        <main className="content" style={esModoPOS ? { padding: '18px 24px', maxWidth: '1600px', margin: '0 auto', width: '100%' } : {}}>
           <div key={location.pathname} className="page-transition">
             <Routes location={location}>
-              {/* <Route path="/" element={<Dashboard />} /> */}
               <Route path="/" element={<Navigate to="/Inventario" replace />} />
               <Route path="/Catalogo_de_productos" element={<Catalogo_de_productos />} />
               <Route path="/Inventario" element={<Inventario2 />} />
@@ -499,7 +504,6 @@ function App() {
               <Route path="/Gestion_de_proveedores" element={<Gestion_de_proveedores />} />
               <Route path="/Cotizaciones_ordenes_compra" element={<Cotizaciones_ordenes_compra />} />
               <Route path="/Cuentas_por_pagar" element={<Cuentas_por_pagar />} />
-              
               <Route path="/Notas_credito_debito" element={<Notas_credito_debito />} />
               <Route path="/Limites_de_credito" element={<Limites_de_credito />} />
               <Route path="/Punto_de_Venta" element={<Punto_de_Venta />} />

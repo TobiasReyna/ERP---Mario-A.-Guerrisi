@@ -2,10 +2,9 @@ import { useState, useMemo, useEffect } from 'react';
 import Modal from '../components/Modal';
 import Detalle_producto from './Detalle_producto';
 
-// Caché en memoria para evitar repetición de peticiones
+// Caché en memoria para evitar repetición de peticiones de imágenes
 const imageMemoryCache = new Map();
 
-// Componente de Búsqueda Automática de Imágenes (MediaWiki Action API)
 function AutoProductImage({ brand, model, description, category, query, alt, style }) {
   const [imageUrl, setImageUrl] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -185,7 +184,7 @@ const ProductStock = ({ articuloId }) => {
 };
 
 function Catalogo_de_productos() {
-  // Datos maestros dinámicos
+  // Datos maestros
   const [formCategories, setFormCategories] = useState([]);
   const [formCountries, setFormCountries] = useState([]);
   const [formBrands, setFormBrands] = useState([]);
@@ -198,6 +197,10 @@ function Catalogo_de_productos() {
   const [sortBy, setSortBy] = useState('relevantes');
   const [activeCategory, setActiveCategory] = useState('Todas');
   const [viewMode, setViewMode] = useState('grid');
+
+  // Paginación
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(12); // Divisible para grid de 2, 3 o 4 columnas
 
   // Modal Detalle
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
@@ -224,7 +227,6 @@ function Catalogo_de_productos() {
   const [isReactivateModalOpen, setIsReactivateModalOpen] = useState(false);
   const [productToReactivate, setProductToReactivate] = useState(null);
 
-  // Carga de categorías, marcas y países desde la BD
   useEffect(() => {
     fetch('http://localhost:3001/api/categories')
       .then((res) => res.json())
@@ -248,7 +250,6 @@ function Catalogo_de_productos() {
       .catch((err) => console.error('Error fetching brands:', err));
   }, []);
 
-  // Carga de artículos
   const fetchArticles = () => {
     let endpoint = 'http://localhost:3001/api/articles';
     if (lifecycleFilter === 'bajas') endpoint = 'http://localhost:3001/api/articles/inactivos';
@@ -266,7 +267,6 @@ function Catalogo_de_productos() {
     fetchArticles();
   }, [lifecycleFilter]);
 
-  // Validación de EAN-13
   const eanValidation = useMemo(() => {
     const val = newProduct.ean.trim();
     if (val.length === 0) return { state: 'empty' };
@@ -291,7 +291,7 @@ function Catalogo_de_productos() {
     return brand ? brand.nombre : 'Sin marca';
   };
 
-  // Filtrado y ordenamiento reactivo
+  // Filtrado reactivo
   const filteredProducts = useMemo(() => {
     return products
       .filter((item) => {
@@ -322,6 +322,19 @@ function Catalogo_de_productos() {
       });
   }, [products, searchTerm, selectedBrand, lifecycleFilter, sortBy, activeCategory, formBrands, formCategories]);
 
+  // Reseteo de página al alterar filtros
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedBrand, lifecycleFilter, sortBy, activeCategory]);
+
+  // Paginación
+  const totalPages = Math.ceil(filteredProducts.length / rowsPerPage) || 1;
+
+  const paginatedProducts = useMemo(() => {
+    const start = (currentPage - 1) * rowsPerPage;
+    return filteredProducts.slice(start, start + rowsPerPage);
+  }, [filteredProducts, currentPage, rowsPerPage]);
+
   const showToast = (message) => {
     setConfirmToast(message);
     setTimeout(() => setConfirmToast(null), 4000);
@@ -332,7 +345,6 @@ function Catalogo_de_productos() {
     setIsDetailModalOpen(true);
   };
 
-  // Crear producto
   const handleCreateProduct = async (e) => {
     e.preventDefault();
     if (!newProduct.category || !newProduct.originCountry || !newProduct.brand || !newProduct.description.trim() || eanValidation.state !== 'valid') {
@@ -379,7 +391,6 @@ function Catalogo_de_productos() {
     }
   };
 
-  // Dar de baja (Soft Delete)
   const handleConfirmDeactivate = async () => {
     if (!productToDeactivate) return;
 
@@ -402,7 +413,6 @@ function Catalogo_de_productos() {
     }
   };
 
-  // Reactivar producto
   const handleConfirmReactivate = async () => {
     if (!productToReactivate) return;
 
@@ -438,7 +448,7 @@ function Catalogo_de_productos() {
       )}
 
       {/* ENCABEZADO */}
-      <div className="section-heading" style={{ justifyContent: 'flex-end' }}>
+      <div className="section-heading" style={{ justifyContent: 'flex-end', marginBottom: '14px' }}>
         <button className="btn btn-primary" onClick={() => setIsNewModalOpen(true)}>
           <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M12 5v14M5 12h14" />
@@ -460,9 +470,17 @@ function Catalogo_de_productos() {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
+          {searchTerm && (
+            <button
+              type="button"
+              onClick={() => setSearchTerm('')}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--gray-400)' }}
+            >
+              ✕
+            </button>
+          )}
         </div>
 
-        {/* FILTRO DE ESTADO */}
         <div className="select-field">
           Catálogo:
           <select value={lifecycleFilter} onChange={(e) => setLifecycleFilter(e.target.value)}>
@@ -472,20 +490,16 @@ function Catalogo_de_productos() {
           </select>
         </div>
 
-        {/* FILTRO DE MARCAS DINÁMICO */}
         <div className="select-field">
           Marca:
           <select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)}>
             <option value="Todas">Todas las marcas</option>
             {formBrands.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.nombre}
-              </option>
+              <option key={b.id} value={b.id}>{b.nombre}</option>
             ))}
           </select>
         </div>
 
-        {/* ORDENAMIENTO */}
         <div className="select-field">
           Ordenar:
           <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
@@ -495,7 +509,6 @@ function Catalogo_de_productos() {
           </select>
         </div>
 
-        {/* TOGGLE VISTA */}
         <div className="view-toggle">
           <button className={viewMode === 'grid' ? 'active' : ''} onClick={() => setViewMode('grid')}>
             <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -515,7 +528,7 @@ function Catalogo_de_productos() {
         </div>
       </div>
 
-      {/* CATEGORY RAIL DINÁMICO (DESDE BD) */}
+      {/* CATEGORY RAIL */}
       <div className="category-rail">
         <button
           key="Todas"
@@ -539,11 +552,11 @@ function Catalogo_de_productos() {
       {viewMode === 'grid' && (
         <div className="product-grid">
           {filteredProducts.length === 0 ? (
-            <div style={{ gridColumn: '1 / -1', padding: '36px', textAlign: 'center', color: 'var(--gray-500)' }}>
+            <div style={{ gridColumn: '1 / -1', padding: '40px', textAlign: 'center', color: 'var(--gray-500)' }}>
               No se encontraron productos para los filtros seleccionados.
             </div>
           ) : (
-            filteredProducts.map((prod) => {
+            paginatedProducts.map((prod) => {
               const brandText = getBrandName(prod.marca_id);
               const categoryText = getCategoryName(prod.categoria_id);
 
@@ -577,7 +590,7 @@ function Catalogo_de_productos() {
                     <ProductStock articuloId={prod.id} />
 
                     <div className="product-card-actions">
-                      <button className="btn btn-outline" onClick={() => {handleOpenDetailModal(prod.id); window.scrollTo({ top: 0, behavior: 'smooth' });}}>
+                      <button className="btn btn-outline" onClick={() => { handleOpenDetailModal(prod.id); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>
                         Ver detalle
                       </button>
 
@@ -631,20 +644,20 @@ function Catalogo_de_productos() {
                   <th>Modelo</th>
                   <th>EAN-13</th>
                   <th>Categoría</th>
-                  <th>Precio actual</th>
+                  <th style={{ textAlign: 'right' }}>Precio actual</th>
                   <th>Estado</th>
-                  <th>Acciones</th>
+                  <th style={{ textAlign: 'center' }}>Acciones</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredProducts.length === 0 ? (
                   <tr>
-                    <td colSpan="9" style={{ textAlign: 'center', padding: '32px', color: 'var(--gray-500)' }}>
+                    <td colSpan="9" style={{ textAlign: 'center', padding: '36px', color: 'var(--gray-500)' }}>
                       No se encontraron productos registrados bajo estos filtros.
                     </td>
                   </tr>
                 ) : (
-                  filteredProducts.map((prod) => (
+                  paginatedProducts.map((prod) => (
                     <tr key={prod.id} style={{ opacity: prod.estado ? 1 : 0.65 }}>
                       <td className="cell-mono">{prod.codigo_interno}</td>
                       <td className="cell-strong">{prod.descripcion}</td>
@@ -652,15 +665,17 @@ function Catalogo_de_productos() {
                       <td>{prod.modelo || '-'}</td>
                       <td className="cell-mono">{prod.codigo_ean13}</td>
                       <td>{getCategoryName(prod.categoria_id)}</td>
-                      <td className="cell-strong">${Number(prod.precio_actual).toLocaleString('es-AR')}</td>
+                      <td className="cell-mono" style={{ textAlign: 'right', fontWeight: '600' }}>
+                        ${Number(prod.precio_actual).toLocaleString('es-AR')}
+                      </td>
                       <td>
                         <span className={`badge ${prod.estado ? 'badge-green' : 'badge-amber'}`}>
                           <span className="badge-dot"></span>
                           {prod.estado ? 'Activo' : 'Baja'}
                         </span>
                       </td>
-                      <td>
-                        <div className="row-actions">
+                      <td style={{ textAlign: 'center' }}>
+                        <div className="row-actions" style={{ justifyContent: 'center' }}>
                           <button
                             className="icon-btn"
                             title="Ver detalle"
@@ -705,6 +720,107 @@ function Catalogo_de_productos() {
                 )}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* BARRA DE PAGINACIÓN UNIFICADA (GRID Y TABLA) */}
+      {filteredProducts.length > 0 && (
+        <div
+          className="table-panel"
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: '12px 18px',
+            marginTop: '16px',
+            fontSize: '12.5px',
+            color: '#64748b',
+            flexWrap: 'wrap',
+            gap: '10px',
+            background: '#fafafa',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span>Mostrar por página:</span>
+            <select
+              value={rowsPerPage}
+              onChange={(e) => {
+                setRowsPerPage(Number(e.target.value));
+                setCurrentPage(1);
+              }}
+              style={{
+                padding: '3px 8px',
+                borderRadius: '6px',
+                border: '1px solid #cbd5e1',
+                background: '#fff',
+                fontSize: '12px',
+                fontWeight: '600',
+                color: '#0f172a',
+                cursor: 'pointer',
+                outline: 'none',
+              }}
+            >
+              <option value={12}>12</option>
+              <option value={24}>24</option>
+              <option value={48}>48</option>
+              <option value={96}>96</option>
+            </select>
+            <span style={{ marginLeft: '6px' }}>
+              Mostrando{' '}
+              <strong style={{ color: '#0f172a' }}>
+                {(currentPage - 1) * rowsPerPage + 1}
+              </strong>{' '}
+              -{' '}
+              <strong style={{ color: '#0f172a' }}>
+                {Math.min(currentPage * rowsPerPage, filteredProducts.length)}
+              </strong>{' '}
+              de <strong style={{ color: '#0f172a' }}>{filteredProducts.length}</strong> artículos
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <button
+              type="button"
+              className="btn btn-outline btn-sm"
+              disabled={currentPage === 1}
+              onClick={() => {
+                setCurrentPage((p) => Math.max(1, p - 1));
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              style={{
+                padding: '4px 10px',
+                fontSize: '11.5px',
+                fontWeight: '600',
+                cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                opacity: currentPage === 1 ? 0.5 : 1,
+              }}
+            >
+              ← Anterior
+            </button>
+
+            <span style={{ fontWeight: '700', padding: '0 6px', color: '#0f172a' }}>
+              Página {currentPage} de {totalPages}
+            </span>
+
+            <button
+              type="button"
+              className="btn btn-outline btn-sm"
+              disabled={currentPage >= totalPages}
+              onClick={() => {
+                setCurrentPage((p) => Math.min(totalPages, p + 1));
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              style={{
+                padding: '4px 10px',
+                fontSize: '11.5px',
+                fontWeight: '600',
+                cursor: currentPage >= totalPages ? 'not-allowed' : 'pointer',
+                opacity: currentPage >= totalPages ? 0.5 : 1,
+              }}
+            >
+              Siguiente →
+            </button>
           </div>
         </div>
       )}
@@ -758,9 +874,7 @@ function Catalogo_de_productos() {
               >
                 <option value="">Seleccione una categoría</option>
                 {formCategories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.nombre}
-                  </option>
+                  <option key={c.id} value={c.id}>{c.nombre}</option>
                 ))}
               </select>
             </div>
@@ -789,9 +903,7 @@ function Catalogo_de_productos() {
               >
                 <option value="">Seleccione una marca</option>
                 {formBrands.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.nombre}
-                  </option>
+                  <option key={b.id} value={b.id}>{b.nombre}</option>
                 ))}
               </select>
             </div>
@@ -851,9 +963,7 @@ function Catalogo_de_productos() {
               >
                 <option value="">Seleccione un país</option>
                 {formCountries.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.nombre}
-                  </option>
+                  <option key={c.id} value={c.id}>{c.nombre}</option>
                 ))}
               </select>
             </div>
@@ -861,7 +971,7 @@ function Catalogo_de_productos() {
         </form>
       </Modal>
 
-      {/* MODAL DAR DE BAJA PRODUCTO */}
+      {/* MODAL DAR DE BAJA */}
       <Modal
         isOpen={isDeactivateModalOpen}
         onClose={() => setIsDeactivateModalOpen(false)}
@@ -891,7 +1001,7 @@ function Catalogo_de_productos() {
         </div>
       </Modal>
 
-      {/* MODAL REACTIVAR PRODUCTO */}
+      {/* MODAL REACTIVAR */}
       <Modal
         isOpen={isReactivateModalOpen}
         onClose={() => setIsReactivateModalOpen(false)}
