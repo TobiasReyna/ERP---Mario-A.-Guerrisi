@@ -703,30 +703,34 @@ function Punto_de_Venta() {
     e.preventDefault();
     const errores = {};
 
-    if (!nuevoClienteForm.razonSocial || nuevoClienteForm.razonSocial.trim().length < 3) {
+    const razonSocial = nuevoClienteForm.razonSocial.trim();
+    const dni = nuevoClienteForm.dni.trim().replace(/\D/g, '');
+    const cuit = nuevoClienteForm.cuit.trim().replace(/\D/g, '');
+    const email = nuevoClienteForm.email.trim();
+    const telefono = nuevoClienteForm.telefono.trim();
+    const direccion = nuevoClienteForm.direccion.trim();
+
+    if (!razonSocial || razonSocial.length < 3) {
       errores.razonSocial = 'El nombre o razón social debe tener al menos 3 caracteres.';
     }
 
-    const tieneDni = Boolean(nuevoClienteForm.dni && nuevoClienteForm.dni.trim());
-    const tieneCuit = Boolean(nuevoClienteForm.cuit && nuevoClienteForm.cuit.trim());
-
-    if (!tieneDni && !tieneCuit) {
+    if (!dni && !cuit) {
       errores.documento = 'Debes ingresar al menos un DNI o un CUIT válido.';
     }
 
-    if (tieneDni && !validarDNI(nuevoClienteForm.dni)) {
+    if (dni && !validarDNI(dni)) {
       errores.dni = 'DNI inválido (debe tener entre 7 y 8 números).';
     }
 
-    if (tieneCuit && !validarCUIT(nuevoClienteForm.cuit)) {
+    if (cuit && !validarCUIT(cuit)) {
       errores.cuit = 'CUIT inválido (no supera la verificación de AFIP).';
     }
 
-    if (nuevoClienteForm.email && !validarEmail(nuevoClienteForm.email)) {
+    if (email && !validarEmail(email)) {
       errores.email = 'Formato de correo electrónico inválido.';
     }
 
-    if (nuevoClienteForm.telefono && !validarTelefono(nuevoClienteForm.telefono)) {
+    if (telefono && !validarTelefono(telefono)) {
       errores.telefono = 'Teléfono inválido (mínimo 8 dígitos).';
     }
 
@@ -739,12 +743,12 @@ function Punto_de_Venta() {
     setCreandoCliente(true);
     try {
       const nuevo = await crearCliente({
-        razonSocial: nuevoClienteForm.razonSocial.trim(),
-        dni: nuevoClienteForm.dni.trim() || null,
-        cuit: nuevoClienteForm.cuit.trim() || null,
-        email: nuevoClienteForm.email.trim() || null,
-        telefono: nuevoClienteForm.telefono.trim(),
-        direccion: nuevoClienteForm.direccion.trim(),
+        razonSocial,
+        dni: dni || null,
+        cuit: cuit || null,
+        email: email || null,
+        telefono,
+        direccion,
       });
       handleSeleccionarCliente(nuevo);
     } catch (err) {
@@ -2156,6 +2160,7 @@ function Punto_de_Venta() {
         isOpen={isClientModalOpen}
         onClose={handleCerrarModalCliente}
         title={mostrarAltaCliente ? 'Nuevo cliente' : 'Buscar cliente (F4)'}
+        wide={mostrarAltaCliente}
       >
         {mostrarAltaCliente ? (
           <form onSubmit={handleCrearCliente} className="form-row" noValidate>
