@@ -64,6 +64,7 @@ class ComprobantesProveedorService {
             fecha_vencimiento,     // null/undefined para Nota de Crédito
             id_cuenta_por_pagar,   // obligatorio para Nota de Crédito
             orden_compra_id,
+            usuario_id,
             detalles,
         } = payload;
 
@@ -92,7 +93,7 @@ class ComprobantesProveedorService {
             .from('comprobantes_proveedores')
             .select('id')
             .eq('proveedor_id', proveedor_id)
-            .eq('tipo_comprobante', tipo_comprobante) // <--- AGREGAR ESTA LÍNEA
+            .eq('tipo_comprobante', tipo_comprobante)
             .eq('numero_comprobante', numero_comprobante)
             .maybeSingle();
 
@@ -139,7 +140,9 @@ class ComprobantesProveedorService {
         }
 
         // ==================================================================
-        // OPERACIÓN ATÓMICA: Paso 1 — insertar el comprobante
+        // Paso 1 — insertar la cabecera del comprobante
+        // (ya NO existe comprobantes_proveedores.id_cuenta_por_pagar: el vínculo
+        //  vive solo en cuentas_por_pagar.comprobante_proveedor_id)
         // ==================================================================
         const { data: comprobante, error: errInsert } = await supabaseAdmin
             .from('comprobantes_proveedores')
@@ -150,57 +153,88 @@ class ComprobantesProveedorService {
                 monto_total: Number(monto_total),
                 fecha_emision,
                 fecha_vencimiento: esNC ? null : fecha_vencimiento,
-                id_cuenta_por_pagar: esNC ? id_cuenta_por_pagar : null,
                 orden_compra_id: orden_compra_id || null,
+                usuario_id: usuario_id || null,
             })
             .select()
             .single();
 
         if (errInsert) throw new Error(errInsert.message);
 
-        // ==================================================================
-        // OPERACIÓN ATÓMICA: Pasos 2 y 3 (CxP y Detalles) agrupados en Try/Catch
-        // ==================================================================
+        // Registro de lo que hay que deshacer si algo falla
+        let cxpCreadaId = null;          // Factura / ND: CxP nueva
+        let saldoOriginalNC = null;      // NC: saldo previo de la CxP afectada
+
         try {
-            // --- PASO 2: Tu lógica actual de Cuentas por Pagar ---
+            // --- Paso 2: Cuentas por Pagar ---
             if (esNC) {
-                // ... tu update a cuentas_por_pagar
-            } else {
-                // ... tu insert a cuentas_por_pagar
+                // La NC descuenta el saldo de la CxP elegida
+                saldoOriginalNC = Number(cuentaDestino.saldo_pendiente);
+                const nuevoSaldo = saldoOriginalNC - Number(monto_total);
+
+                const { error: errUpd } = await supabaseAdmin
+                    .from('cuentas_por_pagar')
+                    .update({
+                        saldo_pendiente: nuevoSaldo,
+                        ...(nuevoSaldo === 0 ? { estado: 'Pagada' } : {}),
+                    })
+                    .eq('id', cuentaDestino.id);
+                if (errUpd) throw new Error(errUpd.message);
+            } else if (tipo_comprobante !== 'Remito') {
+                // Factura / ND: deuda nueva e independiente.
+                // (Un Remito no es un documento de deuda: no genera CxP.)
+                const { data: cxp, error: errCxp } = await supabaseAdmin
+                    .from('cuentas_por_pagar')
+                    .insert({
+                        proveedor_id,
+                        orden_compra_id: orden_compra_id || null,
+                        comprobante_proveedor_id: comprobante.id,
+                        monto_total: Number(monto_total),
+                        saldo_pendiente: Number(monto_total),
+                        fecha_vencimiento,
+                        estado: 'Pendiente',
+                    })
+                    .select('id')
+                    .single();
+                if (errCxp) throw new Error(errCxp.message);
+                cxpCreadaId = cxp.id;
             }
 
-            // --- PASO 3: NUEVO - Insertar los artículos en el detalle ---
-            // Formateamos el array para insertarlo de golpe (Bulk Insert) en Supabase
+            // --- Paso 3: detalle de artículos ---
             const detallesAInsertar = detalles.map((item) => {
                 const cantidad = Number(item.cantidad);
                 const precio = Number(item.precio_unitario);
-                
                 return {
-                    comprobante_id: comprobante.id, // Vinculamos a la cabecera recién creada
+                    comprobante_id: comprobante.id,
                     articulo_id: item.articulo_id,
-                    cantidad: cantidad,
+                    cantidad,
                     precio_unitario: precio,
-                    subtotal: item.subtotal || (cantidad * precio) // Calcula el subtotal si no viene del front
+                    subtotal: item.subtotal || cantidad * precio,
                 };
             });
 
             const { error: errDetalles } = await supabaseAdmin
                 .from('comprobantes_proveedores_detalle')
                 .insert(detallesAInsertar);
-
             if (errDetalles) throw new Error(errDetalles.message);
-
-            // (Nota futura: Aquí mismo iría el Paso 4: Actualizar stock de inventario)
 
         } catch (errOperacion) {
             // ------------------------------------------------------------------
-            // ROLLBACK MANUAL: revertir todo si falla CxP o el Detalle
+            // ROLLBACK MANUAL (orden inverso)
             // ------------------------------------------------------------------
-            console.error('[HU-23] Rollback: eliminando comprobante por falla:', errOperacion.message);
-            await supabaseAdmin
-                .from('comprobantes_proveedores')
-                .delete()
-                .eq('id', comprobante.id);
+            console.error('[HU-23] Rollback por falla:', errOperacion.message);
+
+            if (cxpCreadaId) {
+                await supabaseAdmin.from('cuentas_por_pagar').delete().eq('id', cxpCreadaId);
+            }
+            if (esNC && saldoOriginalNC !== null) {
+                await supabaseAdmin
+                    .from('cuentas_por_pagar')
+                    .update({ saldo_pendiente: saldoOriginalNC, estado: 'Pendiente' })
+                    .eq('id', cuentaDestino.id);
+            }
+            await supabaseAdmin.from('comprobantes_proveedores_detalle').delete().eq('comprobante_id', comprobante.id);
+            await supabaseAdmin.from('comprobantes_proveedores').delete().eq('id', comprobante.id);
 
             throw new Error(`Error procesando la operación. El comprobante fue revertido. Detalle: ${errOperacion.message}`);
         }
@@ -210,4 +244,3 @@ class ComprobantesProveedorService {
 }
 
 module.exports = ComprobantesProveedorService;
-
