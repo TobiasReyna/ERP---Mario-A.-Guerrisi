@@ -16,10 +16,13 @@ import Limites_de_credito from './pages/Limites_de_credito';
 import Punto_de_Venta from './pages/Punto_de_Venta';
 import Perfil from './pages/Perfil';
 import RegistroComprobanteProveedor from './pages/RegistroComprobanteProveedor';
+import Lista_Precios from './pages/Lista_Precios';
 
 const ROUTE_INFO = {
   '/': { title: 'Dashboard', subtitle: 'Resumen general del inventario y el catálogo' },
   '/Catalogo_de_productos': { title: 'Catálogo', subtitle: 'Base maestra de productos — código interno, EAN-13, marca y precio' },
+  '/Lista_Precios': { title: 'Lista de Precios', subtitle: 'Gestión de precios al consumidor final, aumentos masivos y auditoría' },
+  '/lista-precios': { title: 'Lista de Precios', subtitle: 'Gestión de precios al consumidor final, aumentos masivos y auditoría' },
   '/Inventario': { title: 'Inventario', subtitle: 'Stock comparado entre Tienda Central y Galería Margalef' },
   '/Movimientos': { title: 'Movimientos', subtitle: 'Entradas, salidas, ajustes y transferencias de stock' },
   '/Alertas_de_stock': { title: 'Alertas y notificaciones', subtitle: 'Reposición de stock y actividad general del sistema' },
@@ -175,6 +178,17 @@ function App() {
             </NavLink>
 
             <NavLink
+              to="/Lista_Precios"
+              className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+            >
+              <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="2" x2="12" y2="22" />
+                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+              </svg>
+              Lista de Precios
+            </NavLink>
+
+            <NavLink
               to="/Inventario"
               className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
             >
@@ -277,7 +291,7 @@ function App() {
       <div className="main" style={esModoPOS ? { width: '100%' } : {}}>
         {/* TOPBAR */}
         <header className="topbar">
-          {/* LADO IZQUIERDO: Título limpio */}
+          {/* LADO IZQUIERDO */}
           <div className="topbar-left">
             {esModoPOS ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -496,6 +510,8 @@ function App() {
             <Routes location={location}>
               <Route path="/" element={<Navigate to="/Inventario" replace />} />
               <Route path="/Catalogo_de_productos" element={<Catalogo_de_productos />} />
+              <Route path="/Lista_Precios" element={<Lista_Precios />} />
+              <Route path="/lista-precios" element={<Lista_Precios />} />
               <Route path="/Inventario" element={<Inventario2 />} />
               <Route path="/Inventario2" element={<Inventario2 />} />
               <Route path="/Movimientos" element={<Movimientos />} />
