@@ -21,3 +21,10 @@ Por política de seguridad, está **estrictamente prohibido** guardar tokens JWT
 1. **Login Estético y Nativo**: Componente `/login` construido sin librerías externas (sin Tailwind), respetando estrictamente las variables CSS y el Design System corporativo (`index.css`), e integrado con íconos de `lucide-react`.
 2. **Context API (`AuthContext`)**: Maneja globalmente el estado del usuario logueado en memoria.
 3. **Rutas Protegidas (`ProtectedRoute`)**: Componente guardián en `App.jsx` que bloquea el acceso a las vistas internas del ERP si el usuario no existe en el contexto, redirigiéndolo silenciosamente hacia el login.
+
+### Dependencias Instaladas (Módulo Login)
+Durante la implementación del sistema de autenticación se instalaron las siguientes librerías:
+- **Backend (erp-backend)**:
+  - cookie-parser: Middleware esencial para extraer, parsear y manipular las cookies de sesión (HttpOnly) enviadas desde el navegador.
+- **Frontend (erp-front)**:
+  - xios: Cliente HTTP moderno utilizado para el proceso de inicio y cierre de sesión, garantizando el envío seguro de cookies mediante la propiedad withCredentials: true.
