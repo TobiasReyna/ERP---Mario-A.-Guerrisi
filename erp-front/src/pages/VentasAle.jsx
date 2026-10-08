@@ -1,3 +1,6 @@
+//ARCHIVO DEL VIEJO POS, YA NO SE USA PERO PUEDE SERVIR DE BASE PARA EL ECOMMERCE
+
+
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Modal from '../components/Modal';

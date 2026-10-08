@@ -26,6 +26,22 @@ export async function listarDepositos() {
   }
 }
 
+export async function listarListasPrecios() {
+  try {
+    const res = await fetch(`${API_URL}/price-lists`);
+    if (!res.ok) return [];
+    const json = await res.json();
+    return (json.data || []).map((l) => ({
+      id: l.id,
+      nombre: l.nombre,
+      porcentaje: Number(l.porcentaje),
+    }));
+  } catch (err) {
+    console.error('Error al listar listas de precios:', err);
+    return [];
+  }
+}
+
 export async function obtenerCatalogoPOS(depositoId) {
   const res = await fetch(`${API_URL}/stock/pos-catalog?depositoId=${depositoId}`);
   const json = await res.json();

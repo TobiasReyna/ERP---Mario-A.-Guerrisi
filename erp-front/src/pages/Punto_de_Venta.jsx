@@ -4,6 +4,7 @@ import Modal from '../components/Modal';
 import { formatearMonto, formatearFechaHora } from '../utils/format';
 import {
   listarDepositos,
+  listarListasPrecios,
   obtenerCatalogoPOS,
   crearVentaPendiente,
   obtenerVenta,
@@ -279,6 +280,8 @@ function Punto_de_Venta() {
 
   const [carrito, setCarrito] = useState([]);
   const [cliente, setCliente] = useState(null);
+  const [listasPrecios, setListasPrecios] = useState([]);
+  const [listaPrecioId, setListaPrecioId] = useState(''); // '' = precio base
 
   // Descuentos
   const [descuentoPorc, setDescuentoPorc] = useState(0);
@@ -336,9 +339,25 @@ function Punto_de_Venta() {
   const enCobro = Boolean(venta && venta.estado === 'Pendiente');
   const confirmada = Boolean(venta && venta.estado === 'Confirmada');
 
+  // Lista de precios elegida: ajusta el precio base de cada línea por un porcentaje.
+  // El carrito guarda siempre el precio BASE; el precio de lista se deriva acá.
+  const listaActiva = useMemo(
+    () => listasPrecios.find((l) => l.id === listaPrecioId) || null,
+    [listasPrecios, listaPrecioId]
+  );
+  const porcentajeLista = !venta && listaActiva ? listaActiva.porcentaje : 0;
+  const aplicarLista = useCallback(
+    (precioBase) => Math.round(Number(precioBase) * (1 + porcentajeLista / 100) * 100) / 100,
+    [porcentajeLista]
+  );
+  const carritoConLista = useMemo(
+    () => carrito.map((it) => ({ ...it, precioUnitario: aplicarLista(it.precioUnitario) })),
+    [carrito, aplicarLista]
+  );
+
   const subtotalBrutoCarrito = useMemo(() => {
-    return carrito.reduce((acc, it) => acc + it.cantidad * it.precioUnitario, 0);
-  }, [carrito]);
+    return carritoConLista.reduce((acc, it) => acc + it.cantidad * it.precioUnitario, 0);
+  }, [carritoConLista]);
 
   const porcentajeEfectivo = useMemo(() => {
     if (mostrarCustomDesc) {
@@ -458,7 +477,8 @@ function Punto_de_Venta() {
         depositoId: activeDepositId,
         usuarioId: USUARIO_ACTUAL_ID,
         clienteId: cliente?.id || null,
-        items: carrito.map((it) => {
+        listaPrecioId: listaPrecioId || null,
+        items: carritoConLista.map((it) => {
           const precioConDescuento = Math.round((it.precioUnitario * factorDescuento) * 100) / 100;
           return {
             articuloId: it.articuloId,
@@ -478,9 +498,13 @@ function Punto_de_Venta() {
     } finally {
       setProcesando(false);
     }
-  }, [carrito, subtotalBrutoCarrito, totalCarritoConDescuento, activeDepositId, cliente, cargarPendientes, cargarCatalogo]);
+  }, [carrito.length, carritoConLista, listaPrecioId, subtotalBrutoCarrito, totalCarritoConDescuento, activeDepositId, cliente, cargarPendientes, cargarCatalogo]);
 
   // ── EFECTOS DE CICLO DE VIDA ───────────────────────────────────────────────
+
+  useEffect(() => {
+    listarListasPrecios().then(setListasPrecios);
+  }, []);
 
   useEffect(() => {
     listarDepositos().then((data) => {
@@ -833,6 +857,7 @@ function Punto_de_Venta() {
     setVenta(null);
     setCarrito([]);
     setCliente(null);
+    setListaPrecioId('');
     setModoPago(false);
     setModoBuscarVenta(false);
     setTextoBusquedaVenta('');
@@ -1284,6 +1309,8 @@ function Punto_de_Venta() {
 
   // ── VISTA FORMULARIO (PANTALLA COMPLETA) ───────────────────────────────────
   const depositoActivo = depositos.find((d) => d.id === activeDepositId);
+  const etiquetaPorcentajeLista = (pct) =>
+    pct === 0 ? 'sin ajuste' : `${pct > 0 ? '+' : '-'}${Math.abs(pct).toLocaleString('es-AR')}%`;
   const fechaHoy = new Date().toLocaleDateString('es-AR');
 
   const sugerenciasArticulos = (() => {
@@ -1370,7 +1397,7 @@ function Punto_de_Venta() {
       </div>
 
       {/* CABECERA: CLIENTE / DEPÓSITO / FECHA */}
-      <div className="form-row" style={{ gridTemplateColumns: '1.6fr 1fr 1fr' }}>
+      <div className="form-row" style={{ gridTemplateColumns: '1.6fr 1.1fr 1fr 1fr' }}>
         <div className="form-field">
           <label>Cliente</label>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minHeight: '38px' }}>
@@ -1403,6 +1430,24 @@ function Punto_de_Venta() {
           </div>
         </div>
         <div className="form-field">
+          <label>Lista de precios</label>
+          <select
+            value={listaPrecioId}
+            onChange={(e) => setListaPrecioId(e.target.value)}
+            disabled={procesando}
+          >
+            <option value="">Precio base</option>
+            {listasPrecios.map((l) => (
+              <option key={l.id} value={l.id}>
+                {l.nombre} ({etiquetaPorcentajeLista(l.porcentaje)})
+              </option>
+            ))}
+          </select>
+          <span style={{ fontSize: '11px', color: 'var(--gray-500)' }}>
+            {listaActiva ? 'Los precios del detalle se recalculan con esta lista.' : 'Sin ajuste sobre el precio de catálogo.'}
+          </span>
+        </div>
+        <div className="form-field">
           <label>Depósito</label>
           <input type="text" value={depositoActivo ? depositoActivo.nombre : ''} disabled />
           <span style={{ fontSize: '11px', color: 'var(--gray-500)' }}>Se cambia desde las pestañas de arriba.</span>
@@ -1418,7 +1463,15 @@ function Punto_de_Venta() {
         className="detalle-section"
         style={{ marginTop: '10px', padding: '20px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px', boxSizing: 'border-box', width: '100%' }}
       >
-        <h3 style={{ marginTop: 0, marginBottom: '15px', fontSize: '1.1rem', color: '#333' }}>Detalle de Artículos</h3>
+        <h3 style={{ marginTop: 0, marginBottom: '15px', fontSize: '1.1rem', color: '#333', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          Detalle de Artículos
+          {listaActiva && (
+            <span className="badge badge-amber" style={{ fontWeight: 600 }}>
+              <span className="badge-dot" />
+              Lista {listaActiva.nombre} ({etiquetaPorcentajeLista(listaActiva.porcentaje)})
+            </span>
+          )}
+        </h3>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(220px, 3fr) 100px 1fr auto', gap: '15px', alignItems: 'end', marginBottom: '20px', width: '100%' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', position: 'relative' }}>
@@ -1467,7 +1520,7 @@ function Punto_de_Venta() {
                   >
                     <span>{a.descripcion}</span>
                     <span style={{ color: '#6b7280', whiteSpace: 'nowrap' }}>
-                      {a.disponible > 0 ? `Stock ${a.disponible}` : 'Sin stock'} · {formatearMonto(a.precioActual)}
+                      {a.disponible > 0 ? `Stock ${a.disponible}` : 'Sin stock'} · {formatearMonto(aplicarLista(a.precioActual))}
                     </span>
                   </button>
                 ))}
@@ -1497,7 +1550,7 @@ function Punto_de_Venta() {
             <label style={{ fontSize: '0.9rem', color: '#555' }}>Precio Unit.</label>
             <input
               type="text"
-              value={artSeleccionado ? formatearMonto(artSeleccionado.precioActual) : ''}
+              value={artSeleccionado ? formatearMonto(aplicarLista(artSeleccionado.precioActual)) : ''}
               placeholder="—"
               disabled
               style={inputFormStyle}
@@ -1538,7 +1591,7 @@ function Punto_de_Venta() {
                 </tr>
               </thead>
               <tbody>
-                {carrito.map((it) => (
+                {carritoConLista.map((it) => (
                   <tr key={it.articuloId} style={{ borderBottom: '1px solid #eee' }}>
                     <td style={{ padding: '8px' }}>{it.descripcion}</td>
                     <td style={{ padding: '8px', textAlign: 'center' }}>
@@ -1611,10 +1664,18 @@ function Punto_de_Venta() {
         <h2 style={{ margin: '0 0 14px', fontSize: '1.2rem' }}>
           Venta {venta.numeroComprobante || ''}
         </h2>
-        <div className="detail-info-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', margin: '0 0 14px', padding: 0, border: 'none' }}>
+        <div className="detail-info-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', margin: '0 0 14px', padding: 0, border: 'none' }}>
           <div className="detail-info-item">
             <div className="label">Cliente</div>
             <div className="value" style={{ fontWeight: 600 }}>{cliente ? cliente.razonSocial : 'Consumidor final'}</div>
+          </div>
+          <div className="detail-info-item">
+            <div className="label">Lista de precios</div>
+            <div className="value">
+              {venta.listaPrecio
+                ? `${venta.listaPrecio.nombre} (${etiquetaPorcentajeLista(venta.listaPrecio.porcentaje)})`
+                : 'Precio base'}
+            </div>
           </div>
           <div className="detail-info-item">
             <div className="label">Depósito</div>

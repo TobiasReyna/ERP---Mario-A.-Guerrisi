@@ -92,6 +92,16 @@ class MasterService {
 
         return actividad.slice(0, 20); // Retornar las últimas 20 globales
     }
+
+    static async getListasPrecios() {
+        const { data, error } = await supabaseAdmin
+            .from('listas_precios')
+            .select('id, nombre, porcentaje')
+            .eq('estado', true)
+            .order('nombre', { ascending: true });
+        if (error) throw new Error(`Error consultando listas de precios: ${error.message}`);
+        return (data || []).map((l) => ({ id: l.id, nombre: l.nombre, porcentaje: Number(l.porcentaje) }));
+    }
 }
 
 module.exports = MasterService;

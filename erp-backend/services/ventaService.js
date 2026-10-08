@@ -53,7 +53,7 @@ class VentaService {
       .select(`
         id, numero_comprobante, estado, total,
         fecha_hora_reserva, fecha_hora_expiracion, fecha_hora_registro,
-        cliente_id, deposito_id,
+        cliente_id, deposito_id, lista_precio_id,
         ventas_detalle ( id, articulo_id, cantidad, precio_unitario, importe_linea, articulos ( descripcion ) ),
         pagos_venta ( id, metodo, monto )
       `)
@@ -74,6 +74,16 @@ class VentaService {
       }
     }
 
+    let listaPrecio = null;
+    if (venta.lista_precio_id) {
+      const { data: lp } = await supabaseAdmin
+        .from('listas_precios')
+        .select('id, nombre, porcentaje')
+        .eq('id', venta.lista_precio_id)
+        .maybeSingle();
+      if (lp) listaPrecio = { id: lp.id, nombre: lp.nombre, porcentaje: Number(lp.porcentaje) };
+    }
+
     return {
       ventaId: venta.id,
       depositoId: venta.deposito_id,
@@ -83,6 +93,7 @@ class VentaService {
       fechaHoraExpiracion: venta.fecha_hora_expiracion,
       fechaHoraRegistro: venta.fecha_hora_registro,
       cliente,
+      listaPrecio,
       items: (venta.ventas_detalle || []).map((d) => ({
         articuloId: d.articulo_id,
         descripcion: d.articulos?.descripcion || '',
@@ -100,7 +111,7 @@ class VentaService {
   }
 
   static async crearVentaPendiente(payload) {
-    const { depositoId, usuarioId, clienteId, items, ipOrigen } = payload;
+    const { depositoId, usuarioId, clienteId, listaPrecioId, items, ipOrigen } = payload;
 
     if (!depositoId || !usuarioId) {
       throw new Error('Faltan depositoId o usuarioId.');
@@ -112,6 +123,18 @@ class VentaService {
       if (!it.articuloId || !it.cantidad || it.cantidad <= 0 || !it.precioUnitario || it.precioUnitario <= 0) {
         throw new Error('Cada ítem necesita articuloId, cantidad y precioUnitario válidos.');
       }
+    }
+
+    // 0. Validar la lista de precios elegida (si hay). Es solo trazabilidad:
+    //    el precioUnitario de cada ítem ya llega calculado por el POS.
+    if (listaPrecioId) {
+      const { data: lista, error: errLista } = await supabaseAdmin
+        .from('listas_precios')
+        .select('id')
+        .eq('id', listaPrecioId)
+        .eq('estado', true)
+        .maybeSingle();
+      if (errLista || !lista) throw new Error('La lista de precios seleccionada no existe o está inactiva.');
     }
 
     // 1. Reservar stock vía RPC atómico
@@ -134,6 +157,7 @@ class VentaService {
           deposito_id: depositoId,
           usuario_id: usuarioId,
           cliente_id: clienteId || null,
+          lista_precio_id: listaPrecioId || null,
           estado: 'Pendiente',
           total,
           ip_origen: ipOrigen || '127.0.0.1',
