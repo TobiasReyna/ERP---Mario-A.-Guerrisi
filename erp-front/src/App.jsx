@@ -17,6 +17,13 @@ import Punto_de_Venta from './pages/Punto_de_Venta';
 import Perfil from './pages/Perfil';
 import RegistroComprobanteProveedor from './pages/RegistroComprobanteProveedor';
 import Lista_Precios from './pages/Lista_Precios';
+import Login from './pages/Login';
+import ProtectedRoute from './components/ProtectedRoute';
+import RoleProtectedRoute from './components/RoleProtectedRoute';
+import Sidebar from './components/Sidebar';
+import { ROLES } from './constants/roles';
+import { useAuth } from './context/AuthContext';
+import { getInitials } from './utils/userDisplay';
 
 const ROUTE_INFO = {
   '/': { title: 'Dashboard', subtitle: 'Resumen general del inventario y el catálogo' },
@@ -40,9 +47,17 @@ const ROUTE_INFO = {
 function App() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { user, logout } = useAuth();
+
+  const handleLogout = async () => {
+    setIsUserOpen(false);
+    await logout();
+    navigate('/login', { replace: true });
+  };
 
   // Detecta si estamos operando en la caja
   const esModoPOS = location.pathname.toLowerCase() === '/punto_de_venta';
+  const isLogin = location.pathname === '/' || location.pathname.toLowerCase() === '/login';
 
   const [notifications, setNotifications] = useState([]);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
@@ -144,148 +159,19 @@ function App() {
     navigate('/Alertas_de_stock');
   };
 
+  if (isLogin) {
+    return (
+      <Routes>
+        <Route path="/" element={<Login />} />
+        <Route path="/login" element={<Login />} />
+      </Routes>
+    );
+  }
+
   return (
     <div className={`app ${esModoPOS ? 'app--pos-fullscreen' : ''}`}>
       {/* 1. SIDEBAR (Solo visible si NO estamos en el Punto de Venta) */}
-      {!esModoPOS && (
-        <aside className="sidebar">
-          <div className="sidebar-brand">
-            <div className="brand-mark">
-              <svg viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 18V5l12-2v13" />
-                <circle cx="6" cy="18" r="3" />
-                <circle cx="18" cy="16" r="3" />
-              </svg>
-            </div>
-            <div className="brand-text">
-              <span className="brand-name">Mario A. Guerrisi</span>
-              <span className="brand-sub">Inventario</span>
-            </div>
-          </div>
-
-          <nav className="nav-group">
-            <div className="nav-group-label">Navegación</div>
-
-            <NavLink
-              to="/Catalogo_de_productos"
-              className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-            >
-              <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M20.59 13.41 11 3.83A2 2 0 0 0 9.59 3.24L4 3v5.59a2 2 0 0 0 .59 1.41l9.59 9.59a2 2 0 0 0 2.82 0l3.59-3.59a2 2 0 0 0 0-2.59Z" />
-                <circle cx="8" cy="8" r="1.2" />
-              </svg>
-              Catálogo
-            </NavLink>
-
-            <NavLink
-              to="/Lista_Precios"
-              className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-            >
-              <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="12" y1="2" x2="12" y2="22" />
-                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-              </svg>
-              Lista de Precios
-            </NavLink>
-
-            <NavLink
-              to="/Inventario"
-              className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-            >
-              <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 8 12 3 3 8l9 5 9-5Z" />
-                <path d="M3 8v8l9 5 9-5V8" />
-                <path d="M12 13v8" />
-              </svg>
-              Inventario
-            </NavLink>
-
-            <NavLink
-              to="/Movimientos"
-              className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-            >
-              <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M7 7h13l-3-3M17 17H4l3 3" />
-              </svg>
-              Movimientos
-            </NavLink>
-
-            <NavLink
-              to="/Alertas_de_stock"
-              className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-            >
-              <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
-                <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-              </svg>
-              Alertas y notificaciones
-              {unreadCount > 0 && <span className="nav-item-badge">{unreadCount}</span>}
-            </NavLink>
-          </nav>
-
-          <nav className="nav-group">
-            <div className="nav-group-label">Compras</div>
-
-            <NavLink
-              to="/Gestion_de_proveedores"
-              className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-            >
-              <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="1" y="3" width="15" height="13" rx="1.5" />
-                <path d="M16 8h3.5l3.5 3.5V16h-7" />
-                <circle cx="5.5" cy="18.5" r="2.2" />
-                <circle cx="18.5" cy="18.5" r="2.2" />
-              </svg>
-              Proveedores
-            </NavLink>
-
-            <NavLink
-              to="/Cotizaciones_ordenes_compra"
-              className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-            >
-              <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
-                <path d="M14 2v6h6" />
-                <path d="M9 13h6M9 17h6" />
-              </svg>
-              Cotizaciones y OC
-            </NavLink>
-
-            <NavLink
-              to="/Cuentas_por_pagar"
-              className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-            >
-              <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="2" y="5" width="20" height="14" rx="2" />
-                <path d="M2 10h20" />
-              </svg>
-              Cuentas por Pagar
-            </NavLink>
-
-            <NavLink
-              to="/registro-comprobantes"
-              className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-            >
-              <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
-                <path d="M14 2v6h6" />
-                <path d="M9 13h6M9 17h3" />
-                <circle cx="17" cy="17" r="3" />
-                <path d="M17 15v2l1 1" />
-              </svg>
-              Comprobantes
-            </NavLink>
-          </nav>
-
-          <div className="sidebar-footer">
-            <div className="sidebar-footer-text">
-              Mario A. Guerrisi<br />
-              Instrumentos Musicales &copy; 2026<br />
-              Sprint 1 · v1.1
-            </div>
-          </div>
-        </aside>
-      )}
+      {!esModoPOS && <Sidebar unreadCount={unreadCount} />}
 
       {/* 2. MAIN CONTAINER */}
       <div className="main" style={esModoPOS ? { width: '100%' } : {}}>
@@ -316,10 +202,11 @@ function App() {
           </div>
 
           {/* CENTRO: Switch ERP vs POS flotante */}
-          <div className="topbar-center" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-            <div
-              style={{
-                background: '#f4f4f5',
+          {(user?.rol === ROLES.CAJERO || user?.rol === ROLES.ADMIN) && (
+            <div className="topbar-center" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+              <div
+                style={{
+                  background: '#f4f4f5',
                 padding: '3px',
                 borderRadius: '9px',
                 border: '1px solid #e4e4e7',
@@ -382,6 +269,7 @@ function App() {
               </button>
             </div>
           </div>
+          )}
 
           {/* LADO DERECHO: Notificaciones y Perfil */}
           <div className="topbar-right">
@@ -464,10 +352,10 @@ function App() {
                   setIsNotifOpen(false);
                 }}
               >
-                <div className="avatar">JP</div>
+                <div className="avatar">{getInitials(user?.nombre)}</div>
                 <div className="user-meta">
-                  <span className="user-name">Juan Pérez</span>
-                  <span className="user-role">Encargado de Depósito</span>
+                  <span className="user-name">{user?.nombre}</span>
+                  <span className="user-role">{user?.rol}</span>
                 </div>
                 <svg className="chev" viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="m6 9 6 6 6-6" />
@@ -477,8 +365,8 @@ function App() {
               {isUserOpen && (
                 <div className="dropdown-panel user-dropdown open">
                   <div className="user-dropdown-head">
-                    <div className="name">Juan Pérez</div>
-                    <div className="role">Encargado de Depósito · Tienda Central</div>
+                    <div className="name">{user?.nombre}</div>
+                    <div className="role">{user?.rol}</div>
                   </div>
                   <div className="user-dropdown-list">
                     <button
@@ -496,10 +384,7 @@ function App() {
                     </button>
                     <button
                       className="user-dropdown-item danger"
-                      onClick={() => {
-                        setIsUserOpen(false);
-                        alert('Sesión cerrada.');
-                      }}
+                      onClick={handleLogout}
                     >
                       <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
@@ -519,23 +404,43 @@ function App() {
         <main className="content" style={esModoPOS ? { padding: '18px 24px', maxWidth: '1600px', margin: '0 auto', width: '100%' } : {}}>
           <div key={location.pathname} className="page-transition">
             <Routes location={location}>
-              <Route path="/" element={<Navigate to="/Inventario" replace />} />
-              <Route path="/Catalogo_de_productos" element={<Catalogo_de_productos />} />
-              <Route path="/Lista_Precios" element={<Lista_Precios />} />
-              <Route path="/lista-precios" element={<Lista_Precios />} />
-              <Route path="/Inventario" element={<Inventario2 />} />
-              <Route path="/Inventario2" element={<Inventario2 />} />
-              <Route path="/Movimientos" element={<Movimientos />} />
-              <Route path="/Alertas_de_stock" element={<Alertas_de_stock />} />
-              <Route path="/Detalle_producto" element={<Detalle_producto />} />
-              <Route path="/Gestion_de_proveedores" element={<Gestion_de_proveedores />} />
-              <Route path="/Cotizaciones_ordenes_compra" element={<Cotizaciones_ordenes_compra />} />
-              <Route path="/Cuentas_por_pagar" element={<Cuentas_por_pagar />} />
-              <Route path="/Notas_credito_debito" element={<Notas_credito_debito />} />
-              <Route path="/Limites_de_credito" element={<Limites_de_credito />} />
-              <Route path="/Punto_de_Venta" element={<Punto_de_Venta />} />
-              <Route path="/Perfil" element={<Perfil />} />
-              <Route path="/registro-comprobantes" element={<RegistroComprobanteProveedor />} />
+              <Route element={<ProtectedRoute />}>
+                <Route path="/" element={<Navigate to="/Inventario" replace />} />
+                
+                {/* Módulo de Inventario / Catálogo */}
+                <Route element={<RoleProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.DEPOSITO, ROLES.COMPRAS, ROLES.CAJERO]} />}>
+                  <Route path="/Catalogo_de_productos" element={<Catalogo_de_productos />} />
+                  <Route path="/Inventario" element={<Inventario2 />} />
+                  <Route path="/Inventario2" element={<Inventario2 />} />
+                  <Route path="/Movimientos" element={<Movimientos />} />
+                  <Route path="/Alertas_de_stock" element={<Alertas_de_stock />} />
+                  <Route path="/Detalle_producto" element={<Detalle_producto />} />
+                </Route>
+
+                {/* Módulo de Compras y Proveedores */}
+                <Route element={<RoleProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.COMPRAS]} />}>
+                  <Route path="/Gestion_de_proveedores" element={<Gestion_de_proveedores />} />
+                  <Route path="/Cotizaciones_ordenes_compra" element={<Cotizaciones_ordenes_compra />} />
+                  <Route path="/Lista_Precios" element={<Lista_Precios />} />
+                  <Route path="/lista-precios" element={<Lista_Precios />} />
+                </Route>
+
+                {/* Módulo de Tesorería */}
+                <Route element={<RoleProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.TESORERO, ROLES.COMPRAS]} />}>
+                  <Route path="/Cuentas_por_pagar" element={<Cuentas_por_pagar />} />
+                  <Route path="/registro-comprobantes" element={<RegistroComprobanteProveedor />} />
+                  <Route path="/Notas_credito_debito" element={<Notas_credito_debito />} />
+                </Route>
+
+                {/* Módulo de Punto de Venta y Clientes */}
+                <Route element={<RoleProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.CAJERO]} />}>
+                  <Route path="/Punto_de_Venta" element={<Punto_de_Venta />} />
+                  <Route path="/Limites_de_credito" element={<Limites_de_credito />} />
+                </Route>
+
+                {/* Perfil accesible para todos los logueados */}
+                <Route path="/Perfil" element={<Perfil />} />
+              </Route>
             </Routes>
           </div>
         </main>

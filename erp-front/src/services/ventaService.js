@@ -6,7 +6,7 @@ const API_URL = 'http://localhost:3001/api';
 
 // Comprobantes de venta confirmados (apartado unificado de Comprobantes)
 export async function listarVentasConfirmadas() {
-  const res = await fetch(`${API_URL}/ventas`);
+  const res = await fetch(`${API_URL}/ventas`, { credentials: 'include' });
   const json = await res.json();
   if (!res.ok) {
     throw new Error(json.error || 'Error al listar los comprobantes de venta.');
@@ -16,7 +16,7 @@ export async function listarVentasConfirmadas() {
 
 export async function listarDepositos() {
   try {
-    const res = await fetch(`${API_URL}/deposits`);
+    const res = await fetch(`${API_URL}/deposits`, { credentials: 'include' });
     if (!res.ok) return [];
     const json = await res.json();
     return (json.data || []).map((d) => ({ id: d.id, nombre: d.nombre }));
@@ -28,7 +28,7 @@ export async function listarDepositos() {
 
 export async function listarListasPrecios() {
   try {
-    const res = await fetch(`${API_URL}/price-lists`);
+    const res = await fetch(`${API_URL}/price-lists`, { credentials: 'include' });
     if (!res.ok) return [];
     const json = await res.json();
     return (json.data || []).map((l) => ({
@@ -43,7 +43,7 @@ export async function listarListasPrecios() {
 }
 
 export async function obtenerCatalogoPOS(depositoId) {
-  const res = await fetch(`${API_URL}/stock/pos-catalog?depositoId=${depositoId}`);
+  const res = await fetch(`${API_URL}/stock/pos-catalog?depositoId=${depositoId}`, { credentials: 'include' });
   const json = await res.json();
   if (!res.ok) {
     throw new Error(json.error || 'Error al cargar el catálogo del punto de venta.');
@@ -56,7 +56,7 @@ export async function obtenerCatalogoPOS(depositoId) {
  * payload: { depositoId, usuarioId, clienteId, items: [{articuloId, cantidad, precioUnitario}] }
  */
 export async function crearVentaPendiente(payload) {
-  const res = await fetch(`${API_URL}/ventas`, {
+  const res = await fetch(`${API_URL}/ventas`, { credentials: 'include',
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -69,7 +69,7 @@ export async function crearVentaPendiente(payload) {
 }
 
 export async function obtenerVenta(ventaId) {
-  const res = await fetch(`${API_URL}/ventas/${ventaId}`);
+  const res = await fetch(`${API_URL}/ventas/${ventaId}`, { credentials: 'include' });
   const json = await res.json();
   if (!res.ok) {
     throw new Error(json.error || 'No se pudo obtener la venta.');
@@ -78,7 +78,7 @@ export async function obtenerVenta(ventaId) {
 }
 
 export async function buscarVentaPorComprobante(numero) {
-  const res = await fetch(`${API_URL}/ventas/buscar/${encodeURIComponent(numero)}`);
+  const res = await fetch(`${API_URL}/ventas/buscar/${encodeURIComponent(numero)}`, { credentials: 'include' });
   const json = await res.json();
   if (!res.ok) {
     throw new Error(json.error || 'No se pudo encontrar la venta.');
@@ -91,7 +91,7 @@ export async function buscarVentaPorComprobante(numero) {
  * pago: { metodo, monto }
  */
 export async function agregarPago(ventaId, pago) {
-  const res = await fetch(`${API_URL}/ventas/${ventaId}/pagos`, {
+  const res = await fetch(`${API_URL}/ventas/${ventaId}/pagos`, { credentials: 'include',
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(pago),
@@ -104,7 +104,7 @@ export async function agregarPago(ventaId, pago) {
 }
 
 export async function confirmarVenta(ventaId) {
-  const res = await fetch(`${API_URL}/ventas/${ventaId}/confirmar`, {
+  const res = await fetch(`${API_URL}/ventas/${ventaId}/confirmar`, { credentials: 'include',
     method: 'POST',
   });
   const json = await res.json();
@@ -115,7 +115,7 @@ export async function confirmarVenta(ventaId) {
 }
 
 export async function cancelarVenta(ventaId) {
-  const res = await fetch(`${API_URL}/ventas/${ventaId}/cancelar`, {
+  const res = await fetch(`${API_URL}/ventas/${ventaId}/cancelar`, { credentials: 'include',
     method: 'PATCH',
   });
   const json = await res.json();
