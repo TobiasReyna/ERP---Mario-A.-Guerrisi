@@ -1,6 +1,8 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const cookieParser = require('cookie-parser');
+const authRoutes = require('./routes/authRoutes');
 const stockRoutes = require('./routes/stockRoutes');
 const articleRoutes = require('./routes/articleRoutes');
 const masterRoutes = require('./routes/masterRoutes');
@@ -20,8 +22,12 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
  // Middlewares
-app.use(cors());
+app.use(cors({ origin: 'http://localhost:5173', credentials: true }));
 app.use(express.json());
+app.use(cookieParser());
+
+// Rutas de Autenticación
+app.use('/api/auth', authRoutes);
 
 app.use('/api/clients', clientRoutes);
 app.use('/api/credit-notes', creditNoteRoutes);

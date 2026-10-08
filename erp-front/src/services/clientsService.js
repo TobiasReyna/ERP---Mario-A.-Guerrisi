@@ -8,7 +8,7 @@ export async function buscarClientes(query) {
   if (texto.length < 2) return [];
 
   try {
-    const res = await fetch(`http://localhost:3001/api/clients/search?q=${encodeURIComponent(texto)}`);
+    const res = await fetch(`http://localhost:3001/api/clients/search?q=${encodeURIComponent(texto)}`, { credentials: 'include' });
     const json = await res.json();
     if (!res.ok) {
       console.error('Error al buscar clientes:', json.error || res.statusText);
@@ -23,7 +23,7 @@ export async function buscarClientes(query) {
 
 // Alta rápida de cliente desde el POS (HU-20)
 export async function crearCliente(payload) {
-  const res = await fetch('http://localhost:3001/api/clients', {
+  const res = await fetch('http://localhost:3001/api/clients', { credentials: 'include',
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -37,7 +37,7 @@ export async function crearCliente(payload) {
 
 export async function listarClientes() {
   try {
-    const res = await fetch(`${API_URL}/clients`);
+    const res = await fetch(`${API_URL}/clients`, { credentials: 'include' });
     if (!res.ok) return [];
     const json = await res.json();
     return json.data || [];
@@ -54,7 +54,7 @@ export async function obtenerCliente(id) {
 
 export async function listarVentasMock() {
   try {
-    const res = await fetch(`${API_URL}/sales`);
+    const res = await fetch(`${API_URL}/sales`, { credentials: 'include' });
     if (!res.ok) return [];
     const json = await res.json();
     return json.data || [];
@@ -70,7 +70,7 @@ export async function obtenerVentaMock(id) {
 }
 
 export async function actualizarLimiteCredito(clienteId, nuevoLimite) {
-  const res = await fetch(`${API_URL}/clients/${clienteId}/credit-limit`, {
+  const res = await fetch(`${API_URL}/clients/${clienteId}/credit-limit`, { credentials: 'include',
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ limiteCredito: Number(nuevoLimite) }),
