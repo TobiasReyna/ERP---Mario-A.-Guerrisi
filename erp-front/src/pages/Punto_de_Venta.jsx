@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import Modal from '../components/Modal';
 import { formatearMonto, formatearFechaHora } from '../utils/format';
 import {
@@ -15,8 +15,10 @@ import {
   listarVentasConfirmadas,
 } from '../services/ventaService';
 import { buscarClientes, crearCliente } from '../services/clientsService';
+import { obtenerSesionActiva, obtenerResumenCaja } from '../services/cajaService';
+import MovimientoCajaModal from '../components/MovimientoCajaModal';
+import { USUARIO_ACTUAL_ID } from '../config/sesion';
 
-const USUARIO_ACTUAL_ID = '00000000-0000-0000-0000-000000000001';
 
 const METODOS_PAGO = [
   { value: 'efectivo', label: 'Efectivo' },
@@ -268,13 +270,31 @@ function imprimirFacturaHTML(venta, ultimoVuelto = null) {
 // ── COMPONENTE PRINCIPAL ────────────────────────────────────────────────────
 function Punto_de_Venta() {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // HU-26: el POS solo se habilita con una sesión de caja abierta.
+  // undefined = verificando · null = caja cerrada (se redirige) · objeto = sesión activa
+  const [sesionCaja, setSesionCaja] = useState(undefined);
+  const [errorCaja, setErrorCaja] = useState('');
+  const [reintentoCaja, setReintentoCaja] = useState(0);
+
+  // HU-27: saldo teórico de efectivo del turno + ventana de movimientos manuales
+  const [resumenCaja, setResumenCaja] = useState(null);
+  const [isMovimientoOpen, setIsMovimientoOpen] = useState(false);
+  const refrescarResumenCaja = useCallback(() => {
+    obtenerResumenCaja(USUARIO_ACTUAL_ID).then(setResumenCaja).catch(() => {});
+  }, []);
   const nroACobrar = searchParams.get('cobrar');
 
   const searchInputRef = useRef(null);
   const efectivoInputRef = useRef(null);
 
   const [depositos, setDepositos] = useState([]);
-  const [activeDepositId, setActiveDepositId] = useState(null);
+  const [depositoElegidoId, setActiveDepositId] = useState(null);
+  // HU-26: con la caja abierta, la sucursal queda fija en la de la caja (no se puede cambiar).
+  const depositoCajaId = sesionCaja?.depositoId || null;
+  const activeDepositId = depositoCajaId || depositoElegidoId;
 
   const [catalogo, setCatalogo] = useState([]);
 
@@ -503,6 +523,29 @@ function Punto_de_Venta() {
   // ── EFECTOS DE CICLO DE VIDA ───────────────────────────────────────────────
 
   useEffect(() => {
+    let cancelado = false;
+    obtenerSesionActiva(USUARIO_ACTUAL_ID)
+      .then((sesion) => {
+        if (cancelado) return;
+        setErrorCaja('');
+        setSesionCaja(sesion);
+        if (!sesion) {
+          const volver = encodeURIComponent(`${location.pathname}${location.search}`);
+          navigate(`/Apertura_Caja?redirect=${volver}`, { replace: true });
+        }
+      })
+      .catch((err) => !cancelado && setErrorCaja(err.message || 'No se pudo verificar el estado de la caja.'));
+    return () => {
+      cancelado = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reintentoCaja]);
+
+  useEffect(() => {
+    if (sesionCaja) refrescarResumenCaja();
+  }, [sesionCaja, refrescarResumenCaja]);
+
+  useEffect(() => {
     listarListasPrecios().then(setListasPrecios);
   }, []);
 
@@ -522,7 +565,8 @@ function Punto_de_Venta() {
   }, [cargarPendientes]);
 
   useEffect(() => {
-    if (!nroACobrar) return;
+    // HU-26: no se carga ningún cobro hasta confirmar que hay una caja abierta.
+    if (!nroACobrar || !sesionCaja) return;
 
     setBuscandoVenta(true);
     buscarVentaPorComprobante(nroACobrar)
@@ -540,7 +584,7 @@ function Punto_de_Venta() {
         setModoBuscarVenta(true);
       })
       .finally(() => setBuscandoVenta(false));
-  }, [nroACobrar, abrirPasarelaCobro]);
+  }, [nroACobrar, sesionCaja, abrirPasarelaCobro]);
 
   useEffect(() => {
     if (!toast) return;
@@ -786,7 +830,8 @@ function Punto_de_Venta() {
 
     setProcesando(true);
     try {
-      await agregarPago(venta.ventaId, { metodo: pagoForm.metodo, monto });
+      await agregarPago(venta.ventaId, { metodo: pagoForm.metodo, monto, usuarioId: USUARIO_ACTUAL_ID });
+      refrescarResumenCaja();
       const ventaActualizada = await obtenerVenta(venta.ventaId);
       setVenta(ventaActualizada);
 
@@ -822,6 +867,7 @@ function Punto_de_Venta() {
       const ventaConfirmada = await confirmarVenta(venta.ventaId);
       setVenta(ventaConfirmada);
       setToast(`Venta confirmada — comprobante ${ventaConfirmada.numeroComprobante}`);
+      refrescarResumenCaja();
       cargarPendientes();
       cargarCatalogo();
     } catch (err) {
@@ -838,6 +884,7 @@ function Punto_de_Venta() {
       await cancelarVenta(venta.ventaId);
       handleNuevaVenta();
       setToast('Venta cancelada y existencias liberadas.');
+      refrescarResumenCaja();
       cargarPendientes();
       cargarCatalogo();
     } catch (err) {
@@ -1732,6 +1779,27 @@ function Punto_de_Venta() {
   );
 
 
+
+  // ── BLOQUEO HU-26: sin caja abierta no se renderiza la grilla ni el cobro ──
+  if (errorCaja) {
+    return (
+      <div className="table-panel" style={{ maxWidth: '520px', margin: '60px auto', padding: '28px', textAlign: 'center' }}>
+        <div style={{ fontWeight: 700, marginBottom: '8px' }}>No se pudo verificar la caja</div>
+        <div style={{ color: 'var(--gray-500)', fontSize: '13px', marginBottom: '16px' }}>{errorCaja}</div>
+        <button type="button" className="btn btn-primary" onClick={() => { setErrorCaja(''); setReintentoCaja((n) => n + 1); }}>
+          Reintentar
+        </button>
+      </div>
+    );
+  }
+  if (!sesionCaja) {
+    return (
+      <div style={{ padding: '40px', textAlign: 'center', color: 'var(--gray-500)' }}>
+        {sesionCaja === undefined ? 'Verificando estado de la caja…' : 'Redirigiendo a la apertura de caja…'}
+      </div>
+    );
+  }
+
   return (
     <div>
       {/* Toast Alert */}
@@ -1773,7 +1841,9 @@ function Punto_de_Venta() {
             <button
               key={d.id}
               className={`warehouse-tab ${activeDepositId === d.id ? 'active' : ''}`}
-              disabled={!!venta}
+              disabled={!!venta || (!!depositoCajaId && d.id !== depositoCajaId)}
+              title={depositoCajaId && d.id !== depositoCajaId ? 'Tu caja está abierta en otra sucursal' : undefined}
+              style={depositoCajaId && d.id !== depositoCajaId ? { opacity: 0.45, cursor: 'not-allowed' } : undefined}
               onClick={() => setActiveDepositId(d.id)}
             >
               {d.nombre}
@@ -1781,6 +1851,30 @@ function Punto_de_Venta() {
           ))}
         </div>
 
+        <span
+          title={
+            resumenCaja
+              ? `Turno abierto desde ${formatearFechaHora(sesionCaja.fechaHoraApertura)}\nFondo ${formatearMonto(resumenCaja.fondoInicial)} · Ventas en efectivo ${formatearMonto(resumenCaja.ventasEfectivo)}\nIngresos ${formatearMonto(resumenCaja.ingresos)} · Egresos ${formatearMonto(resumenCaja.egresos)}`
+              : `Turno abierto desde ${formatearFechaHora(sesionCaja.fechaHoraApertura)}`
+          }
+          style={{ fontSize: '12px', fontWeight: 600, color: '#065f46', background: '#d1fae5', borderRadius: '6px', padding: '5px 10px', whiteSpace: 'nowrap' }}
+        >
+          {sesionCaja.cajaNombre} abierta · Efectivo {formatearMonto(resumenCaja ? resumenCaja.saldoEfectivo : sesionCaja.montoInicial)}
+        </span>
+        <button type="button" className="btn btn-outline btn-sm" onClick={() => setIsMovimientoOpen(true)}>
+          Movimiento de caja
+        </button>
+        <button
+          type="button"
+          className="btn btn-outline btn-sm"
+          disabled={procesando}
+          onClick={() => {
+            if (carrito.length > 0 && !venta && !window.confirm('Tenés artículos cargados sin cobrar. Si cerrás la caja se pierden. ¿Continuar?')) return;
+            navigate('/Cierre_Caja');
+          }}
+        >
+          Cerrar caja
+        </button>
         {isVentaBuscada && (
           <div style={{ fontSize: '12px', background: '#fef3c7', padding: '4px 10px', borderRadius: '4px', color: '#92400e', fontWeight: '600' }}>
             Retomando cobro de comprobante: {venta?.numeroComprobante}
@@ -1789,6 +1883,15 @@ function Punto_de_Venta() {
       </div>
 
       {ventaFormularioJSX}
+
+      {/* MODAL: MOVIMIENTOS MANUALES DE CAJA (HU-27) */}
+      <MovimientoCajaModal
+        isOpen={isMovimientoOpen}
+        onClose={() => setIsMovimientoOpen(false)}
+        usuarioId={USUARIO_ACTUAL_ID}
+        resumen={resumenCaja}
+        onResumenActualizado={setResumenCaja}
+      />
 
       {/* MODAL: TICKETS PENDIENTES DE COBRO */}
       <Modal

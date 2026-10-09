@@ -191,11 +191,11 @@ class VentaService {
   }
 
   static async agregarPago(ventaId, pago) {
-    const { metodo, monto } = pago;
+    const { metodo, monto, usuarioId } = pago;
 
     const { data: venta, error: errVenta } = await supabaseAdmin
       .from('ventas')
-      .select('id, estado, total')
+      .select('id, estado, total, usuario_id')
       .eq('id', ventaId)
       .single();
 
@@ -219,9 +219,20 @@ class VentaService {
       throw new Error(`El monto supera el saldo pendiente ($${saldoPendientePrevio.toFixed(2)}).`);
     }
 
+    // HU-27: todo cobro queda asociado a la sesión de caja de quien lo registra.
+    // Sin caja abierta no se puede cobrar (el POS ya lo bloquea; acá se refuerza en el servidor).
+    const cajeroId = usuarioId || venta.usuario_id;
+    const { data: sesion } = await supabaseAdmin
+      .from('caja_sesiones')
+      .select('id')
+      .eq('usuario_id', cajeroId)
+      .is('fecha_hora_cierre', null)
+      .maybeSingle();
+    if (!sesion) throw new Error('No hay una caja abierta para registrar el cobro. Abrí tu caja primero.');
+
     const { data: nuevoPago, error: errPago } = await supabaseAdmin
       .from('pagos_venta')
-      .insert([{ venta_id: ventaId, metodo, monto }])
+      .insert([{ venta_id: ventaId, metodo, monto, caja_sesion_id: sesion.id }])
       .select()
       .single();
 

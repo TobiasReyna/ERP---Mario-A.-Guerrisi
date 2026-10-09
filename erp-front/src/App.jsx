@@ -17,6 +17,7 @@ import Punto_de_Venta from './pages/Punto_de_Venta';
 import Perfil from './pages/Perfil';
 import RegistroComprobanteProveedor from './pages/RegistroComprobanteProveedor';
 import Lista_Precios from './pages/Lista_Precios';
+
 import Login from './pages/Login';
 import ProtectedRoute from './components/ProtectedRoute';
 import RoleProtectedRoute from './components/RoleProtectedRoute';
@@ -25,7 +26,13 @@ import { ROLES } from './constants/roles';
 import { useAuth } from './context/AuthContext';
 import { getInitials } from './utils/userDisplay';
 
+import Apertura_Caja from './pages/Apertura_Caja';
+import Cierre_Caja from './pages/Cierre_Caja';
+
+
 const ROUTE_INFO = {
+  '/Cierre_Caja': { title: 'Cierre de caja', subtitle: 'Arqueo ciego y cierre de turno' },
+  '/Apertura_Caja': { title: 'Apertura de caja', subtitle: 'Inicio de turno y fondo de caja' },
   '/': { title: 'Dashboard', subtitle: 'Resumen general del inventario y el catálogo' },
   '/Catalogo_de_productos': { title: 'Catálogo', subtitle: 'Base maestra de productos — código interno, EAN-13, marca y precio' },
   '/Lista_Precios': { title: 'Lista de Precios', subtitle: 'Gestión de precios al consumidor final, aumentos masivos y auditoría' },
@@ -56,8 +63,12 @@ function App() {
   };
 
   // Detecta si estamos operando en la caja
+
   const esModoPOS = location.pathname.toLowerCase() === '/punto_de_venta';
   const isLogin = location.pathname === '/' || location.pathname.toLowerCase() === '/login';
+
+//  const esModoPOS = ['/punto_de_venta', '/apertura_caja', '/cierre_caja'].includes(location.pathname.toLowerCase());  PRESTAR ATENCION ACA
+
 
   const [notifications, setNotifications] = useState([]);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
@@ -435,6 +446,8 @@ function App() {
                 {/* Módulo de Punto de Venta y Clientes */}
                 <Route element={<RoleProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.CAJERO]} />}>
                   <Route path="/Punto_de_Venta" element={<Punto_de_Venta />} />
+                  <Route path="/Apertura_Caja" element={<Apertura_Caja />} />
+                  <Route path="/Cierre_Caja" element={<Cierre_Caja />} />
                   <Route path="/Limites_de_credito" element={<Limites_de_credito />} />
                 </Route>
 
