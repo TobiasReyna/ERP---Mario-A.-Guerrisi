@@ -122,11 +122,13 @@ button:active, .btn:active, .category-chip:active, .warehouse-tab:active, .icon-
   display: flex;
   flex-direction: column;
   padding: 24px 0 20px 0;
-  position: sticky;
-  top: 0;
-  height: 100vh;
-  z-index: 40;
+  position: relative; /* Cambiado de 'sticky' a 'relative' para integrarse al flujo flex */
+  min-height: 100vh; /* Mínimo el alto de la pantalla */
+  height: auto; /* Se estira dinámicamente si la pantalla principal es más larga */
+  align-self: stretch; /* Le exige a la sidebar estirarse al 100% de la altura de .app */
+  z-index: 10;
 }
+
 .sidebar-brand {
   display: flex;
   align-items: center;

@@ -1,5 +1,5 @@
 const { supabaseAdmin } = require('../config/supabase');
-const { LIMITE_RETIRO_CAJA } = require('../config/tesoreria');
+const { LIMITE_RETIRO_CAJA, LIMITE_SEGURIDAD_EFECTIVO } = require('../config/tesoreria');
 
 // Códigos de negocio que devuelve la función SQL abrir_caja() al inicio del mensaje.
 const CODIGOS_NEGOCIO = [
@@ -292,6 +292,176 @@ class CajaService {
     if (error) throw new Error(`Error generando el reporte: ${error.message}`);
     if (!data) throw fallo('REPORTE_NO_ENCONTRADO', 'La sesión no existe o todavía no fue cerrada.');
     if (data.sesion.usuarioId !== usuarioId) throw fallo('SIN_PERMISO', 'No tenés permiso para ver este reporte.');
+    return data;
+  }
+  
+  // HU-29: Estado actual de las cajas para supervisión.
+  static async obtenerDashboardSupervision() {
+    const { data: cajas, error } = await supabaseAdmin
+      .from('cajas')
+      .select(`
+        id,
+        nombre,
+        estado,
+        deposito_id,
+        usuario_id,
+        usuarios ( id, nombre ),
+        depositos ( id, nombre )
+      `)
+      .order('deposito_id', { ascending: true })
+      .order('nombre', { ascending: true });
+
+    if (error) {
+      throw new Error(`No se pudieron consultar las cajas: ${error.message}`);
+    }
+
+    const { data: sesiones, error: errorSesiones } = await supabaseAdmin
+      .from('caja_sesiones')
+      .select(`
+        id,
+        caja_id,
+        usuario_id,
+        monto_inicial,
+        fecha_hora_apertura,
+        usuarios ( id, nombre )
+      `)
+      .is('fecha_hora_cierre', null);
+
+    if (errorSesiones) {
+      throw new Error(`No se pudieron consultar los turnos: ${errorSesiones.message}`);
+    }
+
+    const sesionPorCaja = new Map(
+      (sesiones || []).map((sesion) => [sesion.caja_id, sesion])
+    );
+
+    const resultado = await Promise.all(
+      (cajas || []).map(async (caja) => {
+        const sesion = sesionPorCaja.get(caja.id);
+        let saldoEfectivo = 0;
+
+        if (caja.estado === 'Abierta' && sesion) {
+          const { data: resumen, error: errorResumen } = await supabaseAdmin
+            .rpc('caja_resumen_efectivo', {
+              p_sesion_id: sesion.id,
+            });
+
+          if (errorResumen) {
+            throw new Error(
+              `No se pudo calcular el saldo de ${caja.nombre}: ${errorResumen.message}`
+            );
+          }
+
+          saldoEfectivo = Number(resumen?.saldoEfectivo ?? 0);
+        }
+
+        return {
+          cajaId: caja.id,
+          nombre: caja.nombre,
+          estado: caja.estado,
+          depositoId: caja.deposito_id,
+          depositoNombre: caja.depositos?.nombre || 'Sucursal',
+          cajeroActivo: sesion?.usuarios?.nombre || '',
+          sesionId: sesion?.id || null,
+          fechaHoraApertura: sesion?.fecha_hora_apertura || null,
+          saldoEfectivo,
+          limiteSeguridad: LIMITE_SEGURIDAD_EFECTIVO,
+          requiereRetiro:
+            caja.estado === 'Abierta' &&
+            saldoEfectivo > LIMITE_SEGURIDAD_EFECTIVO,
+        };
+      })
+    );
+
+    return resultado;
+  }
+
+  // HU-29: Historial de cierres con filtros opcionales.
+  static async listarHistorialSupervision({ cajeroId, desde, hasta } = {}) {
+    let query = supabaseAdmin
+      .from('caja_sesiones')
+      .select(`
+        id,
+        caja_id,
+        usuario_id,
+        fecha_hora_apertura,
+        fecha_hora_cierre,
+        monto_inicial,
+        monto_fisico,
+        saldo_teorico,
+        diferencia_arqueo,
+        cajas!inner (
+          id,
+          nombre,
+          deposito_id,
+          depositos ( nombre )
+        ),
+        usuarios!inner (
+          id,
+          nombre
+        )
+      `)
+      .not('fecha_hora_cierre', 'is', null)
+      .order('fecha_hora_cierre', { ascending: false });
+
+    if (cajeroId) {
+      query = query.eq('usuario_id', cajeroId);
+    }
+
+    if (desde) {
+      query = query.gte('fecha_hora_cierre', desde);
+    }
+
+    if (hasta) {
+      query = query.lte('fecha_hora_cierre', hasta);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      throw new Error(`No se pudo consultar el historial: ${error.message}`);
+    }
+
+    return (data || []).map((sesion) => ({
+      sesionId: sesion.id,
+      cajaId: sesion.caja_id,
+      cajaNombre: sesion.cajas?.nombre || '',
+      depositoId: sesion.cajas?.deposito_id || null,
+      depositoNombre: sesion.cajas?.depositos?.nombre || 'Sucursal',
+      cajeroId: sesion.usuario_id,
+      cajeroNombre: sesion.usuarios?.nombre || 'Sin nombre',
+      apertura: sesion.fecha_hora_apertura,
+      cierre: sesion.fecha_hora_cierre,
+      montoInicial: Number(sesion.monto_inicial || 0),
+      montoFisico: Number(sesion.monto_fisico || 0),
+      saldoTeorico: Number(sesion.saldo_teorico || 0),
+      diferenciaArqueo: Number(sesion.diferencia_arqueo || 0),
+    }));
+  }
+
+  // HU-29: Detalle completo de un cierre ya realizado.
+  static async obtenerDetalleCierreSupervision(sesionId) {
+    if (!sesionId) {
+      const error = new Error('Falta el identificador del turno.');
+      error.codigo = 'REPORTE_NO_ENCONTRADO';
+      throw error;
+    }
+
+    const { data, error } = await supabaseAdmin.rpc(
+      'caja_reporte_cierre',
+      { p_sesion_id: sesionId }
+    );
+
+    if (error) {
+      throw new Error(`No se pudo consultar el cierre: ${error.message}`);
+    }
+
+    if (!data) {
+      const err = new Error('El cierre no existe o todavía no fue cerrado.');
+      err.codigo = 'REPORTE_NO_ENCONTRADO';
+      throw err;
+    }
+
     return data;
   }
 }

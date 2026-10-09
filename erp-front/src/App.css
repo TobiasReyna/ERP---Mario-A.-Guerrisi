@@ -1,0 +1,31 @@
+/* 1. Contenedor principal flex en fila */
+.app {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: stretch !important;
+  width: 100% !important;
+  min-height: 100vh !important;
+  overflow-x: hidden;
+}
+
+/* 2. Sidebar: Ancho fijo, sin flotar ni solaparse */
+.sidebar {
+  position: relative !important; /* Importante: NO debe ser fixed ni absolute */
+  top: auto !important;
+  left: auto !important;
+  z-index: 10 !important;
+  flex-shrink: 0 !important; /* Impide que la sidebar se deforme o aplaste */
+  align-self: stretch !important;
+  min-height: 100vh !important;
+  height: auto !important;
+  /* Ancho controlado desde React por inline-style (260px / 80px) */
+}
+
+/* 3. Main: Toma todo el ancho restante */
+.main {
+  flex: 1 1 0% !important;
+  min-width: 0 !important; /* Evita desbordamientos de tablas o tarjetas */
+  display: flex !important;
+  flex-direction: column !important;
+  width: 100% !important;
+}

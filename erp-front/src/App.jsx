@@ -28,6 +28,7 @@ import { getInitials } from './utils/userDisplay';
 
 import Apertura_Caja from './pages/Apertura_Caja';
 import Cierre_Caja from './pages/Cierre_Caja';
+import Gestion_Cajas from './pages/Gestion_Cajas';
 
 
 const ROUTE_INFO = {
@@ -49,6 +50,7 @@ const ROUTE_INFO = {
   '/Punto_de_Venta': { title: 'Punto de Venta', subtitle: 'Caja única — venta rápida, cobro mixto y comprobante' },
   '/Perfil': { title: 'Mi perfil', subtitle: 'Información de la cuenta y el depósito asignado' },
   '/registro-comprobantes': { title: 'Registro de Comprobantes', subtitle: 'Facturas, Notas de Crédito y Notas de Débito de proveedores' },
+  '/Gestion_Cajas': {  title: 'Gestión de Cajas',  subtitle: 'Monitoreo de efectivo, turnos e historial de cierres',},
 };
 
 function App() {
@@ -441,6 +443,11 @@ function App() {
                   <Route path="/Cuentas_por_pagar" element={<Cuentas_por_pagar />} />
                   <Route path="/registro-comprobantes" element={<RegistroComprobanteProveedor />} />
                   <Route path="/Notas_credito_debito" element={<Notas_credito_debito />} />
+                </Route>
+
+                {/* HU-29 · Supervisión de cajas */}
+                <Route element={<RoleProtectedRoute allowedRoles={[ROLES.COMPRAS, ROLES.GERENTE,ROLES.ADMIN,]}/>}>
+                  <Route path="/Gestion_Cajas"  element={<Gestion_Cajas />} />
                 </Route>
 
                 {/* Módulo de Punto de Venta y Clientes */}
