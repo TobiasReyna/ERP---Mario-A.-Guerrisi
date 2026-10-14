@@ -39,7 +39,24 @@ const getDetalleEvento = async (req, res) => {
   }
 };
 
+const getResumenCajas = async (req, res) => {
+  try {
+    const { fecha, deposito_id } = req.query;
+
+    if (!fecha || !deposito_id) {
+      return res.status(400).json({ error: 'La fecha y la sucursal son obligatorias.' });
+    }
+
+    const data = await tesoreriaService.obtenerResumenCajas({ fecha, deposito_id });
+    res.status(200).json(data);
+  } catch (error) {
+    console.error('Error en getResumenCajas:', error);
+    res.status(500).json({ error: 'Error interno al obtener el resumen de cajas.' });
+  }
+};
+
 module.exports = {
   getLibroDiario,
-  getDetalleEvento
+  getDetalleEvento,
+  getResumenCajas
 };

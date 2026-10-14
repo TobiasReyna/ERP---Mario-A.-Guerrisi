@@ -47,7 +47,18 @@ const obtenerDetalleEvento = async ({ tipo_evento, referencia_id }) => {
   return {};
 };
 
+const obtenerResumenCajas = async ({ fecha, deposito_id }) => {
+  const { data, error } = await supabaseAdmin.rpc('obtener_resumen_diario_cajas', {
+    p_fecha: fecha,
+    p_deposito_id: deposito_id
+  });
+
+  if (error) throw error;
+  return data;
+};
+
 module.exports = {
   obtenerLibroDiario,
-  obtenerDetalleEvento
+  obtenerDetalleEvento,
+  obtenerResumenCajas
 };

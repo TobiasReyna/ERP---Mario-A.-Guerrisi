@@ -30,6 +30,7 @@ import Apertura_Caja from './pages/Apertura_Caja';
 import Cierre_Caja from './pages/Cierre_Caja';
 import Gestion_Cajas from './pages/Gestion_Cajas';
 import LibroDiario from './pages/LibroDiario';
+import ResumenDiario from './pages/ResumenDiario';
 
 
 const ROUTE_INFO = {
@@ -53,6 +54,7 @@ const ROUTE_INFO = {
   '/registro-comprobantes': { title: 'Registro de Comprobantes', subtitle: 'Facturas, Notas de Crédito y Notas de Débito de proveedores' },
   '/Gestion_Cajas': {  title: 'Gestión de Cajas',  subtitle: 'Monitoreo de efectivo, turnos e historial de cierres',},
   '/Libro_Diario': { title: 'Movimiento Diario de Caja', subtitle: 'Listado cronológico de aperturas, ventas, ingresos, egresos y cierres' },
+  '/Resumen_Cajas': { title: 'Resumen Diario y Conciliación', subtitle: 'Monitoreo de turnos, arqueos, faltantes y sobrantes de caja' },
 };
 
 function App() {
@@ -452,9 +454,10 @@ function App() {
                   <Route path="/Gestion_Cajas"  element={<Gestion_Cajas />} />
                 </Route>
 
-                {/* HU-46 · Libro diario */}
-                <Route element={<RoleProtectedRoute allowedRoles={[ROLES.GERENTE,ROLES.ADMIN,]}/>}>
+                {/* HU-46 · Libro diario + HU-47 Resumen de cajas */}
+                <Route element={<RoleProtectedRoute allowedRoles={[ROLES.GERENTE,ROLES.ADMIN,ROLES.TESORERO]}/>}>
                   <Route path="/Libro_Diario" element={<LibroDiario />} />
+                  <Route path="/Resumen_Cajas" element={<ResumenDiario />} />
                 </Route>
 
                 {/* Módulo de Punto de Venta y Clientes */}

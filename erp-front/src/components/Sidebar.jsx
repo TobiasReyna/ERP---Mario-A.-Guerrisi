@@ -13,7 +13,8 @@ import {
   CreditCard, 
   FileText,
   Wallet,
-  BookText 
+  BookText,
+  Coins, 
 } from 'lucide-react';
 
 const Sidebar = ({ unreadCount }) => {
@@ -112,7 +113,17 @@ const Sidebar = ({ unreadCount }) => {
           rolesAllowed: [
             ROLES.ADMIN,
             ROLES.GERENTE,
-            ROLES.COMPRAS,
+            ROLES.TESORERO,
+          ],
+        },
+        {
+          title: 'Resumen Diario',
+          path: '/Resumen_Cajas',
+          icon: Coins,
+          rolesAllowed: [
+            ROLES.ADMIN,
+            ROLES.GERENTE,
+            ROLES.TESORERO,
           ],
         },
       ],
