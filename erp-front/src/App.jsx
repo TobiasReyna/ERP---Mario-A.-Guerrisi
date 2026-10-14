@@ -32,6 +32,8 @@ import Gestion_Cajas from './pages/Gestion_Cajas';
 import LibroDiario from './pages/LibroDiario';
 import ResumenDiario from './pages/ResumenDiario';
 
+import DashboardGerencial from './pages/DashboardGerencial';
+
 
 const ROUTE_INFO = {
   '/Cierre_Caja': { title: 'Cierre de caja', subtitle: 'Arqueo ciego y cierre de turno' },
@@ -55,6 +57,7 @@ const ROUTE_INFO = {
   '/Gestion_Cajas': {  title: 'Gestión de Cajas',  subtitle: 'Monitoreo de efectivo, turnos e historial de cierres',},
   '/Libro_Diario': { title: 'Movimiento Diario de Caja', subtitle: 'Listado cronológico de aperturas, ventas, ingresos, egresos y cierres' },
   '/Resumen_Cajas': { title: 'Resumen Diario y Conciliación', subtitle: 'Monitoreo de turnos, arqueos, faltantes y sobrantes de caja' },
+  '/Dashboard_Cajas': { title: 'Dashboard Gerencial de Cajas', subtitle: 'Monitoreo en tiempo real de ventas, alertas y arqueos' },
 };
 
 function App() {
@@ -449,8 +452,9 @@ function App() {
                   <Route path="/Notas_credito_debito" element={<Notas_credito_debito />} />
                 </Route>
 
-                {/* HU-29 · Supervisión de cajas */}
+                {/* HU-29 · Supervisión de cajas + HU48 DASHBOARD*/}
                 <Route element={<RoleProtectedRoute allowedRoles={[ROLES.COMPRAS, ROLES.GERENTE,ROLES.ADMIN,]}/>}>
+                  <Route path="/Dashboard_Cajas" element={<DashboardGerencial />} />
                   <Route path="/Gestion_Cajas"  element={<Gestion_Cajas />} />
                 </Route>
 

@@ -29,6 +29,18 @@ const Sidebar = ({ unreadCount }) => {
   // Definición dinámica de ítems del menú con RBAC
   const MENU_ITEMS = [
     {
+      group: 'Gerencia',
+      items: [
+        {
+          title: 'Dashboard',
+          path: '/Dashboard_Cajas',
+          icon: TagIcon,
+          rolesAllowed: [ROLES.ADMIN, ROLES.DEPOSITO, ROLES.COMPRAS]
+        },
+   
+      ]
+    },
+    {
       group: 'Navegación',
       items: [
         {

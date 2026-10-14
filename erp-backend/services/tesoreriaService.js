@@ -2,6 +2,9 @@
 // Ajusta la importación de supabase según cómo lo tengas configurado en tu proyecto
 const  {supabaseAdmin} = require('../config/supabase'); 
 
+const { LIMITE_SEGURIDAD_EFECTIVO } = require('../config/tesoreria'); 
+const UMBRAL_DIFERENCIA = 5000;
+
 const obtenerLibroDiario = async ({ fecha, deposito_id, caja_id, cajero_id, tipo_evento, medio_pago, limit, offset }) => {
   const { data, error } = await supabaseAdmin.rpc('obtener_libro_diario', {
     p_fecha: fecha,
@@ -57,8 +60,21 @@ const obtenerResumenCajas = async ({ fecha, deposito_id }) => {
   return data;
 };
 
+const obtenerDashboardGerencial = async ({ fecha, deposito_id }) => {
+  const { data, error } = await supabaseAdmin.rpc('obtener_dashboard_gerencial', {
+    p_fecha: fecha,
+    p_deposito_id: deposito_id || null,
+    p_limite_efectivo: LIMITE_SEGURIDAD_EFECTIVO,
+    p_umbral_diferencia: UMBRAL_DIFERENCIA
+  });
+
+  if (error) throw error;
+  return data;
+};
+
 module.exports = {
   obtenerLibroDiario,
   obtenerDetalleEvento,
-  obtenerResumenCajas
+  obtenerResumenCajas,
+  obtenerDashboardGerencial
 };

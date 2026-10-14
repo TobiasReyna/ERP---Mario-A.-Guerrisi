@@ -55,8 +55,22 @@ const getResumenCajas = async (req, res) => {
   }
 };
 
+const getDashboardGerencial = async (req, res) => {
+  try {
+    const { fecha, deposito_id } = req.query;
+    if (!fecha) return res.status(400).json({ error: 'La fecha es obligatoria.' });
+
+    const data = await tesoreriaService.obtenerDashboardGerencial({ fecha, deposito_id });
+    res.status(200).json(data);
+  } catch (error) {
+    console.error('Error en getDashboardGerencial:', error);
+    res.status(500).json({ error: 'Error interno al obtener el dashboard.' });
+  }
+};
+
 module.exports = {
   getLibroDiario,
   getDetalleEvento,
-  getResumenCajas
+  getResumenCajas,
+  getDashboardGerencial
 };
