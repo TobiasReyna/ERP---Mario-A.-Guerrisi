@@ -1,0 +1,218 @@
+/* Contenedor principal imitando el fondo gris muy claro o blanco del sistema */
+.libro-diario-container {
+  padding: 24px;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  color: #111827;
+  max-width: 100%;
+}
+
+/* Tarjetas de Resumen (Kpis) */
+.summary-grid {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.summary-card {
+  flex: 1;
+  min-width: 200px;
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.summary-value {
+  font-size: 28px;
+  font-weight: 800;
+  color: #111827;
+  margin-bottom: 4px;
+}
+
+.summary-value.monto {
+  font-size: 24px;
+}
+
+.summary-label {
+  font-size: 14px;
+  color: #6b7280;
+  font-weight: 400;
+}
+
+/* Barra de Filtros */
+.filter-bar {
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 16px 20px;
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.form-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.form-group label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+}
+
+.form-input {
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #111827;
+  background-color: #f9fafb;
+  outline: none;
+  min-width: 180px;
+}
+
+.form-input:focus {
+  border-color: #2563eb;
+  background-color: #ffffff;
+}
+
+.btn-consultar {
+  padding: 8px 20px;
+  background-color: #111827;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  margin-left: auto; /* Empuja el botón a la derecha */
+}
+
+.btn-consultar:hover {
+  background-color: #374151;
+}
+
+.btn-consultar:disabled {
+  background-color: #9ca3af;
+  cursor: not-allowed;
+}
+
+/* Contenedor de la Tabla */
+.table-container {
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  overflow-x: auto;
+}
+
+.tabla-diario {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.tabla-diario th {
+  background-color: #f9fafb;
+  padding: 12px 24px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.tabla-diario td {
+  padding: 16px 24px;
+  font-size: 14px;
+  color: #374151;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.fila-clickeable {
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.fila-clickeable:hover {
+  background-color: #f9fafb;
+}
+
+/* Badges imitando los "FAC A" de tu imagen */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.badge::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.badge-venta { background-color: #eff6ff; color: #1d4ed8; }
+.badge-venta::before { background-color: #2563eb; }
+
+.badge-ingreso { background-color: #f0fdf4; color: #15803d; }
+.badge-ingreso::before { background-color: #16a34a; }
+
+.badge-egreso { background-color: #fef2f2; color: #b91c1c; }
+.badge-egreso::before { background-color: #dc2626; }
+
+.badge-apertura { background-color: #f3f4f6; color: #4b5563; }
+.badge-apertura::before { background-color: #6b7280; }
+
+.badge-cierre { background-color: #fefce8; color: #a16207; }
+.badge-cierre::before { background-color: #ca8a04; }
+
+/* Detalle desplegable */
+.detalle-row {
+  background-color: #f8fafc;
+}
+
+.detalle-row td {
+  padding: 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.detalle-contenido {
+  padding: 20px 24px;
+  border-left: 4px solid #3b82f6;
+  font-size: 14px;
+  color: #475569;
+}
+
+.detalle-contenido ul {
+  margin: 0;
+  padding-left: 20px;
+  margin-bottom: 10px;
+}
+
+.detalle-contenido li {
+  margin-bottom: 4px;
+}
+
+.msg-vacio {
+  text-align: center;
+  color: #6b7280;
+  padding: 40px;
+  font-size: 14px;
+  background-color: #ffffff;
+  border: 1px dashed #d1d5db;
+  border-radius: 8px;
+}

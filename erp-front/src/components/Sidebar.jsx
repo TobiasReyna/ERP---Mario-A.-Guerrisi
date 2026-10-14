@@ -12,7 +12,8 @@ import {
   ShoppingCart, 
   CreditCard, 
   FileText,
-  Wallet 
+  Wallet,
+  BookText 
 } from 'lucide-react';
 
 const Sidebar = ({ unreadCount }) => {
@@ -98,6 +99,16 @@ const Sidebar = ({ unreadCount }) => {
           title: 'Gestión de Cajas',
           path: '/Gestion_Cajas',
           icon: Wallet,
+          rolesAllowed: [
+            ROLES.ADMIN,
+            ROLES.GERENTE,
+            ROLES.COMPRAS,
+          ],
+        },
+        {
+          title: 'Libro Diario',
+          path: '/Libro_Diario',
+          icon: BookText,
           rolesAllowed: [
             ROLES.ADMIN,
             ROLES.GERENTE,

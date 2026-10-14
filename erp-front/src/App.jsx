@@ -29,6 +29,7 @@ import { getInitials } from './utils/userDisplay';
 import Apertura_Caja from './pages/Apertura_Caja';
 import Cierre_Caja from './pages/Cierre_Caja';
 import Gestion_Cajas from './pages/Gestion_Cajas';
+import LibroDiario from './pages/LibroDiario';
 
 
 const ROUTE_INFO = {
@@ -51,6 +52,7 @@ const ROUTE_INFO = {
   '/Perfil': { title: 'Mi perfil', subtitle: 'Información de la cuenta y el depósito asignado' },
   '/registro-comprobantes': { title: 'Registro de Comprobantes', subtitle: 'Facturas, Notas de Crédito y Notas de Débito de proveedores' },
   '/Gestion_Cajas': {  title: 'Gestión de Cajas',  subtitle: 'Monitoreo de efectivo, turnos e historial de cierres',},
+  '/Libro_Diario': { title: 'Movimiento Diario de Caja', subtitle: 'Listado cronológico de aperturas, ventas, ingresos, egresos y cierres' },
 };
 
 function App() {
@@ -448,6 +450,11 @@ function App() {
                 {/* HU-29 · Supervisión de cajas */}
                 <Route element={<RoleProtectedRoute allowedRoles={[ROLES.COMPRAS, ROLES.GERENTE,ROLES.ADMIN,]}/>}>
                   <Route path="/Gestion_Cajas"  element={<Gestion_Cajas />} />
+                </Route>
+
+                {/* HU-46 · Libro diario */}
+                <Route element={<RoleProtectedRoute allowedRoles={[ROLES.GERENTE,ROLES.ADMIN,]}/>}>
+                  <Route path="/Libro_Diario" element={<LibroDiario />} />
                 </Route>
 
                 {/* Módulo de Punto de Venta y Clientes */}

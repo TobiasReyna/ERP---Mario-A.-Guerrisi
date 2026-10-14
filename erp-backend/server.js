@@ -17,6 +17,8 @@ const creditNoteRoutes = require('./routes/creditNoteRoutes');
 const ventaRoutes = require('./routes/ventaRoutes');
 const comprobantesProveedorRoutes = require('./routes/comprobantesProveedorRoutes');
 const cajaRoutes = require('./routes/cajaRoutes');
+const depositosRoutes = require('./routes/depositosRoutes');
+const tesoreriaRoutes = require('./routes/tesoreriaRoutes');
 
 
 const app = express();
@@ -47,6 +49,8 @@ app.use('/api/purchase-orders', purchaseOrderRoutes);
 app.use('/api/accounts-payable', accountPayableRoutes);
 app.use('/api/comprobantes-proveedores', comprobantesProveedorRoutes);
 app.use('/api/cajas', cajaRoutes);
+app.use('/api/depositos', depositosRoutes);
+app.use('/api/tesoreria', tesoreriaRoutes);
 app.use('/api', masterRoutes);
 
 app.listen(PORT, () => {
