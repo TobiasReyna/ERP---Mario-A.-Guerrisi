@@ -41,6 +41,41 @@ const Sidebar = ({ unreadCount }) => {
       ]
     },
     {
+      group: 'Supervisión',
+      items: [
+        {
+          title: 'Gestión de Cajas',
+          path: '/Gestion_Cajas',
+          icon: Wallet,
+          rolesAllowed: [
+            ROLES.ADMIN,
+            ROLES.GERENTE,
+            ROLES.COMPRAS,
+          ],
+        },
+        {
+          title: 'Libro Diario',
+          path: '/Libro_Diario',
+          icon: BookText,
+          rolesAllowed: [
+            ROLES.ADMIN,
+            ROLES.GERENTE,
+            ROLES.TESORERO,
+          ],
+        },
+        {
+          title: 'Resumen Diario',
+          path: '/Resumen_Cajas',
+          icon: Coins,
+          rolesAllowed: [
+            ROLES.ADMIN,
+            ROLES.GERENTE,
+            ROLES.TESORERO,
+          ],
+        },
+      ],
+    },
+    {
       group: 'Navegación',
       items: [
         {
@@ -104,41 +139,6 @@ const Sidebar = ({ unreadCount }) => {
           rolesAllowed: [ROLES.ADMIN, ROLES.TESORERO, ROLES.COMPRAS]
         }
       ]
-    },
-    {
-      group: 'Supervisión',
-      items: [
-        {
-          title: 'Gestión de Cajas',
-          path: '/Gestion_Cajas',
-          icon: Wallet,
-          rolesAllowed: [
-            ROLES.ADMIN,
-            ROLES.GERENTE,
-            ROLES.COMPRAS,
-          ],
-        },
-        {
-          title: 'Libro Diario',
-          path: '/Libro_Diario',
-          icon: BookText,
-          rolesAllowed: [
-            ROLES.ADMIN,
-            ROLES.GERENTE,
-            ROLES.TESORERO,
-          ],
-        },
-        {
-          title: 'Resumen Diario',
-          path: '/Resumen_Cajas',
-          icon: Coins,
-          rolesAllowed: [
-            ROLES.ADMIN,
-            ROLES.GERENTE,
-            ROLES.TESORERO,
-          ],
-        },
-      ],
     },
   ];
 

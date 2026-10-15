@@ -60,12 +60,15 @@ const obtenerResumenCajas = async ({ fecha, deposito_id }) => {
   return data;
 };
 
-const obtenerDashboardGerencial = async ({ fecha, deposito_id }) => {
+const obtenerDashboardGerencial = async ({ fechaDesde, fechaHasta, fechaDesdePrev, fechaHastaPrev, deposito_id }) => {
   const { data, error } = await supabaseAdmin.rpc('obtener_dashboard_gerencial', {
-    p_fecha: fecha,
+    p_fecha_desde: fechaDesde,
+    p_fecha_hasta: fechaHasta,
+    p_fecha_desde_prev: fechaDesdePrev,
+    p_fecha_hasta_prev: fechaHastaPrev,
     p_deposito_id: deposito_id || null,
     p_limite_efectivo: LIMITE_SEGURIDAD_EFECTIVO,
-    p_umbral_diferencia: UMBRAL_DIFERENCIA
+    p_umbral_diferencia: 5000 // O el valor que hayan definido
   });
 
   if (error) throw error;

@@ -9,6 +9,7 @@ const formatTime = (dateStr) => dateStr ? new Date(dateStr).toLocaleTimeString('
 
 const DashboardGerencial = () => {
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0]);
+  const [periodo, setPeriodo] = useState('dia'); 
   const [depositoId, setDepositoId] = useState('');
   const [depositos, setDepositos] = useState([]);
   
@@ -16,6 +17,8 @@ const DashboardGerencial = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdate, setLastUpdate] = useState('');
+  
+
 
   useEffect(() => {
     fetch('http://localhost:3001/api/depositos')
@@ -28,7 +31,7 @@ const DashboardGerencial = () => {
     else setRefreshing(true);
 
     try {
-      const query = new URLSearchParams({ fecha, ...(depositoId && { deposito_id: depositoId }) });
+      const query = new URLSearchParams({ fecha, periodo, ...(depositoId && { deposito_id: depositoId }) });
       const res = await fetch(`http://localhost:3001/api/tesoreria/dashboard?${query.toString()}`);
       const result = await res.json();
       setData(result);
@@ -64,16 +67,15 @@ const DashboardGerencial = () => {
       
       {/* Header y Filtros */}
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#ffffff', padding: '20px 24px', borderRadius: '16px', border: '1px solid #e2e8f0', marginBottom: '24px' }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: '22px', fontWeight: '800', color: '#0f172a' }}>Dashboard Gerencial</h1>
-          <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#64748b' }}>
-            Última actualización: {lastUpdate} {refreshing && <span style={{ color: '#2563eb' }}>(Refrescando...)</span>}
-          </p>
-        </div>
         <div style={{ display: 'flex', gap: '12px' }}>
           <select value={depositoId} onChange={(e) => setDepositoId(e.target.value)} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
             <option value="">Todas las sucursales</option>
             {depositos.map(d => <option key={d.id} value={d.id}>{d.nombre}</option>)}
+          </select>
+          <select value={periodo} onChange={(e) => setPeriodo(e.target.value)} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontWeight: 'bold' }}>
+            <option value="dia">Día</option>
+            <option value="semana">Semana</option>
+            <option value="mes">Mes</option>
           </select>
           <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1' }} />
         </div>
@@ -105,7 +107,7 @@ const DashboardGerencial = () => {
           { label: 'Efectivo en Cajas (Abiertas)', value: formatMoney(efectivoTotal), color: '#16a34a' },
           { label: 'Cantidad Ventas', value: kpis.cantidad_ventas, color: '#475569' },
           { label: 'Ticket Promedio', value: formatMoney(ticketPromedio), color: '#475569' },
-          { label: 'Vs Semana Anterior', value: `${variacion > 0 ? '+' : ''}${variacion.toFixed(1)}%`, color: variacion >= 0 ? '#16a34a' : '#dc2626' }
+          { label: 'Vs Periodo Anterior', value: `${variacion > 0 ? '+' : ''}${variacion.toFixed(1)}%`, color: variacion >= 0 ? '#16a34a' : '#dc2626' }
         ].map((kpi, i) => (
           <div key={i} style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
             <div style={{ fontSize: '13px', color: '#64748b', marginBottom: '8px' }}>{kpi.label}</div>
@@ -117,13 +119,13 @@ const DashboardGerencial = () => {
       {/* Gráficos con Recharts */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '24px', marginBottom: '32px' }}>
         <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0', height: '300px' }}>
-          <h3 style={{ margin: '0 0 16px 0', fontSize: '15px' }}>Ventas por Hora</h3>
+          <h3 style={{ margin: '0 0 16px 0', fontSize: '15px' }}>Evolución de Ventas</h3>
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data?.ventasHora}>
+            <LineChart data={data?.ventasTiempo}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="hora" tickFormatter={(v) => `${v}hs`} />
+              <XAxis dataKey="etiqueta" tickFormatter={(v) => periodo === 'dia' ? `${v}hs` : v} />
               <YAxis tickFormatter={(v) => `$${v/1000}k`} />
-              <Tooltip formatter={(value) => formatMoney(value)} />
+              <Tooltip formatter={(value) => formatMoney(value)} labelFormatter={(label) => periodo === 'dia' ? `${label}:00 hs` : label} />
               <Line type="monotone" dataKey="total" stroke="#2563eb" strokeWidth={3} dot={{ r: 4 }} />
             </LineChart>
           </ResponsiveContainer>
