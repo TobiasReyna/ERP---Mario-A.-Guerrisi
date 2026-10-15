@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import './LibroDiario.css';
+import { FileText } from 'lucide-react'; // O Download
 
 const LibroDiario = () => {
   const fechaHoy = new Date().toISOString().split('T')[0];
@@ -98,6 +99,42 @@ const LibroDiario = () => {
     }
   };
 
+
+  const exportarPDF = async () => {
+  try {
+    // Si tu sistema usa JWT en localStorage, lo obtenemos:
+    const token = localStorage.getItem('token'); 
+    
+    const query = new URLSearchParams({ fecha, ...(depositoId && { deposito_id: depositoId }) });
+    
+    const res = await fetch(`http://localhost:3001/api/tesoreria/reporte-pdf?${query.toString()}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}` // Requisito de la HU para validar permisos
+      }
+    });
+
+    if (!res.ok) {
+      const errorData = await res.json();
+      throw new Error(errorData.error || 'Error al generar el PDF');
+    }
+
+    // Convertir respuesta a Blob para forzar descarga sin abrir una pestaña muerta
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `movimiento-caja-${fecha}.pdf`; // Fallback, el backend manda su propio header
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+    
+  } catch (err) {
+    alert(`Error: ${err.message}`);
+  }
+};
+
   // Calcular totales para las tarjetas (Kpis)
   const totalVentas = movimientos.filter(m => m.tipo_evento === 'Venta').reduce((acc, m) => acc + Number(m.monto), 0);
   const totalIngresos = movimientos.filter(m => m.tipo_evento === 'Ingreso').reduce((acc, m) => acc + Number(m.monto), 0);
@@ -174,6 +211,25 @@ const LibroDiario = () => {
         <button type="button" onClick={consultarLibro} className="btn-consultar" disabled={loading}>
           {loading ? 'Cargando...' : 'Actualizar'}
         </button>
+        <button 
+    type="button" 
+    onClick={exportarPDF} 
+    style={{
+      padding: '8px 16px',
+      backgroundColor: '#ef4444', // Rojo distintivo para PDFs
+      color: '#ffffff',
+      border: 'none',
+      borderRadius: '6px',
+      fontSize: '14px',
+      fontWeight: '500',
+      cursor: 'pointer',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px'
+    }}
+  >
+    <FileText size={16} /> Exportar PDF
+  </button>
       </div>
 
       {error && <p style={{ color: '#dc2626', marginBottom: '16px' }}>{error}</p>}

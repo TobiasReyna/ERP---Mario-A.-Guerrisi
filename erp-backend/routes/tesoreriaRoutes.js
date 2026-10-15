@@ -11,5 +11,6 @@ router.get('/libro-diario', tesoreriaController.getLibroDiario);
 router.get('/libro-diario/detalle', tesoreriaController.getDetalleEvento);
 router.get('/resumen-diario', tesoreriaController.getResumenCajas);
 router.get('/dashboard',tesoreriaController.getDashboardGerencial);
+router.get('/reporte-pdf', tesoreriaController.descargarReportePdf);
 
 module.exports = router;
