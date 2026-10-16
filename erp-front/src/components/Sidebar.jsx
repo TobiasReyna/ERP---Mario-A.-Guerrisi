@@ -14,7 +14,8 @@ import {
   FileText,
   Wallet,
   BookText,
-  Coins, 
+  Coins,
+  BarChart3,
 } from 'lucide-react';
 
 const Sidebar = ({ unreadCount }) => {
@@ -37,7 +38,12 @@ const Sidebar = ({ unreadCount }) => {
           icon: TagIcon,
           rolesAllowed: [ROLES.ADMIN, ROLES.DEPOSITO, ROLES.COMPRAS]
         },
-   
+        {
+          title: 'Reportes Gerenciales',
+          path: '/reportes',
+          icon: BarChart3,
+          rolesAllowed: [ROLES.ADMIN, ROLES.TESORERO]
+        },
       ]
     },
     {

@@ -1,0 +1,187 @@
+/* Estilos complementarios y utilidades Tailwind para ReportesHub (Guerrisi Design System) */
+.reportes-hub {
+  font-family: var(--font, "Inter", system-ui, -apple-system, sans-serif);
+  color: var(--ink, #1c1c1e);
+}
+
+.reportes-hub .rh-tabs {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid #e4e4e7;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.reportes-hub .rh-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 18px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #71717a;
+  background: transparent;
+  border: none;
+  border-bottom: 2.5px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.reportes-hub .rh-tab-btn:hover {
+  color: #18181b;
+  background: #f4f4f5;
+  border-radius: 8px 8px 0 0;
+}
+
+.reportes-hub .rh-tab-btn.active {
+  color: #e11d48;
+  border-bottom-color: #e11d48;
+  font-weight: 700;
+}
+
+.reportes-hub .rh-filter-card {
+  background: #ffffff;
+  border: 1px solid #e4e4e7;
+  border-radius: 14px;
+  padding: 16px 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.reportes-hub .rh-preset-group {
+  display: inline-flex;
+  background: #f4f4f5;
+  padding: 3px;
+  border-radius: 9px;
+  border: 1px solid #e4e4e7;
+  gap: 3px;
+  flex-wrap: wrap;
+}
+
+.reportes-hub .rh-preset-btn {
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 7px;
+  border: none;
+  background: transparent;
+  color: #52525b;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.reportes-hub .rh-preset-btn.active {
+  background: #18181b;
+  color: #ffffff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+.reportes-hub .rh-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.reportes-hub .rh-kpi-card {
+  background: #ffffff;
+  border: 1px solid #e4e4e7;
+  border-radius: 14px;
+  padding: 18px 20px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.reportes-hub .rh-kpi-card.negativo {
+  background: #fef2f2;
+  border: 1.5px solid #f87171;
+}
+
+.reportes-hub .rh-charts-grid {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 18px;
+  margin-bottom: 20px;
+}
+
+@media (max-width: 1024px) {
+  .reportes-hub .rh-charts-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.reportes-hub .rh-panel {
+  background: #ffffff;
+  border: 1px solid #e4e4e7;
+  border-radius: 14px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+
+.reportes-hub .rh-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 15px 20px;
+  border-bottom: 1px solid #e4e4e7;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.reportes-hub .rh-panel-body {
+  padding: 18px 20px;
+}
+
+.reportes-hub .rh-input,
+.reportes-hub .rh-select {
+  height: 36px;
+  padding: 0 11px;
+  border-radius: 8px;
+  border: 1px solid #d4d4d8;
+  background: #ffffff;
+  font-size: 12.5px;
+  color: #18181b;
+  outline: none;
+}
+
+.reportes-hub .rh-input:focus,
+.reportes-hub .rh-select:focus {
+  border-color: #e11d48;
+  box-shadow: 0 0 0 3px rgba(225, 29, 72, 0.12);
+}
+
+.reportes-hub .rh-btn-pdf {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 600;
+  background: #e11d48;
+  color: #ffffff;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(225, 29, 72, 0.25);
+}
+
+.reportes-hub .rh-btn-pdf:hover:not(:disabled) {
+  background: #be123c;
+}
+
+.reportes-hub .rh-btn-pdf:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.reportes-hub .rh-clickable-row {
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+
+.reportes-hub .rh-clickable-row:hover {
+  background-color: #fef2f2 !important;
+}
