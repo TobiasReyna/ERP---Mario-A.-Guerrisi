@@ -19,6 +19,7 @@ const comprobantesProveedorRoutes = require('./routes/comprobantesProveedorRoute
 const cajaRoutes = require('./routes/cajaRoutes');
 const depositosRoutes = require('./routes/depositosRoutes');
 const tesoreriaRoutes = require('./routes/tesoreriaRoutes');
+const reportesRoutes = require('./routes/reportes.routes');
 
 
 const app = express();
@@ -51,6 +52,7 @@ app.use('/api/comprobantes-proveedores', comprobantesProveedorRoutes);
 app.use('/api/cajas', cajaRoutes);
 app.use('/api/depositos', depositosRoutes);
 app.use('/api/tesoreria', tesoreriaRoutes);
+app.use('/api/reportes', reportesRoutes);
 app.use('/api', masterRoutes);
 
 app.listen(PORT, () => {

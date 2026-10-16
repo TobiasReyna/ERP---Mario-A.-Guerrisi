@@ -33,6 +33,7 @@ import LibroDiario from './pages/LibroDiario';
 import ResumenDiario from './pages/ResumenDiario';
 
 import DashboardGerencial from './pages/DashboardGerencial';
+import ReportesHub from './pages/gerencia/ReportesHub';
 
 
 const ROUTE_INFO = {
@@ -58,6 +59,7 @@ const ROUTE_INFO = {
   '/Libro_Diario': { title: 'Movimiento Diario de Caja', subtitle: 'Listado cronológico de aperturas, ventas, ingresos, egresos y cierres' },
   '/Resumen_Cajas': { title: 'Resumen Diario y Conciliación', subtitle: 'Monitoreo de turnos, arqueos, faltantes y sobrantes de caja' },
   '/Dashboard_Cajas': { title: 'Dashboard Gerencial de Cajas', subtitle: 'Monitoreo en tiempo real de ventas, alertas y arqueos' },
+  '/reportes': { title: 'Reportes Gerenciales', subtitle: 'Ingresos por ventas (Caja y E-commerce), egresos a proveedores y balance financiero' },
 };
 
 function App() {
@@ -459,9 +461,14 @@ function App() {
                 </Route>
 
                 {/* HU-46 · Libro diario + HU-47 Resumen de cajas */}
-                <Route element={<RoleProtectedRoute allowedRoles={[ROLES.GERENTE,ROLES.ADMIN,ROLES.TESORERO]}/>}>
+                <Route element={<RoleProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.TESORERO]}/>}>
                   <Route path="/Libro_Diario" element={<LibroDiario />} />
                   <Route path="/Resumen_Cajas" element={<ResumenDiario />} />
+                </Route>
+
+                {/* HU-50 a HU-54 · Módulo de Reportes Gerenciales */}
+                <Route element={<RoleProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.TESORERO]} />}>
+                  <Route path="/reportes" element={<ReportesHub />} />
                 </Route>
 
                 {/* Módulo de Punto de Venta y Clientes */}
